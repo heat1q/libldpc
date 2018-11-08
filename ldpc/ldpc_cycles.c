@@ -1,6 +1,6 @@
 ﻿#include "ldpc_cycles.h"
 
-void cycle_ldpc_code_t(ldpc_code_t* code, const char* name)
+void cycle_ldpc_code_t(ldpc_code_t* code)
 {
     printf("Counting cycles of LDPC code... ");
 
@@ -108,15 +108,23 @@ void cycle_ldpc_code_t(ldpc_code_t* code, const char* name)
 
     printf("\rCounting cycles of LDPC code...  100%% Completed.");
     printf("\n");
+    printf("=========== LDPC Cycles ===========\n");
 
     //print to file
     FILE *fp;
     char fname[100];
-    sprintf(fname, "cycles_%s.txt", name);
+    sprintf(fname, "cycles_%lux%lu.txt", code->nc, code->mc);
     fp = fopen(fname, "w");
     fprintf(fp, "length count\n");
+    printf("length count\n");
     for (size_t i = 2; i < code->girth; ++i)
+    {
         fprintf(fp, "%lu %lu\n", 2*i, counter[i]);
+        printf("%lu %lu\n", 2*i, counter[i]);
+    }
+
+    printf("===================================\n");
+    printf("Results saved in %s.\n", fname);
 
     for (size_t i = 0; i < length; ++i)
         free(edge_msg[i]);

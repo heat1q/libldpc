@@ -147,3 +147,32 @@ void destroy_ldpc_code_t(ldpc_code_t* code) {
     free(code->genmat);
 #endif
 }
+
+void calc_syndrome_c(ldpc_code_t code, bits_t* c, bits_t* s) {
+    bits_t b = 0;
+    for(size_t i = 0; i < code.mc; i++) {
+        b = 0;
+        for(size_t j = 0; j < code.cw[i]; j++) {
+            b ^= c[code.c[code.cn[i][j]]];
+        }
+        s[i] = b;
+    }
+}
+
+bits_t is_codeword(ldpc_code_t code, bits_t* c) {
+    bits_t* synd = malloc(sizeof(bits_t) * code.mc);
+    bits_t is_codeword = 1;
+
+    calc_syndrome_c(code, c, synd);
+
+    for(size_t i = 0; i < code.mc; i++) {
+        if(synd[i] == 1) {
+            is_codeword = 0;
+            break;
+        }
+    }
+
+    free(synd);
+
+    return is_codeword;
+}
