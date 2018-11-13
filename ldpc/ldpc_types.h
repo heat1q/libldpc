@@ -41,7 +41,7 @@ struct {
     size_t** cn; /* denotes the check neighbors, i.e. connected VN, for each check node as index in c/r; dimensions cn[mc][cw[i]] */
     size_t** vn; /* denotes the var neighbors, i.e., connected CN, for each variable node as index in c/r; dimensions vn[nc][vw[i]] */
     size_t* r; /* non zero row indices; length nnz */
-    size_t* c; /* non zero check indices; length nnz */
+    size_t* c; /* non zero column indices; length nnz */
 } typedef ldpc_code_t;
 
 struct {
