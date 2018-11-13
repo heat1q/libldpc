@@ -1,4 +1,5 @@
 ﻿#include "ldpc_cycles.h"
+#include "functions.h"
 
 void cycle_ldpc_code_t(ldpc_code_t* code)
 {
@@ -249,18 +250,6 @@ void girth_ldpc_code_t(ldpc_code_t* code)
     printf("\n");
 
     code->girth = girth;
-}
-
-void printVector(uint64_t* x, const size_t k)
-{
-    printf("[");
-    for (size_t i = 0; i < k; ++i)
-    {
-        printf("%lu", x[i]);
-        if (i < k - 1)
-            printf(" ");
-    }
-    printf("]\n");
 }
 
 void ex_msg_t_add(uint64_t* result, uint64_t* x, const size_t length)

@@ -5,12 +5,11 @@
 #include "ldpc_decoder.h"
 #include "functions.h"
 
-uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double** llr_out, uint64_t max_iter, uint8_t early_termination) {
+uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double** llr_out, uint64_t max_iter, uint8_t early_termination, bits_t** c_out) {
     size_t it;
 
     double* l_v2c;
     double* l_c2v;
-    bits_t* c_out;
 
     size_t* vn;
     size_t* cn;
@@ -26,7 +25,6 @@ uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double** llr_out, uint64_
 
     l_v2c = malloc(sizeof(double) * code.nnz);
     l_c2v = malloc(sizeof(double) * code.nnz);
-    c_out = malloc(sizeof(bits_t) * code.nc);
 
     /* initialize with llrs */
     for(size_t i = 0; i < code.nnz; i++) {
@@ -76,13 +74,13 @@ uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double** llr_out, uint64_
             while(vw--) {
                 (*llr_out)[i] += l_c2v[*vn++];
             }
-            c_out[i] = ((*llr_out)[i] <= 0);
+            (*c_out)[i] = ((*llr_out)[i] <= 0);
         }
 
         it++;
 
         if(early_termination) {
-            if(is_codeword(code, c_out)) {
+            if(is_codeword(code, *c_out)) {
                 break;
             }
         }
@@ -90,7 +88,6 @@ uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double** llr_out, uint64_
         
   free(l_c2v);
   free(l_v2c);
-  free(c_out);
 
   free(b);
   free(f);

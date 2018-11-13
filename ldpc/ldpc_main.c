@@ -4,6 +4,7 @@
 #include "functions.h"
 #include "ldpc_cycles.h"
 #include "ldpc_decoder.h"
+#include "ldpc_stoppingsets.h"
 
 int main(int argc, char* argv[])
 {
@@ -27,27 +28,10 @@ int main(int argc, char* argv[])
     //girth_ldpc_code_t(code);
     //cycle_ldpc_code_t(code);
 
-    printf("Test\n");
-    double* llr_out = calloc(code->nc, sizeof(double));
-    double* llr_in = calloc(code->nc, sizeof(double));
-    for (size_t i = 0; i < code->nc; ++i)
-        llr_in[i] = 0.5;
-
-    ldpc_decode(*code, llr_in, &llr_out, 10000, 0);
-
-    printf("[");
-    for (size_t i = 0; i < code->nc; ++i)
-    {
-        printf("%.2f", llr_out[i]);
-        if (i < code->nc - 1)
-            printf(" ");
-    }
-    printf("]\n");
+    //lpdc_code_t_stopping_sets(code)
 
     destroy_ldpc_code_t(code);
-	free(code);
-    free(llr_out);
-    free(llr_in);
+    free(code);
 
     return 0;
 }

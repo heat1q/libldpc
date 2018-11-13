@@ -176,3 +176,39 @@ bits_t is_codeword(ldpc_code_t code, bits_t* c) {
 
     return is_codeword;
 }
+
+void printVector(uint64_t* x, const size_t k)
+{
+    printf("[");
+    for (size_t i = 0; i < k; ++i)
+    {
+        printf("%lu", x[i]);
+        if (i < k - 1)
+            printf(" ");
+    }
+    printf("]\n");
+}
+
+void printVectorDouble(double* x, const size_t k)
+{
+    printf("[");
+    for (size_t i = 0; i < k; ++i)
+    {
+        printf("%.2f", x[i]);
+        if (i < k - 1)
+            printf(" ");
+    }
+    printf("]\n");
+}
+
+void printBits(bits_t* x, const size_t k)
+{
+    printf("[");
+    for (size_t i = 0; i < k; ++i)
+    {
+        printf("%i", x[i]);
+        if (i < k - 1)
+            printf(" ");
+    }
+    printf("]\n");
+}

@@ -8,7 +8,8 @@ SOURCES += main.c \
     ldpc_main.c \
     ldpc_decoder.c \
     scm_functions.c \
-    functions.c
+    functions.c \
+    ldpc_stoppingsets.c
 
 HEADERS += \
     scm_types.h \
@@ -16,5 +17,6 @@ HEADERS += \
     ldpc_types.h \
     ldpc_decoder.h \
     scm_functions.h \
-    functions.h
+    functions.h \
+    ldpc_stoppingsets.h
 

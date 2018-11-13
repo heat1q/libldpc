@@ -6,9 +6,9 @@ LIBRARYPATH=
 
 LIBS=-lm
 
-SRC=ldpc_main.c functions.c ldpc_cycles.c ldpc_decoder.c scm_functions.c
+SRC=ldpc_main.c functions.c ldpc_cycles.c ldpc_decoder.c scm_functions.c ldpc_stoppingsets.c
 
-OBJ=ldpc_main.o functions.o ldpc_cycles.o ldpc_decoder.o scm_functions.o
+OBJ=ldpc_main.o functions.o ldpc_cycles.o ldpc_decoder.o scm_functions.o ldpc_stoppingsets.o
 
 all: $(OBJ)
 	gcc $(OBJ) $(INCLUDEPATH) $(LIBRARYPATH) $(LIBS) -o run

@@ -7,3 +7,7 @@ void destroy_ldpc_code_t(ldpc_code_t* code);
 
 void calc_syndrome_c(ldpc_code_t code, bits_t* c, bits_t* s);
 bits_t is_codeword(ldpc_code_t code, bits_t* c);
+
+void printVector(uint64_t* x, const size_t k);
+void printVectorDouble(double* x, const size_t k);
+void printBits(bits_t* x, const size_t k);
