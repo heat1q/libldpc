@@ -53,7 +53,6 @@ void lpdc_code_t_erasure_decoding(ldpc_code_t* code, bits_t* in_bits, bits_t** o
     // submatrix of H
     generate_submatrix(code, &e_code, epsilon, tmp_e);
 
-
     size_t tmp_r = 0;
     size_t* rows = calloc(tmp_r, sizeof(size_t)); // set of rows with weight 1
     // find the set of rows in H_e with single 1-component
@@ -82,14 +81,13 @@ void lpdc_code_t_erasure_decoding(ldpc_code_t* code, bits_t* in_bits, bits_t** o
         {
             size_t vn_index = code->c[code->cn[rows[t]][n]];
 
-            bit += in_bits[vn_index];
+            if (vn_index != rows[t+1])
+                bit ^= in_bits[vn_index];
         }
-        bit -= in_bits[rows[t+1]];
 
         //recover bit
         (*out_bits)[rows[t+1]] = bit;
     }
-
 
     free(epsilon);
     free(rows);
@@ -149,29 +147,7 @@ void generate_submatrix(ldpc_code_t* code, ldpc_code_t* erasure_code, size_t* ep
     }
 
     erasure_code->nnz = tmp_rc;
+
+    erasure_code->puncture = calloc(0, sizeof(size_t));
+    erasure_code->shorten = calloc(0, sizeof(size_t));
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
