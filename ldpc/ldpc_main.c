@@ -25,10 +25,17 @@ int main(int argc, char* argv[])
     read_ldpc_file(code, argv[1]);
 
 
-    //girth_ldpc_code_t(code);
-    //cycle_ldpc_code_t(code);
+    girth_ldpc_code_t(code);
+    cycle_ldpc_code_t(code);
 
     //lpdc_code_t_stopping_sets(code)
+    bits_t* in_bits = calloc(code->nc, sizeof(size_t));
+    bits_t* out_bits = calloc(code->nc, sizeof(size_t));
+
+    generic_codeword_search(code, &in_bits, code->nc, 0);
+
+    //lpdc_code_t_erasure_decoding(code, in_bits, &out_bits);
+    //printBits(out_bits, 4);
 
     destroy_ldpc_code_t(code);
     free(code);

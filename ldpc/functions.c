@@ -43,7 +43,7 @@ void read_ldpc_file(ldpc_code_t* code, char* filename) {
         code->shorten = NULL;
     }
 
-	
+
     size_t* cw_tmp;
     size_t* vw_tmp;
     code->cw = calloc(code->mc, sizeof(uint64_t));
@@ -53,24 +53,24 @@ void read_ldpc_file(ldpc_code_t* code, char* filename) {
     code->r = calloc(code->nnz, sizeof(size_t));
     code->c = calloc(code->nnz, sizeof(size_t));
 
-	
+
     // uint64_t r, c;
     for(size_t i = 0; i < code->nnz; i++) {
         fscanf(fp, "%lu %lu\n", &(code->r[i]), &(code->c[i]));
         // add_ldpc_edge_t(code, i, r, c);
-		code->cw[code->r[i]]++;
+        code->cw[code->r[i]]++;
         code->vw[code->c[i]]++;
     }
-	
+
     code->cn = calloc(code->mc, sizeof(size_t*));
     for(size_t i = 0; i < code->mc; i++) {
         code->cn[i] = calloc(code->cw[i], sizeof(size_t));
-    }	
+    }
     code->vn = calloc(code->nc, sizeof(size_t*));
     for(size_t i = 0; i < code->nc; i++) {
         code->vn[i] = calloc(code->vw[i], sizeof(size_t));
     }
-	
+
     for(size_t i = 0; i < code->nnz; i++) {
         code->cn[code->r[i]][cw_tmp[code->r[i]]++] = i;
         code->vn[code->c[i]][vw_tmp[code->c[i]]++] = i;
@@ -142,7 +142,7 @@ void destroy_ldpc_code_t(ldpc_code_t* code) {
     free(code->shorten);
 #ifdef ENCODE
     for(size_t i = 0; i < code->kc; i++) {
-      free(code->genmat[i]);
+        free(code->genmat[i]);
     }
     free(code->genmat);
 #endif
@@ -211,4 +211,24 @@ void printBits(bits_t* x, const size_t k)
             printf(" ");
     }
     printf("]\n");
+}
+
+// just for testing small codes
+void generic_codeword_search(ldpc_code_t *code, bits_t** bits, const size_t length, size_t currentbitindex)
+{
+    for (bits_t b = 0; b < 2; ++b)
+    {
+        (*bits)[currentbitindex] = b;
+        if ((currentbitindex+1) < length)
+            generic_codeword_search(code, bits, length, (currentbitindex+1));
+        else
+        {
+            if (is_codeword(*code, *bits))
+            {
+                printf("====================\n");
+                printf("Found valid codeword. \n");
+                printBits(*bits, length);
+            }
+        }
+    }
 }

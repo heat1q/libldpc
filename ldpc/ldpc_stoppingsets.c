@@ -34,27 +34,65 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
 
 void lpdc_code_t_erasure_decoding(ldpc_code_t* code, bits_t* in_bits, bits_t** out_bits)
 {
-    size_t* epsilon = calloc(1, sizeof(size_t));
+    size_t tmp_e = 0;
+    size_t* epsilon = calloc(tmp_e, sizeof(size_t));
 
-    size_t tmp = 0;
     for (size_t i = 0; i < code->nc; ++i)
     {
+        (*out_bits)[i] = in_bits[i];
         if (in_bits[i] > 1) //erasure
         {
-            epsilon = realloc(epsilon, (tmp+1) * sizeof(size_t));
-            epsilon[tmp] = i;
-            ++tmp;
+            epsilon = realloc(epsilon, (tmp_e+1) * sizeof(size_t));
+            epsilon[tmp_e] = i;
+            ++tmp_e;
         }
     }
 
     ldpc_code_t e_code;
 
     // submatrix of H
-    generate_submatrix(code, &e_code, epsilon, tmp);
+    generate_submatrix(code, &e_code, epsilon, tmp_e);
 
-    print_ldpc_code_t(e_code);
+
+    size_t tmp_r = 0;
+    size_t* rows = calloc(tmp_r, sizeof(size_t)); // set of rows with weight 1
+    // find the set of rows in H_e with single 1-component
+    for (size_t j = 0; j < e_code.mc; ++j)
+    {
+        if (e_code.cw[j] == 1)
+        {
+            rows = realloc(rows, (tmp_r+2) * sizeof(size_t));
+            rows[tmp_r] = j; // denotes the row of H
+            rows[tmp_r+1] = epsilon[e_code.c[e_code.cn[j][0]]]; // gives the position of erased bit
+
+            tmp_r += 2;
+        }
+    }
+
+    if (!tmp_r)
+    {
+        // stop; erasure cannot be recoverd
+    }
+
+    for (size_t t = 0; t < tmp_r; t+=2)
+    {
+        // parity-checks
+        bits_t bit = 0;
+        for (size_t n = 0; n < code->cw[rows[t]]; ++n)
+        {
+            size_t vn_index = code->c[code->cn[rows[t]][n]];
+
+            bit += in_bits[vn_index];
+        }
+        bit -= in_bits[rows[t+1]];
+
+        //recover bit
+        (*out_bits)[rows[t+1]] = bit;
+    }
+
 
     free(epsilon);
+    free(rows);
     destroy_ldpc_code_t(&e_code);
 }
 
@@ -78,9 +116,6 @@ void generate_submatrix(ldpc_code_t* code, ldpc_code_t* erasure_code, size_t* ep
     erasure_code->cn = calloc(erasure_code->mc, sizeof(size_t*));
     for (size_t i = 0; i < erasure_code->mc; ++i)
         erasure_code->cn[i] = calloc(0, sizeof(size_t));
-
-    printVector(epsilon, epsilon_size);
-    printVector(erasure_code->vw, epsilon_size);
 
     size_t tmp_rc = 0;
     erasure_code->r = calloc(tmp_rc, sizeof(size_t));

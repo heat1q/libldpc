@@ -11,3 +11,5 @@ bits_t is_codeword(ldpc_code_t code, bits_t* c);
 void printVector(uint64_t* x, const size_t k);
 void printVectorDouble(double* x, const size_t k);
 void printBits(bits_t* x, const size_t k);
+
+void generic_codeword_search(ldpc_code_t* code, bits_t** bits, const size_t length, const size_t currentbit);
