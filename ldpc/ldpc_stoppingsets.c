@@ -32,66 +32,78 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
     */
 }
 
-void lpdc_code_t_erasure_decoding(ldpc_code_t* code, bits_t* in_bits, bits_t** out_bits)
+void lpdc_code_t_erasure_decoding(ldpc_code_t* code, bits_t** in_bits)
 {
-    size_t tmp_e = 0;
-    size_t* epsilon = calloc(tmp_e, sizeof(size_t));
-
-    for (size_t i = 0; i < code->nc; ++i)
+    while (1)
     {
-        (*out_bits)[i] = in_bits[i];
-        if (in_bits[i] > 1) //erasure
+        size_t tmp_e = 0;
+        size_t* epsilon = calloc(tmp_e, sizeof(size_t));
+
+        for (size_t i = 0; i < code->nc; ++i)
         {
-            epsilon = realloc(epsilon, (tmp_e+1) * sizeof(size_t));
-            epsilon[tmp_e] = i;
-            ++tmp_e;
-        }
-    }
-
-    ldpc_code_t e_code;
-
-    // submatrix of H
-    generate_submatrix(code, &e_code, epsilon, tmp_e);
-
-    size_t tmp_r = 0;
-    size_t* rows = calloc(tmp_r, sizeof(size_t)); // set of rows with weight 1
-    // find the set of rows in H_e with single 1-component
-    for (size_t j = 0; j < e_code.mc; ++j)
-    {
-        if (e_code.cw[j] == 1)
-        {
-            rows = realloc(rows, (tmp_r+2) * sizeof(size_t));
-            rows[tmp_r] = j; // denotes the row of H
-            rows[tmp_r+1] = epsilon[e_code.c[e_code.cn[j][0]]]; // gives the position of erased bit
-
-            tmp_r += 2;
-        }
-    }
-
-    if (!tmp_r)
-    {
-        // stop; erasure cannot be recoverd
-    }
-
-    for (size_t t = 0; t < tmp_r; t+=2)
-    {
-        // parity-checks
-        bits_t bit = 0;
-        for (size_t n = 0; n < code->cw[rows[t]]; ++n)
-        {
-            size_t vn_index = code->c[code->cn[rows[t]][n]];
-
-            if (vn_index != rows[t+1])
-                bit ^= in_bits[vn_index];
+            if ((*in_bits)[i] > 1) //erasure
+            {
+                epsilon = realloc(epsilon, (tmp_e+1) * sizeof(size_t));
+                epsilon[tmp_e] = i;
+                ++tmp_e;
+            }
         }
 
-        //recover bit
-        (*out_bits)[rows[t+1]] = bit;
-    }
+        if (!tmp_e) // all erasures removed
+        {
+            free(epsilon);
+            break;
+        }
 
-    free(epsilon);
-    free(rows);
-    destroy_ldpc_code_t(&e_code);
+        ldpc_code_t e_code;
+
+        // submatrix of H
+        generate_submatrix(code, &e_code, epsilon, tmp_e);
+
+        size_t tmp_r = 0;
+        size_t* rows = calloc(tmp_r, sizeof(size_t)); // set of rows with weight 1
+        // find the set of rows in H_e with single 1-component
+        for (size_t j = 0; j < e_code.mc; ++j)
+        {
+            if (e_code.cw[j] == 1)
+            {
+                rows = realloc(rows, (tmp_r+2) * sizeof(size_t));
+                rows[tmp_r] = j; // denotes the row of H
+                rows[tmp_r+1] = epsilon[e_code.c[e_code.cn[j][0]]]; // gives the position of erased bit
+
+                tmp_r += 2;
+            }
+        }
+
+        if (!tmp_r) // stop; erasure cannot be recoverd
+        {
+            printf("Stopping set found at VN nodes: ");
+            printVector(epsilon, tmp_e);
+            free(epsilon);
+            free(rows);
+            destroy_ldpc_code_t(&e_code);
+            break;
+        }
+
+        for (size_t t = 0; t < tmp_r; t+=2)
+        {
+            // parity-checks
+            bits_t bit = 0;
+            for (size_t n = 0; n < code->cw[rows[t]]; ++n)
+            {
+                size_t vn_index = code->c[code->cn[rows[t]][n]];
+
+                bit ^= (*in_bits)[vn_index];
+            }
+
+            //recover bit
+            (*in_bits)[rows[t+1]] = bit ^ (*in_bits)[rows[t+1]];
+        }
+
+        free(epsilon);
+        free(rows);
+        destroy_ldpc_code_t(&e_code);
+    }
 }
 
 void generate_submatrix(ldpc_code_t* code, ldpc_code_t* erasure_code, size_t* epsilon, const size_t epsilon_size)

@@ -30,7 +30,6 @@ int main(int argc, char* argv[])
 
     //lpdc_code_t_stopping_sets(code)
     bits_t* in_bits = calloc(code->nc, sizeof(size_t));
-    bits_t* out_bits = calloc(code->nc, sizeof(size_t));
 
     //generic_codeword_search(code, &in_bits, code->nc, 0);
 
@@ -42,11 +41,10 @@ int main(int argc, char* argv[])
         in_bits[i] = (unsigned short)bit;
     }
 
-    lpdc_code_t_erasure_decoding(code, in_bits, &out_bits);
-    printBits(out_bits, code->nc);
+    lpdc_code_t_erasure_decoding(code, &in_bits);
+    printBits(in_bits, code->nc);
 
     free(in_bits);
-    free(out_bits);
     destroy_ldpc_code_t(code);
     free(code);
 
