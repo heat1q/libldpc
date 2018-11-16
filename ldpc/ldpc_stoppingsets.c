@@ -42,7 +42,7 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
                     if (tr_set_size && tr_set_size <= code->st_max_size)
                     {
                         uint8_t tr_stored = 0;
-                        for (size_t a = 0; a < code->stw[tr_set_size-2]; ++a) // for all stored st sets
+                        for (size_t a = 0; a < code->stw[tr_set_size]; ++a) // for all stored st sets
                         {
                             size_t tmp = 0;
                             for (size_t b = a*tr_set_size; b < (a+1)*tr_set_size; ++b)
@@ -56,15 +56,15 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
                         if (!tr_stored)
                         {
                             //store
-                            code->st[tr_set_size-2] = realloc(code->st[tr_set_size-2], (code->stw[tr_set_size-2] + 1) * tr_set_size * sizeof(size_t));
+                            code->st[tr_set_size-2] = realloc(code->st[tr_set_size-2], (code->stw[tr_set_size] + 1) * tr_set_size * sizeof(size_t));
                             for (size_t a = 0; a < tr_set_size; ++a)
-                                code->st[tr_set_size-2][code->stw[tr_set_size-2] * tr_set_size + a] = tr_set[a];
+                                code->st[tr_set_size-2][code->stw[tr_set_size] * tr_set_size + a] = tr_set[a];
 
-                            ++code->stw[tr_set_size-2];
+                            ++code->stw[tr_set_size];
 
                             // stopping set found
-                            printf("Stopping set found at VN nodes: ");
-                            printVector(tr_set, tr_set_size);
+                            //printf("Stopping set found at VN nodes: ");
+                            //printVector(tr_set, tr_set_size);
                             //printBits(bits, code->nc);
 
                             //printf("IsCodeword: %u \n", is_codeword(*code, bits));
@@ -79,7 +79,9 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
             free(llr);
             free(bits);
         }
+        printf("\rCounting stopping sets of LDPC code...  %.2f%%", (double)j/code->nc *100);
     }
+    printf("\r");
 }
 
 size_t lpdc_code_t_erasure_decoding(ldpc_code_t* code, bits_t** in_bits, size_t** set)
@@ -219,8 +221,8 @@ void ldpc_code_t_st_setup(ldpc_code_t* code, const size_t ST_MAX_SIZE)
 {
     code->st_max_size = ST_MAX_SIZE;
 
-    code->stw = calloc(ST_MAX_SIZE - 1, sizeof(size_t));
-    code->st = calloc(ST_MAX_SIZE - 1, sizeof(size_t*));
-    for (size_t i = 0; i < ST_MAX_SIZE - 1; ++i)
+    code->stw = calloc(ST_MAX_SIZE + 1, sizeof(size_t));
+    code->st = calloc(ST_MAX_SIZE + 1, sizeof(size_t*));
+    for (size_t i = 0; i < ST_MAX_SIZE + 1; ++i)
         code->st[i] = calloc(0, sizeof(size_t));
 }
