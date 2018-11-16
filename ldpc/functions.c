@@ -247,3 +247,10 @@ void generic_codeword_search(ldpc_code_t *code, bits_t** bits, const size_t leng
         }
     }
 }
+
+size_t NchooseK(const size_t n, const size_t k)
+{
+    if (k == 0)
+        return 1;
+    return (n * NchooseK(n - 1, k - 1)) / k;
+}

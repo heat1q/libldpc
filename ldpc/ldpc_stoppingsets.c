@@ -9,6 +9,9 @@
 
 void lpdc_code_t_stopping_sets(ldpc_code_t *code)
 {
+    const size_t t_ges = NchooseK(code->nc, 2);
+    size_t time = 0;
+
     for (size_t j = 0; j < code->nc; ++j)
     {
         for (size_t l = j+1; l < code->nc; ++l)
@@ -61,13 +64,6 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
                                 code->st[tr_set_size-2][code->stw[tr_set_size] * tr_set_size + a] = tr_set[a];
 
                             ++code->stw[tr_set_size];
-
-                            // stopping set found
-                            //printf("Stopping set found at VN nodes: ");
-                            //printVector(tr_set, tr_set_size);
-                            //printBits(bits, code->nc);
-
-                            //printf("IsCodeword: %u \n", is_codeword(*code, bits));
                         }
 
                         free(tr_set);
@@ -78,8 +74,8 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
 
             free(llr);
             free(bits);
+            printf("\rCounting stopping sets of LDPC code...  %.2f%%", (double)++time/t_ges *100);
         }
-        printf("\rCounting stopping sets of LDPC code...  %.2f%%", (double)j/code->nc *100);
     }
     printf("\r");
 }
