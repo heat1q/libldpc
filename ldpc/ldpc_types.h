@@ -42,6 +42,10 @@ struct {
     size_t** vn; /* denotes the var neighbors, i.e., connected CN, for each variable node as index in c/r; dimensions vn[nc][vw[i]] */
     size_t* r; /* non zero row indices; length nnz */
     size_t* c; /* non zero column indices; length nnz */
+    // trapping sets;
+    size_t st_max_size;
+    size_t* stw;
+    size_t** st;
 } typedef ldpc_code_t;
 
 struct {

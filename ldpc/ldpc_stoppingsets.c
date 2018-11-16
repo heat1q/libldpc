@@ -2,37 +2,87 @@
 #include "functions.h"
 #include "ldpc_decoder.h"
 
+
+#define I_MAX 10 // 10 .. 100
+#define THRESH 10
+#define REL -10.0
+
 void lpdc_code_t_stopping_sets(ldpc_code_t *code)
 {
-    /*
-    //for (size_t j = 0; j < code->nc; ++j)
-    //for (size_t l = j+1; l < code->nc; ++l)
-    size_t j = 0;
-    size_t l = 1;
-    const size_t I_max = 1; // 10 .. 100
-    //const size_t T = 10.0;
-
-    bits_t* bits = calloc(code->nc, sizeof(bits_t));
-    double* llr = calloc(code->nc, sizeof(double));
-    for (size_t i = 0; i < code->nc; ++i)
-        llr[i] = 1.0;
-
-    llr[j] = -10000.0;
-    llr[l] = -10000.0;
-
-    for (size_t i = 0; i < I_max; ++i)
+    for (size_t j = 0; j < code->nc; ++j)
     {
-        ldpc_decode(*code, llr, &llr, 100, 0, &bits);
+        for (size_t l = j+1; l < code->nc; ++l)
+        {
+            double* llr = calloc(code->nc, sizeof(double));
+            bits_t* bits = calloc(code->nc, sizeof(bits_t));
+            for (size_t i = 0; i < code->nc; ++i)
+                llr[i] = 1.0;
+
+            llr[j] = REL; llr[l] = REL;
+
+            for (size_t i = 0; i < I_MAX; ++i)
+            {
+                // run the belief propagation decoder for one interation
+                ldpc_decode(*code, llr, &llr, 1, 0);
+
+                // set the threshold
+                int64_t t = -1;
+
+                while (t <= THRESH)
+                {
+                    // declare all bits for which R_h <= t as erasure & all others as 0
+                    for (size_t h = 0; h < code->nc; ++h)
+                        bits[h] = (uint8_t)((llr[h] <= t)*2);
+
+                    size_t *tr_set;
+                    //erasure decoding
+                    const size_t tr_set_size = lpdc_code_t_erasure_decoding(code, &bits, &tr_set);
+                    // when stopping set is found
+
+                    if (tr_set_size && tr_set_size <= code->st_max_size)
+                    {
+                        uint8_t tr_stored = 0;
+                        for (size_t a = 0; a < code->stw[tr_set_size-2]; ++a) // for all stored st sets
+                        {
+                            size_t tmp = 0;
+                            for (size_t b = a*tr_set_size; b < (a+1)*tr_set_size; ++b)
+                                tmp += (code->st[tr_set_size-2][b] == tr_set[b - a*tr_set_size]);
+                            if (tmp == tr_set_size)
+                            {
+                                tr_stored = 1;
+                                break;
+                            }
+                        }
+                        if (!tr_stored)
+                        {
+                            //store
+                            code->st[tr_set_size-2] = realloc(code->st[tr_set_size-2], (code->stw[tr_set_size-2] + 1) * tr_set_size * sizeof(size_t));
+                            for (size_t a = 0; a < tr_set_size; ++a)
+                                code->st[tr_set_size-2][code->stw[tr_set_size-2] * tr_set_size + a] = tr_set[a];
+
+                            ++code->stw[tr_set_size-2];
+
+                            // stopping set found
+                            printf("Stopping set found at VN nodes: ");
+                            printVector(tr_set, tr_set_size);
+                            //printBits(bits, code->nc);
+
+                            //printf("IsCodeword: %u \n", is_codeword(*code, bits));
+                        }
+
+                        free(tr_set);
+                    }
+                    ++t;
+                }
+            }
+
+            free(llr);
+            free(bits);
+        }
     }
-
-    printBits(bits, code->nc);
-
-    free(bits);
-    free(llr);
-    */
 }
 
-void lpdc_code_t_erasure_decoding(ldpc_code_t* code, bits_t** in_bits)
+size_t lpdc_code_t_erasure_decoding(ldpc_code_t* code, bits_t** in_bits, size_t** set)
 {
     while (1)
     {
@@ -52,7 +102,8 @@ void lpdc_code_t_erasure_decoding(ldpc_code_t* code, bits_t** in_bits)
         if (!tmp_e) // all erasures removed
         {
             free(epsilon);
-            break;
+            *set = NULL;
+            return 0;
         }
 
         ldpc_code_t e_code;
@@ -77,12 +128,11 @@ void lpdc_code_t_erasure_decoding(ldpc_code_t* code, bits_t** in_bits)
 
         if (!tmp_r) // stop; erasure cannot be recoverd
         {
-            printf("Stopping set found at VN nodes: ");
-            printVector(epsilon, tmp_e);
-            free(epsilon);
+            *set = epsilon;
+            //free(epsilon);
             free(rows);
             destroy_ldpc_code_t(&e_code);
-            break;
+            return tmp_e;
         }
 
         for (size_t t = 0; t < tmp_r; t+=2)
@@ -160,6 +210,17 @@ void generate_submatrix(ldpc_code_t* code, ldpc_code_t* erasure_code, size_t* ep
 
     erasure_code->nnz = tmp_rc;
 
-    erasure_code->puncture = calloc(0, sizeof(size_t));
-    erasure_code->shorten = calloc(0, sizeof(size_t));
+    erasure_code->puncture = NULL;
+    erasure_code->shorten = NULL;
+    erasure_code->st_max_size = 0;
+}
+
+void ldpc_code_t_st_setup(ldpc_code_t* code, const size_t ST_MAX_SIZE)
+{
+    code->st_max_size = ST_MAX_SIZE;
+
+    code->stw = calloc(ST_MAX_SIZE - 1, sizeof(size_t));
+    code->st = calloc(ST_MAX_SIZE - 1, sizeof(size_t*));
+    for (size_t i = 0; i < ST_MAX_SIZE - 1; ++i)
+        code->st[i] = calloc(0, sizeof(size_t));
 }

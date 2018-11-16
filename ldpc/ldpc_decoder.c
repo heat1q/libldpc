@@ -5,7 +5,7 @@
 #include "ldpc_decoder.h"
 #include "functions.h"
 
-uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double** llr_out, uint64_t max_iter, uint8_t early_termination, bits_t** c_out) {
+uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double** llr_out, uint64_t max_iter, uint8_t early_termination) {
     size_t it;
 
     double* l_v2c;
@@ -16,6 +16,8 @@ uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double** llr_out, uint64_
 
     size_t vw;
     size_t cw;
+
+    bits_t *c_out = calloc(code.nc, sizeof(bits_t));
 
     // double f[code.max_dc];
     // double b[code.max_dc];
@@ -74,13 +76,13 @@ uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double** llr_out, uint64_
             while(vw--) {
                 (*llr_out)[i] += l_c2v[*vn++];
             }
-            (*c_out)[i] = ((*llr_out)[i] <= 0);
+            c_out[i] = ((*llr_out)[i] <= 0);
         }
 
         it++;
 
         if(early_termination) {
-            if(is_codeword(code, *c_out)) {
+            if(is_codeword(code, c_out)) {
                 break;
             }
         }

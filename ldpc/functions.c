@@ -86,6 +86,7 @@ void read_ldpc_file(ldpc_code_t* code, char* filename) {
         }
     }
 
+    code->st_max_size = 0;
 
 #ifdef ENCODE
     code->genmat = calloc(code->kc, sizeof(uint8_t*));
@@ -138,8 +139,21 @@ void destroy_ldpc_code_t(ldpc_code_t* code) {
     free(code->cw);
     free(code->r);
     free(code->c);
-    free(code->puncture);
-    free(code->shorten);
+
+
+    if (code->puncture != NULL)
+        free(code->puncture);
+    if (code->shorten != NULL)
+        free(code->shorten);
+
+    if (code->st_max_size)
+    {
+        free(code->stw);
+        for(size_t i = 0; i < code->st_max_size - 1; i++)
+            free(code->st[i]);
+    }
+
+
 #ifdef ENCODE
     for(size_t i = 0; i < code->kc; i++) {
         free(code->genmat[i]);
@@ -177,8 +191,9 @@ bits_t is_codeword(ldpc_code_t code, bits_t* c) {
     return is_codeword;
 }
 
-void printVector(uint64_t* x, const size_t k)
+void printVector(void* input, const size_t k)
 {
+    uint64_t *x = input;
     printf("[");
     for (size_t i = 0; i < k; ++i)
     {
