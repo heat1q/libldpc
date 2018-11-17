@@ -46,6 +46,8 @@ struct {
     size_t st_max_size;
     size_t* stw;
     size_t** st;
+    size_t* dw;
+    size_t** ds;
 } typedef ldpc_code_t;
 
 struct {

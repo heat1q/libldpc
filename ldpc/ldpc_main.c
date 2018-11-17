@@ -51,6 +51,7 @@ int main(int argc, char* argv[])
     ldpc_code_t_st_setup(code, code->nc);
     lpdc_code_t_stopping_sets(code);
     printVector(code->stw, code->st_max_size+1);
+    printVector(code->dw, code->st_max_size+1);
 
     //printBits(in_bits, code->nc);
 

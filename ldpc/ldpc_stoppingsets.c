@@ -12,12 +12,13 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
     const size_t t_ges = NchooseK(code->nc, 2);
     size_t time = 0;
 
+    double* llr = calloc(code->nc, sizeof(double));
+    bits_t* bits = calloc(code->nc, sizeof(bits_t));
+
     for (size_t j = 0; j < code->nc; ++j)
     {
         for (size_t l = j+1; l < code->nc; ++l)
         {
-            double* llr = calloc(code->nc, sizeof(double));
-            bits_t* bits = calloc(code->nc, sizeof(bits_t));
             for (size_t i = 0; i < code->nc; ++i)
                 llr[i] = 1.0;
 
@@ -41,7 +42,6 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
                     //erasure decoding
                     const size_t tr_set_size = lpdc_code_t_erasure_decoding(code, &bits, &tr_set);
                     // when stopping set is found
-
                     if (tr_set_size && tr_set_size <= code->st_max_size)
                     {
                         uint8_t tr_stored = 0;
@@ -49,7 +49,7 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
                         {
                             size_t tmp = 0;
                             for (size_t b = a*tr_set_size; b < (a+1)*tr_set_size; ++b)
-                                tmp += (code->st[tr_set_size-2][b] == tr_set[b - a*tr_set_size]);
+                                tmp += (code->st[tr_set_size][b] == tr_set[b - a*tr_set_size]);
                             if (tmp == tr_set_size)
                             {
                                 tr_stored = 1;
@@ -59,11 +59,31 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
                         if (!tr_stored)
                         {
                             //store
-                            code->st[tr_set_size-2] = realloc(code->st[tr_set_size-2], (code->stw[tr_set_size] + 1) * tr_set_size * sizeof(size_t));
+                            code->st[tr_set_size] = realloc(code->st[tr_set_size], (code->stw[tr_set_size] + 1) * tr_set_size * sizeof(size_t));
                             for (size_t a = 0; a < tr_set_size; ++a)
-                                code->st[tr_set_size-2][code->stw[tr_set_size] * tr_set_size + a] = tr_set[a];
+                                code->st[tr_set_size][code->stw[tr_set_size] * tr_set_size + a] = tr_set[a];
 
                             ++code->stw[tr_set_size];
+
+                            // distance set
+                            bits_t *r_word = calloc(code->nc, sizeof(bits_t));
+                            for (size_t e = 0; e < code->nc; ++e)
+                                r_word[e] = 1;
+
+                            if (is_codeword(*code, r_word))
+                            {
+                                code->ds[tr_set_size] = realloc(code->ds[tr_set_size], (code->dw[tr_set_size] + 1) * tr_set_size * sizeof(size_t));
+                                for (size_t a = 0; a < tr_set_size; ++a)
+                                    code->ds[tr_set_size][code->dw[tr_set_size] * tr_set_size + a] = tr_set[a];
+
+                                ++code->dw[tr_set_size];
+                            }
+                            else
+                            {
+                                printf("Not codeword\n");
+                            }
+
+                            free(r_word);
                         }
 
                         free(tr_set);
@@ -71,13 +91,13 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
                     ++t;
                 }
             }
-
-            free(llr);
-            free(bits);
             printf("\rCounting stopping sets of LDPC code...  %.2f%%", (double)++time/t_ges *100);
         }
     }
     printf("\r");
+
+    free(llr);
+    free(bits);
 }
 
 size_t lpdc_code_t_erasure_decoding(ldpc_code_t* code, bits_t** in_bits, size_t** set)
@@ -221,4 +241,9 @@ void ldpc_code_t_st_setup(ldpc_code_t* code, const size_t ST_MAX_SIZE)
     code->st = calloc(ST_MAX_SIZE + 1, sizeof(size_t*));
     for (size_t i = 0; i < ST_MAX_SIZE + 1; ++i)
         code->st[i] = calloc(0, sizeof(size_t));
+
+    code->dw = calloc(ST_MAX_SIZE + 1, sizeof(size_t));
+    code->ds = calloc(ST_MAX_SIZE + 1, sizeof(size_t*));
+    for (size_t i = 0; i < ST_MAX_SIZE + 1; ++i)
+        code->ds[i] = calloc(0, sizeof(size_t));
 }
