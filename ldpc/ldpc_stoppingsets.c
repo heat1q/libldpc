@@ -1,4 +1,4 @@
-#include "ldpc_stoppingsets.h"
+﻿#include "ldpc_stoppingsets.h"
 #include "functions.h"
 #include "ldpc_decoder.h"
 
@@ -66,11 +66,11 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
                             ++code->stw[tr_set_size];
 
                             // distance set
-                            bits_t *r_word = calloc(code->nc, sizeof(bits_t));
-                            for (size_t e = 0; e < code->nc; ++e)
-                                r_word[e] = 1;
+                            //bits_t *r_word = calloc(code->nc, sizeof(bits_t));
+                            //for (size_t e = 0; e < code->nc; ++e)
+                            //    r_word[e] = 1;
 
-                            if (is_codeword(*code, r_word))
+                            if (is_codeword(*code, bits))
                             {
                                 code->ds[tr_set_size] = realloc(code->ds[tr_set_size], (code->dw[tr_set_size] + 1) * tr_set_size * sizeof(size_t));
                                 for (size_t a = 0; a < tr_set_size; ++a)
@@ -83,7 +83,7 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
                                 printf("Not codeword\n");
                             }
 
-                            free(r_word);
+                            //free(r_word);
                         }
 
                         free(tr_set);
