@@ -12,11 +12,26 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
     const size_t t_ges = NchooseK(code->nc, 2);
     size_t time = 0;
 
-    double* llr = calloc(code->nc, sizeof(double));
-    bits_t* bits = calloc(code->nc, sizeof(bits_t));
+    size_t tr_set_size;
+    uint8_t tr_stored;
+    size_t tmp;
 
+    double* llr;
+    bits_t* bits;
+    size_t* tr_set;
+
+    char f_w[100]; char f_st[100];
+    sprintf(f_w, "st_sets_cardinality_code_%lux%lu.txt", code->nc, code->mc);
+    sprintf(f_st, "st_sets_code_%lux%lu.txt", code->nc, code->mc);
+    FILE* file_w = fopen(f_w, "w");
+    FILE* file_st = fopen(f_st, "w");
+
+    #pragma omp parallel for default(none) private(llr, bits, tr_set, tr_set_size, tr_stored, tmp) shared(code, time, file_w, f_w)
     for (size_t j = 0; j < code->nc; ++j)
     {
+        llr = calloc(code->nc, sizeof(double));
+        bits = calloc(code->nc, sizeof(bits_t));
+
         for (size_t l = j+1; l < code->nc; ++l)
         {
             for (size_t i = 0; i < code->nc; ++i)
@@ -38,66 +53,83 @@ void lpdc_code_t_stopping_sets(ldpc_code_t *code)
                     for (size_t h = 0; h < code->nc; ++h)
                         bits[h] = (uint8_t)((llr[h] <= t)*2);
 
-                    size_t *tr_set;
+                    //size_t *tr_set;
                     //erasure decoding
-                    const size_t tr_set_size = lpdc_code_t_erasure_decoding(code, &bits, &tr_set);
+                    tr_set_size = lpdc_code_t_erasure_decoding(code, &bits, &tr_set);
                     // when stopping set is found
                     if (tr_set_size && tr_set_size <= code->st_max_size)
                     {
-                        uint8_t tr_stored = 0;
-                        for (size_t a = 0; a < code->stw[tr_set_size]; ++a) // for all stored st sets
+                        #pragma omp critical
                         {
-                            size_t tmp = 0;
-                            for (size_t b = a*tr_set_size; b < (a+1)*tr_set_size; ++b)
-                                tmp += (code->st[tr_set_size][b] == tr_set[b - a*tr_set_size]);
-                            if (tmp == tr_set_size)
+                            tr_stored = 0;
+
+                            size_t cur_stw = code->stw[tr_set_size];
+                            for (size_t a = 0; a < cur_stw; ++a) // for all stored st sets
                             {
-                                tr_stored = 1;
-                                break;
+                                tmp = 0;
+                                for (size_t b = a*tr_set_size; b < (a+1)*tr_set_size; ++b)
+                                    tmp += (code->st[tr_set_size][b] == tr_set[b - a*tr_set_size]);
+                                if (tmp == tr_set_size)
+                                {
+                                    tr_stored = 1;
+                                    break;
+                                }
                             }
-                        }
-                        if (!tr_stored)
-                        {
-                            //store
-                            code->st[tr_set_size] = realloc(code->st[tr_set_size], (code->stw[tr_set_size] + 1) * tr_set_size * sizeof(size_t));
-                            for (size_t a = 0; a < tr_set_size; ++a)
-                                code->st[tr_set_size][code->stw[tr_set_size] * tr_set_size + a] = tr_set[a];
-
-                            ++code->stw[tr_set_size];
-
-                            // distance set
-                            //bits_t *r_word = calloc(code->nc, sizeof(bits_t));
-                            //for (size_t e = 0; e < code->nc; ++e)
-                            //    r_word[e] = 1;
-
-                            if (is_codeword(*code, bits))
+                            if (!tr_stored)
                             {
-                                code->ds[tr_set_size] = realloc(code->ds[tr_set_size], (code->dw[tr_set_size] + 1) * tr_set_size * sizeof(size_t));
+                                //store
+                                code->st[tr_set_size] = realloc(code->st[tr_set_size], (cur_stw + 1) * tr_set_size * sizeof(size_t));
                                 for (size_t a = 0; a < tr_set_size; ++a)
-                                    code->ds[tr_set_size][code->dw[tr_set_size] * tr_set_size + a] = tr_set[a];
+                                    code->st[tr_set_size][cur_stw * tr_set_size + a] = tr_set[a];
 
-                                ++code->dw[tr_set_size];
-                            }
-                            else
-                            {
-                                printf("Not codeword\n");
+                                ++code->stw[tr_set_size];
+
+                                // distance set
+                                //bits_t *r_word = calloc(code->nc, sizeof(bits_t));
+                                //for (size_t e = 0; e < code->nc; ++e)
+                                //    r_word[e] = 1;
+
+                                if (is_codeword(*code, bits))
+                                {
+                                    code->ds[tr_set_size] = realloc(code->ds[tr_set_size], (code->dw[tr_set_size] + 1) * tr_set_size * sizeof(size_t));
+                                    for (size_t a = 0; a < tr_set_size; ++a)
+                                        code->ds[tr_set_size][code->dw[tr_set_size] * tr_set_size + a] = tr_set[a];
+
+                                    ++code->dw[tr_set_size];
+                                }
+                                else
+                                {
+                                    //printf("Not codeword\n");
+                                }
+
+                                //free(r_word);
                             }
 
-                            //free(r_word);
+                            free(tr_set);
                         }
-
-                        free(tr_set);
                     }
                     ++t;
                 }
             }
-            printf("\rCounting stopping sets of LDPC code...  %.2f%%", (double)++time/t_ges *100);
+            printf("\rProgress:  %.2f%%", (double)++time/t_ges *100);
         }
+        free(llr);
+        free(bits);
     }
     printf("\r");
 
-    free(llr);
-    free(bits);
+    printVectorToFile(code->stw, code->st_max_size+1, file_w, 0);
+
+    for (size_t i = 2; i <= code->st_max_size; ++i)
+    {
+        fprintf(file_st, "%lu ", i);
+        for (size_t j = 0; j < code->stw[i]; ++j)
+        {
+            printVectorToFile(code->st[i], i, file_st, j*i);
+            fprintf(file_st, " ");
+        }
+        fprintf(file_st, "\n");
+    }
 }
 
 size_t lpdc_code_t_erasure_decoding(ldpc_code_t* code, bits_t** in_bits, size_t** set)

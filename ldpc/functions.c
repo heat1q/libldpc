@@ -234,6 +234,19 @@ void printBits(bits_t* x, const size_t k)
     printf("]\n");
 }
 
+void printVectorToFile(void* input, const size_t k, FILE* file, size_t a)
+{
+    uint64_t *x = input;
+    fprintf(file, "[");
+    for (size_t i = a; i < a+k; ++i)
+    {
+        fprintf(file, "%lu", x[i]);
+        if (i < a+k - 1)
+            fprintf(file, " ");
+    }
+    fprintf(file, "]");
+}
+
 // just for testing small codes
 void generic_codeword_search(ldpc_code_t *code, bits_t** bits, const size_t length, size_t currentbitindex)
 {

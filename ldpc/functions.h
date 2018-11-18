@@ -12,6 +12,8 @@ void printVector(void *input, const size_t k);
 void printVectorDouble(double* x, const size_t k);
 void printBits(bits_t* x, const size_t k);
 
+void printVectorToFile(void* input, const size_t k, FILE* file, size_t a);
+
 void generic_codeword_search(ldpc_code_t* code, bits_t** bits, const size_t length, const size_t currentbit);
 
 size_t NchooseK(const size_t n, const size_t k);
