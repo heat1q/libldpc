@@ -28,7 +28,7 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const size_t MAX_SIZE)
     size_t* tr_set;
 
     char f_w[100]; char f_st[100];
-    sprintf(f_w, "st_sets_cardinality.txt");
+    sprintf(f_w, "st_sets_count.txt");
     sprintf(f_st, "st_sets.txt");
     FILE* file_w = fopen(f_w, "w");
     FILE* file_st = fopen(f_st, "w");
