@@ -237,14 +237,8 @@ void printBits(bits_t* x, const size_t k)
 void printVectorToFile(void* input, const size_t k, FILE* file, size_t a)
 {
     uint64_t *x = input;
-    fprintf(file, "[");
     for (size_t i = a; i < a+k; ++i)
-    {
-        fprintf(file, "%lu", x[i]);
-        if (i < a+k - 1)
-            fprintf(file, " ");
-    }
-    fprintf(file, "]");
+        fprintf(file, "%lu ", x[i]);
 }
 
 // just for testing small codes
