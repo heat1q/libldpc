@@ -11,7 +11,7 @@ SRC=ldpc_main.c functions.c ldpc_cycles.c ldpc_decoder.c scm_functions.c ldpc_st
 OBJ=ldpc_main.o functions.o ldpc_cycles.o ldpc_decoder.o scm_functions.o ldpc_stoppingsets.o
 
 all: $(OBJ)
-	gcc $(OBJ) $(INCLUDEPATH) $(LIBRARYPATH) $(LIBS) -o run
+	gcc $(OBJ) $(INCLUDEPATH) $(LIBRARYPATH) $(LIBS) -o st_ldpc
 
 $(OBJ): $(SRC)
 	gcc -std=c11 $(CFLAGS) $(INCLUDEPATH) $(LIBRARYPATH) $(LIBS) $(SRC)
