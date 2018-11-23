@@ -1,9 +1,12 @@
 #pragma once
 
+#define _POSIX_C_SOURCE 199309L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <time.h>
 
 // structure for messages
 /*

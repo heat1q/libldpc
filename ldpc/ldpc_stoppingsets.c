@@ -2,8 +2,6 @@
 #include "functions.h"
 #include "ldpc_decoder.h"
 
-#include "time.h"
-
 #define I_MAX 10 // 10 .. 100
 #define THRESH 10
 #define REL -10.0
@@ -35,8 +33,8 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const size_t MAX_SIZE)
 
     printf("Result Files: %s %s\n", f_st, f_w);
 
-    //struct timespec tstart={0,0}, tend={0,0};
-    //clock_gettime(CLOCK_MONOTONIC, &tstart);
+    struct timespec tstart={0,0}, tend={0,0};
+    clock_gettime(CLOCK_MONOTONIC, &tstart);
 
     #pragma omp parallel for default(none) private(llr, bits, tr_set, tr_set_size, tr_stored, tmp) shared(code, time, file_w, f_w, st_found)
     for (size_t j = 0; j < code->nc; ++j)
@@ -73,8 +71,8 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const size_t MAX_SIZE)
                         #pragma omp critical
                         {
                             tr_stored = 0;
-
                             size_t cur_stw = code->stw[tr_set_size];
+
                             for (size_t a = 0; a < cur_stw; ++a) // for all stored st sets
                             {
                                 tmp = 0;
@@ -86,6 +84,7 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const size_t MAX_SIZE)
                                     break;
                                 }
                             }
+
                             if (!tr_stored)
                             {
                                 //store
@@ -128,8 +127,8 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const size_t MAX_SIZE)
     }
     printf("\n");
 
-    //clock_gettime(CLOCK_MONOTONIC, &tend);
-    //printf("Total Time taken:  %.5f seconds\n", ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) - ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec));
+    clock_gettime(CLOCK_MONOTONIC, &tend);
+    printf("Total Time taken:  %.5f seconds\n", ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) - ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec));
 
     printVectorToFile(code->stw, MAX_SIZE+1, file_w, 0);
 
