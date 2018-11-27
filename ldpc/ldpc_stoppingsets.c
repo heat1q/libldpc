@@ -6,9 +6,9 @@
 #define THRESH 10
 #define REL -10.0
 
-void lpdc_code_t_stopping_sets(ldpc_code_t* code, const size_t MAX_SIZE)
+void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const char* fileName_count, const size_t MAX_SIZE)
 {
-    printf("=========== LDPC Stopping Sets ===========\n");
+    printf("====================== LDPC Stopping Sets ======================\n");
     printf("Maximum Size: %lu \n", MAX_SIZE);
 
     ldpc_code_t_st_setup(code, MAX_SIZE);
@@ -25,18 +25,15 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const size_t MAX_SIZE)
     bits_t* bits;
     size_t* tr_set;
 
-    char f_w[100]; char f_st[100];
-    sprintf(f_w, "st_sets_count.txt");
-    sprintf(f_st, "st_sets.txt");
-    FILE* file_w = fopen(f_w, "w");
-    FILE* file_st = fopen(f_st, "w");
+    FILE* file_count = fopen(fileName_count, "w");
+    FILE* file_st = fopen(fileName_st, "w");
 
-    printf("Result Files: %s %s\n", f_st, f_w);
+    printf("Result Files: %s %s\n", fileName_st, fileName_count);
 
     struct timespec tstart={0,0}, tend={0,0};
     clock_gettime(CLOCK_MONOTONIC, &tstart);
 
-    #pragma omp parallel for default(none) private(llr, bits, tr_set, tr_set_size, tr_stored, tmp) shared(code, time, file_w, f_w, st_found)
+    #pragma omp parallel for default(none) private(llr, bits, tr_set, tr_set_size, tr_stored, tmp) shared(code, time, st_found)
     for (size_t j = 0; j < code->nc; ++j)
     {
         llr = calloc(code->nc, sizeof(double));
@@ -130,7 +127,7 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const size_t MAX_SIZE)
     clock_gettime(CLOCK_MONOTONIC, &tend);
     printf("Total Time taken:  %.5f seconds\n", ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) - ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec));
 
-    printVectorToFile(code->stw, MAX_SIZE+1, file_w, 0);
+    printVectorToFile(code->stw, MAX_SIZE+1, file_count, 0);
 
     for (size_t i = 1; i <= MAX_SIZE; ++i)
     {
@@ -142,7 +139,7 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const size_t MAX_SIZE)
         }
     }
 
-    printf("==========================================\n");
+    printf("================================================================\n");
 }
 
 size_t lpdc_code_t_erasure_decoding(ldpc_code_t* code, bits_t** in_bits, size_t** set)
