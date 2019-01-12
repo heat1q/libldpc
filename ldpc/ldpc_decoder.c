@@ -5,6 +5,8 @@
 #include "ldpc_decoder.h"
 #include "functions.h"
 
+#define CN_APPROX_LIN
+
 uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double** llr_out, uint64_t max_iter, uint8_t early_termination) {
     size_t it;
 

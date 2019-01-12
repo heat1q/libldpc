@@ -2,28 +2,27 @@
 #include "functions.h"
 #include "ldpc_decoder.h"
 
-#define I_MAX 10 // 10 .. 100
-#define THRESH 10
-#define REL -10.0
-
-void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const char* fileName_count, const size_t MAX_SIZE)
+void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const char* fileName_count, const size_t MaxStSize, const size_t ImaxBP, const int ImaxE, const double InitLLR)
 {
     printf("====================== LDPC Stopping Sets ======================\n");
-    printf("Maximum Size: %lu \n", MAX_SIZE);
+    printf("Maximum Set Size: %lu \n", MaxStSize);
+    printf("iterBP: %lu \n", ImaxBP);
+    printf("iterE: %i \n", ImaxE);
+    printf("LLR: %.2f \n", InitLLR);
 
-    ldpc_code_t_st_setup(code, MAX_SIZE);
+    ldpc_code_t_st_setup(code, MaxStSize);
 
     const size_t t_ges = NchooseK(code->nc, 2);
     size_t time = 0;
     size_t st_found = 0;
 
-    size_t tr_set_size;
-    uint8_t tr_stored;
+    size_t st_set_size;
+    uint8_t st_stored;
     size_t tmp;
 
     double* llr;
     bits_t* bits;
-    size_t* tr_set;
+    size_t* st_set;
 
     FILE* file_count = fopen(fileName_count, "w");
     FILE* file_st = fopen(fileName_st, "w");
@@ -33,7 +32,7 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const
     struct timespec tstart={0,0}, tend={0,0};
     clock_gettime(CLOCK_MONOTONIC, &tstart);
 
-    #pragma omp parallel for default(none) private(llr, bits, tr_set, tr_set_size, tr_stored, tmp) shared(code, time, st_found)
+    #pragma omp parallel for default(none) private(llr, bits, st_set, st_set_size, st_stored, tmp) shared(code, time, st_found)
     for (size_t j = 0; j < code->nc; ++j)
     {
         llr = calloc(code->nc, sizeof(double));
@@ -44,9 +43,9 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const
             for (size_t i = 0; i < code->nc; ++i)
                 llr[i] = 1.0;
 
-            llr[j] = REL; llr[l] = REL;
+            llr[j] = InitLLR; llr[l] = InitLLR;
 
-            for (size_t i = 0; i < I_MAX; ++i)
+            for (size_t i = 0; i < ImaxBP; ++i)
             {
                 // run the belief propagation decoder for one interation
                 ldpc_decode(*code, llr, &llr, 1, 0);
@@ -54,42 +53,42 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const
                 // set the threshold
                 int64_t t = -1;
 
-                while (t <= THRESH)
+                while (t <= ImaxE)
                 {
                     // declare all bits for which R_h <= t as erasure & all others as 0
                     for (size_t h = 0; h < code->nc; ++h)
                         bits[h] = (uint8_t)((llr[h] <= t)*2);
 
                     //erasure decoding
-                    tr_set_size = lpdc_code_t_erasure_decoding(code, &bits, &tr_set);
+                    st_set_size = lpdc_code_t_erasure_decoding(code, &bits, &st_set);
                     // when stopping set is found
-                    if (tr_set_size && tr_set_size <= MAX_SIZE)
+                    if (st_set_size && st_set_size <= MaxStSize)
                     {
                         #pragma omp critical
                         {
-                            tr_stored = 0;
-                            size_t cur_stw = code->stw[tr_set_size];
+                            st_stored = 0;
+                            size_t cur_stw = code->stw[st_set_size];
 
                             for (size_t a = 0; a < cur_stw; ++a) // for all stored st sets
                             {
                                 tmp = 0;
-                                for (size_t b = a*tr_set_size; b < (a+1)*tr_set_size; ++b)
-                                    tmp += (code->st[tr_set_size][b] == tr_set[b - a*tr_set_size]);
-                                if (tmp == tr_set_size)
+                                for (size_t b = a*st_set_size; b < (a+1)*st_set_size; ++b)
+                                    tmp += (code->st[st_set_size][b] == st_set[b - a*st_set_size]);
+                                if (tmp == st_set_size)
                                 {
-                                    tr_stored = 1;
+                                    st_stored = 1;
                                     break;
                                 }
                             }
 
-                            if (!tr_stored)
+                            if (!st_stored)
                             {
                                 //store
-                                code->st[tr_set_size] = realloc(code->st[tr_set_size], (cur_stw + 1) * tr_set_size * sizeof(size_t));
-                                for (size_t a = 0; a < tr_set_size; ++a)
-                                    code->st[tr_set_size][cur_stw * tr_set_size + a] = tr_set[a];
+                                code->st[st_set_size] = realloc(code->st[st_set_size], (cur_stw + 1) * st_set_size * sizeof(size_t));
+                                for (size_t a = 0; a < st_set_size; ++a)
+                                    code->st[st_set_size][cur_stw * st_set_size + a] = st_set[a];
 
-                                ++code->stw[tr_set_size];
+                                ++code->stw[st_set_size];
 
                                 ++st_found;
                                 // distance set
@@ -111,7 +110,7 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const
                                 }
                                 */
                             }
-                            free(tr_set);
+                            free(st_set);
                         }
                     }
                     ++t;
@@ -127,11 +126,11 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const
     clock_gettime(CLOCK_MONOTONIC, &tend);
     printf("Total Time taken:  %.5f seconds\n", ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) - ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec));
 
-    printVectorToFile(code->stw, MAX_SIZE+1, file_count, 0);
+    printVectorToFile(code->stw, MaxStSize+1, file_count, 0);
 
-    for (size_t i = 1; i <= MAX_SIZE; ++i)
+    for (size_t i = 1; i <= MaxStSize; ++i)
     {
-        fprintf(file_st, "Size=%lu\t# of Stopping Sets=%lu\n", i, code->stw[i]);
+        fprintf(file_st, "size=%lu multiplicity=%lu\n", i, code->stw[i]);
         for (size_t j = 0; j < code->stw[i]; ++j)
         {
             printVectorToFile(code->st[i], i, file_st, j*i);
