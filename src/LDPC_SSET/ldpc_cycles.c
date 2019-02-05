@@ -1,5 +1,5 @@
 ﻿#include "ldpc_cycles.h"
-#include "functions.h"
+#include "../function/ldpc_functions.h"
 
 void cycle_ldpc_code_t(ldpc_code_t* code)
 {

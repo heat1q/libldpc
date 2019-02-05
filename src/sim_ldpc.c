@@ -7,12 +7,12 @@
 #ifdef INTELMKL
 #include <mkl.h>
 #endif
-#include "scm_functions.h"
-#include "ldpc_functions.h"
+#include "function/scm_functions.h"
+#include "function/ldpc_functions.h"
 #ifdef QUANT
 #include "ldpc_decoder_quant.h"
 #else
-#include "ldpc_decoder.h"
+#include "decoder/ldpc_decoder.h"
 #endif
 
 

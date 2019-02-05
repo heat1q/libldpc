@@ -1,11 +1,11 @@
-#include "unistd.h"
-#include "string.h"
+#include <unistd.h>
+#include <string.h>
 
-#include "ldpc_types.h"
-#include "functions.h"
-#include "ldpc_cycles.h"
-#include "ldpc_decoder.h"
-#include "ldpc_stoppingsets.h"
+#include "function/ldpc_types.h"
+#include "function/ldpc_functions.h"
+#include "LDPC_SSET/ldpc_cycles.h"
+#include "decoder/ldpc_decoder.h"
+#include "LDPC_SSET/ldpc_stoppingsets.h"
 
 int main(int argc, char* argv[])
 {

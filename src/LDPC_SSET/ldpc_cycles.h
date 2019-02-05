@@ -1,4 +1,4 @@
-#include "ldpc_types.h"
+#include "../function/ldpc_types.h"
 
 void cycle_ldpc_code_t(ldpc_code_t* code);
 void girth_ldpc_code_t(ldpc_code_t* code);

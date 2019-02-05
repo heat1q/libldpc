@@ -740,6 +740,7 @@ int read_ldpc_file(ldpc_code_t* code, const char* filename) {
         }
     }
 
+    code->st_max_size = 0;
 
 #ifdef ENCODE
     code->genmat = malloc(sizeof(uint8_t*) * code->kc);
@@ -889,6 +890,21 @@ void destroy_ldpc_code_t(ldpc_code_t* code) {
     }
     free(code->genmat);
 #endif
+    
+    if (code->st_max_size)
+    {
+        free(code->stw);
+        for(size_t i = 0; i < code->st_max_size + 1; i++)
+            free(code->st[i]);
+        free(code->st);
+
+        /*
+        free(code->dw);
+        for(size_t i = 0; i < code->st_max_size + 1; i++)
+            free(code->ds[i]);
+        free(code->ds);
+        */
+    }
 }
 
 void destroy_ldpc_sim_t(ldpc_sim_t *sim) {
@@ -950,4 +966,55 @@ void print_ldpc_sim_t(ldpc_sim_t sim) {
     //     printf("\n");
     // }
     printf("=========== SIM: END ===========\n");
+}
+
+void printVector(void* input, const size_t k)
+{
+    uint64_t *x = input;
+    printf("[");
+    for (size_t i = 0; i < k; ++i)
+    {
+        printf("%lu", x[i]);
+        if (i < k - 1)
+            printf(" ");
+    }
+    printf("]\n");
+}
+
+void printVectorDouble(double* x, const size_t k)
+{
+    printf("[");
+    for (size_t i = 0; i < k; ++i)
+    {
+        printf("%.2f", x[i]);
+        if (i < k - 1)
+            printf(" ");
+    }
+    printf("]\n");
+}
+
+void printBits(bits_t* x, const size_t k)
+{
+    printf("[");
+    for (size_t i = 0; i < k; ++i)
+    {
+        printf("%i", x[i]);
+        if (i < k - 1)
+            printf(" ");
+    }
+    printf("]\n");
+}
+
+void printVectorToFile(void* input, const size_t k, FILE* file, size_t a)
+{
+    uint64_t *x = input;
+    for (size_t i = a; i < a+k; ++i)
+        fprintf(file, "%lu ", x[i]);
+}
+
+size_t NchooseK(const size_t n, const size_t k)
+{
+    if (k == 0)
+        return 1;
+    return (n * NchooseK(n - 1, k - 1)) / k;
 }

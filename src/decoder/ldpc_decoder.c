@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "scm_functions.h"
+#include "../function/scm_functions.h"
 #include "ldpc_decoder.h"
-#include "functions.h"
+#include "../function/ldpc_functions.h"
 
 #define CN_APPROX_LIN
 

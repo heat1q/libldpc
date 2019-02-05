@@ -1,5 +1,5 @@
-#include "ldpc_types.h"
-#include "scm_types.h"
+#include "../function/ldpc_types.h"
+#include "../function/scm_types.h"
 
 void ldpc_code_t_st_setup(ldpc_code_t* code, const size_t ST_MAX_SIZE);
 void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const char* fileName_count, const size_t MaxStSize, const size_t ImaxBP, const int ImaxE, const double InitLLR);

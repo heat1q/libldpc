@@ -1,6 +1,6 @@
 ﻿#include "ldpc_stoppingsets.h"
-#include "functions.h"
-#include "ldpc_decoder.h"
+#include "../function/ldpc_functions.h"
+#include "../decoder/ldpc_decoder.h"
 #include <math.h>
 #include <string.h>
 
