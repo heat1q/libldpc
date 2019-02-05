@@ -4,7 +4,9 @@
 #include <string.h>
 #include <getopt.h>
 #include <omp.h>
+#ifdef INTELMKL
 #include <mkl.h>
+#endif
 #include "scm_functions.h"
 #include "ldpc_functions.h"
 #ifdef QUANT
@@ -99,6 +101,8 @@ int main(int argc, char* argv[]) {
     for(size_t i = 0; i < num_threads; i++) {
         vslNewStream(&rng_stream[i], VSL_BRNG_MT2203+i, 777777);
     }
+    #else
+    void *rng_stream = NULL;
     #endif
 
     /*
