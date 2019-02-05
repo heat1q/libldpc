@@ -9,7 +9,9 @@ SOURCES += analysis_ldpc.c \
     decoder/ldpc_decoder.c \
     function/scm_functions.c \
     function/ldpc_functions.c \
-    LDPC_SSET/ldpc_stoppingsets.c
+    LDPC_SSET/ldpc_stoppingsets.c \
+    decoder/ldpc_decoder_layered.c \
+    decoder/main.c
 
 HEADERS += \
     scm_types.h \
@@ -19,5 +21,6 @@ HEADERS += \
     function/scm_functions.h \
     function/ldpc_functions.h \
     LDPC_SSET/ldpc_stoppingsets.h \
-    function/scm_types.h
+    function/scm_types.h \
+    decoder/ldpc_decoder_layered.h
 

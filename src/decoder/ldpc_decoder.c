@@ -5,7 +5,6 @@
 #include "ldpc_decoder.h"
 #include "../function/ldpc_functions.h"
 
-#define CN_APPROX_LIN
 
 uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double** llr_out, uint64_t max_iter, uint8_t early_termination) {
     size_t it;
@@ -38,21 +37,21 @@ uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double** llr_out, uint64_
     it = 0;
     while(it < max_iter) {
         for(size_t i = 0; i < code.mc; i++) {
-          cw = code.cw[i];
-          cn = code.cn[i];
-          f[0] = l_v2c[*cn];
-          b[cw-1] = l_v2c[*(cn+cw-1)];
-          for(size_t j = 1; j < cw; j++) {
-              f[j] = jacobian(f[j-1], l_v2c[*(cn+j)]);
-              b[cw-1-j] = jacobian(b[cw-j], l_v2c[*(cn + cw-j-1)]);
-          }
+            cw = code.cw[i];
+            cn = code.cn[i];
+            f[0] = l_v2c[*cn];
+            b[cw-1] = l_v2c[*(cn+cw-1)];
+            for(size_t j = 1; j < cw; j++) {
+                f[j] = jacobian(f[j-1], l_v2c[*(cn+j)]);
+                b[cw-1-j] = jacobian(b[cw-j], l_v2c[*(cn + cw-j-1)]);
+            }
 
-          l_c2v[*cn] = b[1];
-          l_c2v[*(cn+cw-1)] = f[cw-2];
-          for(size_t j = 1; j < cw-1; j++) {
-              l_c2v[*(cn+j)] = jacobian(f[j-1], b[j+1]);
-          }
-       }
+            l_c2v[*cn] = b[1];
+            l_c2v[*(cn+cw-1)] = f[cw-2];
+            for(size_t j = 1; j < cw-1; j++) {
+                l_c2v[*(cn+j)] = jacobian(f[j-1], b[j+1]);
+            }
+        }
 
         /* VN node processing */
         for(size_t i = 0; i < code.nc; i++) {
@@ -89,24 +88,25 @@ uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double** llr_out, uint64_
             }
         }
     }
-        
-  free(l_c2v);
-  free(l_v2c);
 
-  free(b);
-  free(f);
+    free(l_c2v);
+    free(l_v2c);
+    free(c_out);
 
-  return it;
+    free(b);
+    free(f);
+
+    return it;
 }
 
 double jacobian(double L1, double L2) {
-    #ifdef CN_APPROX_LIN
+#ifdef CN_APPROX_LIN
     return sign(L1) * sign(L2) * fmin(fabs(L1),fabs(L2)) + jacobian_lin_approx(L1+L2) - jacobian_lin_approx(L1-L2);
-    #elif CN_APPROX_MINSUM
+#elif CN_APPROX_MINSUM
     return sign(L1) * sign(L2) * fmin(fabs(L1), fabs(L2));
-    #else
+#else
     return sign(L1) * sign(L2) * fmin(fabs(L1),fabs(L2)) + log((1+exp(-fabs(L1+L2)))/(1+exp(-fabs(L1-L2))));
-    #endif
+#endif
 }
 
 double jacobian_lin_approx(double L) {
