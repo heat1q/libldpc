@@ -1,6 +1,8 @@
 ﻿#include "ldpc_stoppingsets.h"
 #include "functions.h"
 #include "ldpc_decoder.h"
+#include <math.h>
+#include <string.h>
 
 void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const char* fileName_count, const size_t MaxStSize, const size_t ImaxBP, const int ImaxE, const double InitLLR)
 {
@@ -17,12 +19,13 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const
     size_t st_found = 0;
 
     size_t st_set_size;
-    uint8_t st_stored;
-    size_t tmp;
 
     double* llr;
     bits_t* bits;
     size_t* st_set;
+    const uint64_t MaxStrEntrySize = (floor(log10(code->nc)) + 1);
+    const uint64_t MaxStrStSize = MaxStrEntrySize * MaxStSize + 2;
+    char* st_set_str;
 
     FILE* file_count = fopen(fileName_count, "w");
     FILE* file_st = fopen(fileName_st, "w");
@@ -32,11 +35,12 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const
     struct timespec tstart={0,0}, tend={0,0};
     clock_gettime(CLOCK_MONOTONIC, &tstart);
 
-    #pragma omp parallel for default(none) private(llr, bits, st_set, st_set_size, st_stored, tmp) shared(code, time, st_found)
+    #pragma omp parallel for default(none) private(llr, bits, st_set, st_set_size, st_set_str) shared(code, time, st_found)
     for (size_t j = 0; j < code->nc; ++j)
     {
         llr = calloc(code->nc, sizeof(double));
         bits = calloc(code->nc, sizeof(bits_t));
+        st_set_str = calloc(MaxStrStSize*2, sizeof(char)); //TODO
 
         for (size_t l = j+1; l < code->nc; ++l)
         {
@@ -64,51 +68,25 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const
                     // when stopping set is found
                     if (st_set_size && st_set_size <= MaxStSize)
                     {
+                        strcpy(st_set_str, "");
+                        int index = 0;
+                        for (size_t s = 0; s < st_set_size; ++s)
+                           index += sprintf(&st_set_str[index], "%lu ", st_set[s]);
+                        strcat(st_set_str, "| ");
+
                         #pragma omp critical
                         {
-                            st_stored = 0;
                             size_t cur_stw = code->stw[st_set_size];
 
-                            for (size_t a = 0; a < cur_stw; ++a) // for all stored st sets
-                            {
-                                tmp = 0;
-                                for (size_t b = a*st_set_size; b < (a+1)*st_set_size; ++b)
-                                    tmp += (code->st[st_set_size][b] == st_set[b - a*st_set_size]);
-                                if (tmp == st_set_size)
-                                {
-                                    st_stored = 1;
-                                    break;
-                                }
-                            }
-
-                            if (!st_stored)
+                            if(strstr(code->st[st_set_size], st_set_str) == NULL)
                             {
                                 //store
-                                code->st[st_set_size] = realloc(code->st[st_set_size], (cur_stw + 1) * st_set_size * sizeof(size_t));
-                                for (size_t a = 0; a < st_set_size; ++a)
-                                    code->st[st_set_size][cur_stw * st_set_size + a] = st_set[a];
+                                code->st[st_set_size] = realloc(code->st[st_set_size], (cur_stw + 1) * MaxStrStSize*2 * sizeof(char));
+                                strcat(code->st[st_set_size], st_set_str);
 
                                 ++code->stw[st_set_size];
 
                                 ++st_found;
-                                // distance set
-                                /*
-                                for (size_t e = 0; e < tr_set_size; ++e)
-                                    bits[e] = 0;
-
-                                if (is_codeword(*code, bits))
-                                {
-                                    code->ds[tr_set_size] = realloc(code->ds[tr_set_size], (code->dw[tr_set_size] + 1) * tr_set_size * sizeof(size_t));
-                                    for (size_t a = 0; a < tr_set_size; ++a)
-                                        code->ds[tr_set_size][code->dw[tr_set_size] * tr_set_size + a] = tr_set[a];
-
-                                    ++code->dw[tr_set_size];
-                                }
-                                else
-                                {
-                                    printf("Not codeword\n");
-                                }
-                                */
                             }
                             free(st_set);
                         }
@@ -120,12 +98,14 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const
         }
         free(llr);
         free(bits);
+        free(st_set_str);
     }
     printf("\n");
 
     clock_gettime(CLOCK_MONOTONIC, &tend);
     printf("Total Time taken:  %.5f seconds\n", ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) - ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec));
 
+    /*
     printVectorToFile(code->stw, MaxStSize+1, file_count, 0);
 
     for (size_t i = 1; i <= MaxStSize; ++i)
@@ -137,8 +117,10 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const
             fprintf(file_st, "\n");
         }
     }
+    */
 
     printf("================================================================\n");
+
 }
 
 size_t lpdc_code_t_erasure_decoding(ldpc_code_t* code, bits_t** in_bits, size_t** set)
@@ -278,12 +260,14 @@ void ldpc_code_t_st_setup(ldpc_code_t* code, const size_t ST_MAX_SIZE)
     code->st_max_size = ST_MAX_SIZE;
 
     code->stw = calloc(ST_MAX_SIZE + 1, sizeof(size_t));
-    code->st = calloc(ST_MAX_SIZE + 1, sizeof(size_t*));
+    code->st = calloc(ST_MAX_SIZE + 1, sizeof(char*));
     for (size_t i = 0; i < ST_MAX_SIZE + 1; ++i)
-        code->st[i] = calloc(0, sizeof(size_t));
+        code->st[i] = calloc(0, sizeof(char));
 
+    /*
     code->dw = calloc(ST_MAX_SIZE + 1, sizeof(size_t));
     code->ds = calloc(ST_MAX_SIZE + 1, sizeof(size_t*));
     for (size_t i = 0; i < ST_MAX_SIZE + 1; ++i)
         code->ds[i] = calloc(0, sizeof(size_t));
+    */
 }

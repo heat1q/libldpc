@@ -153,10 +153,12 @@ void destroy_ldpc_code_t(ldpc_code_t* code) {
             free(code->st[i]);
         free(code->st);
 
+        /*
         free(code->dw);
         for(size_t i = 0; i < code->st_max_size + 1; i++)
             free(code->ds[i]);
         free(code->ds);
+        */
     }
 
 
