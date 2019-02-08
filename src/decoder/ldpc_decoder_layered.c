@@ -2,10 +2,8 @@
 #include "../function/ldpc_functions.h"
 
 
-uint64_t ldpc_decode_layered(ldpc_code_t* code, double* llr_in, double** llr_out, uint64_t max_iter, uint64_t *vn_subset, const uint64_t vn_size, uint64_t *cn_subset, const uint64_t cn_size)
+void ldpc_decode_layered(ldpc_code_t* code, double** llr, uint64_t *cn_subset, const uint64_t cn_size, const size_t SubIter)
 {
-    size_t it;
-
     double* l_v2c;
     double* l_c2v;
 
@@ -15,23 +13,23 @@ uint64_t ldpc_decode_layered(ldpc_code_t* code, double* llr_in, double** llr_out
     size_t vw;
     size_t cw;
 
+    double *f = calloc(code->max_dc, sizeof(double));
+    double *b = calloc(code->max_dc, sizeof(double));
 
-    // double f[code.max_dc];
-    // double b[code.max_dc];
-    double *f = malloc(sizeof(double) * code->max_dc);
-    double *b = malloc(sizeof(double) * code->max_dc);
+    // set to all zero
+    l_v2c = calloc(code->nnz, sizeof(double));
+    l_c2v = calloc(code->nnz, sizeof(double));
 
-
-    l_v2c = malloc(sizeof(double) * code->nnz);
-    l_c2v = malloc(sizeof(double) * code->nnz);
-
-    /* initialize with llrs */
-    for(size_t i = 0; i < code->nnz; i++)
-        l_v2c[i] = llr_in[code->c[i]];
-
-    it = 0;
-    while(it < max_iter)
+    for (size_t it = 0; it < SubIter; ++it)
     {
+
+        /* VN node intialization */
+        for(size_t i = 0; i < code->nnz; i++) //TODO - optimize
+        {
+            l_v2c[i] = (*llr)[code->c[i]];
+            l_c2v[i] = 0.0;
+        }
+
         /* CN node processing */
         for(size_t i = 0; i < cn_size; i++)
         {
@@ -52,38 +50,14 @@ uint64_t ldpc_decode_layered(ldpc_code_t* code, double* llr_in, double** llr_out
                 l_c2v[*(cn+j)] = jacobian(f[j-1], b[j+1]);
         }
 
-        /* VN node processing */
-        for(size_t i = 0; i < vn_size; i++)
-        {
-            double tmp = llr_in[vn_subset[i]];
-            vw = code->vw[vn_subset[i]];
-            vn = code->vn[vn_subset[i]];
-
-            while(vw--)
-                tmp += l_c2v[*vn++];
-
-            vn = code->vn[vn_subset[i]];
-            vw = code->vw[vn_subset[i]];
-
-            while(vw--)
-            {
-                l_v2c[*vn] = tmp - l_c2v[*vn];
-                vn++;
-            }
-        }
-
         // app calculation
-        for(size_t i = 0; i < vn_size; i++)
+        for(size_t i = 0; i < code->nc; ++i)
         {
-            (*llr_out)[vn_subset[i]] = llr_in[vn_subset[i]];
-            vn = code->vn[vn_subset[i]];
-            vw = code->vw[vn_subset[i]];
+            vn = code->vn[i];
+            vw = code->vw[i];
             while(vw--)
-                (*llr_out)[vn_subset[i]] += l_c2v[*vn++];
-
+                (*llr)[i] += l_c2v[*vn++];
         }
-
-        it++;
     }
 
     free(l_c2v);
@@ -91,6 +65,15 @@ uint64_t ldpc_decode_layered(ldpc_code_t* code, double* llr_in, double** llr_out
 
     free(b);
     free(f);
+}
 
-    return it;
+uint64_t ldpc_decode_layered_init(ldpc_code_t* code, double** llr, const uint64_t MaxIter)
+{
+    for (uint64_t i = 0; i < MaxIter; ++i)
+    {
+        for (uint64_t j = 0; j < code->mc; ++j)
+            ldpc_decode_layered(code, llr, &j, 1, 1);
+    }
+
+    return MaxIter;
 }

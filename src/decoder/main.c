@@ -11,31 +11,26 @@ int main()
 
     read_ldpc_file(code, "code6x6.txt");
 
-    double *llrin = calloc(6, sizeof (double));
-    double *llrout = calloc(6, sizeof (double));
-    llrin[0] = 1;llrin[1] = 1;llrin[2] = 1;
-    llrin[3] = 1;llrin[4] = 1;llrin[5] = 1;
+    double *llr1 = calloc(6, sizeof (double));
+    double *llr2 = calloc(6, sizeof (double));
+    llr1[0] = -1;llr1[1] = 2;llr1[2] = -3;
+    llr1[3] = 4;llr1[4] = -5;llr1[5] = 6;
 
-    uint64_t vn_subset[6] = {0, 1, 2, 3, 4, 5};
+    llr2[0] = -1;llr2[1] = 2;llr2[2] = -3;
+    llr2[3] = 4;llr2[4] = -5;llr2[5] = 6;
 
-    uint64_t cn_subset[3] = {0, 2, 4};
-    ldpc_decode_layered(code, llrin, &llrout, 10, vn_subset, 6, cn_subset, 3);
-    printf("Subset 1 :: \t");
-    printVectorDouble(llrout, 6);
+    ldpc_decode_layered_init(code, &llr1);
+    printf("Layerd :: \t");
+    printVectorDouble(llr1, 6);
 
-    cn_subset[0] = 1;cn_subset[0] = 3;cn_subset[0] = 5;
-    ldpc_decode_layered(code, llrout, &llrout, 10, vn_subset, 6, cn_subset, 3);
-    printf("Subset 2 :: \t");
-    printVectorDouble(llrout, 6);
-
-    ldpc_decode(*code, llrin, &llrout, 100, 0);
+    ldpc_decode(*code, llr2, &llr2, 1, 0);
     printf("Full :: \t");
-    printVectorDouble(llrout, 6);
+    printVectorDouble(llr2, 6);
 
     destroy_ldpc_code_t(code);
     free(code);
-    free(llrin);
-    free(llrout);
+    free(llr1);
+    free(llr2);
 
     return 0;
 }

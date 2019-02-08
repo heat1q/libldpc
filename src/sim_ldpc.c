@@ -4,6 +4,9 @@
 #include <string.h>
 #include <getopt.h>
 #include <omp.h>
+
+//#define LAYERED_DEC
+
 #ifdef INTELMKL
 #include <mkl.h>
 #endif
@@ -11,6 +14,8 @@
 #include "function/ldpc_functions.h"
 #ifdef QUANT
 #include "ldpc_decoder_quant.h"
+#elif defined LAYERED_DEC
+#include "decoder/ldpc_decoder_layered.h"
 #else
 #include "decoder/ldpc_decoder.h"
 #endif
@@ -185,11 +190,15 @@ int main(int argc, char* argv[]) {
                 #endif
 
                 /* ldpc decoder */
-                #ifdef QUANT
+                #if defined QUANT
                 iters += ldpc_decode_quant(code, l_in, l_out, sim.bp_iter);
+                #elif defined LAYERED_DEC
+                iters += ldpc_decode_layered_init(&code, &l_in, 1);
                 #else
-                iters += ldpc_decode(code, l_in, l_out, sim.bp_iter, sim.decoder_terminate_early);                
+                iters += ldpc_decode(code, l_in, &l_out, 1, sim.decoder_terminate_early);//sim.bp_iter
                 #endif
+
+
 
 
                 // we just processed one frame in this thread, so we increase the
@@ -204,8 +213,13 @@ int main(int argc, char* argv[]) {
                     bec_tmp += ((l_out[j] <= 0) != c[j]);
                 }
                 #else
-                for(size_t j = 0; j < code.nc; j++) {
+                for(size_t j = 0; j < code.nc; j++)
+                {
+                    #ifdef LAYERED_DEC
+                    bec_tmp += (l_in[j] <= 0);
+                    #else
                     bec_tmp += (l_out[j] <= 0);
+                    #endif
                 }
                 #endif
 
@@ -219,7 +233,11 @@ int main(int argc, char* argv[]) {
                         printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e\n", fec, sim.min_fec, frames, 10*log10(1/sigma2), (double) bec/(frames*code.nc), (double) fec/frames);
 
                         #ifndef NO_ERR_ANALYSIS
+                        #ifdef LAYERED_DEC
+                        log_error(sim, code, cstll, c, l_in, frames, 10*log10(1/sigma2));
+                        #else
                         log_error(sim, code, cstll, c, l_out, frames, 10*log10(1/sigma2));
+                        #endif
                         #endif
                     }
                 }
