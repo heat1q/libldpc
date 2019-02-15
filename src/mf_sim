@@ -4,7 +4,7 @@ INCLUDEPATH= -I.
 
 LIBRARYPATH=
 
-LIBS=-lrt -lm -fopenmp
+LIBS=-lrt -lm #-fopenmp
 
 SRC=sim_ldpc.c function/ldpc_functions.c LDPC_SSET/ldpc_cycles.c decoder/ldpc_decoder.c decoder/ldpc_decoder_layered.c function/scm_functions.c LDPC_SSET/ldpc_stoppingsets.c
 

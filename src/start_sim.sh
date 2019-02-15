@@ -1,1 +1,1 @@
-./sim_ldpc sim_high_res.txt code_rand_proto_3x6_400_4.txt mapping_rand_proto_3x6_400_4.txt
+./sim_ldpc sim.txt code/test_code/code_rand_proto_3x6_400_4.txt code/test_code/mapping_rand_proto_3x6_400_4.txt

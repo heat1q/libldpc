@@ -71,8 +71,10 @@ uint64_t ldpc_decode_layered_init(ldpc_code_t* code, double** llr, const uint64_
 {
     for (uint64_t i = 0; i < MaxIter; ++i)
     {
-        for (uint64_t j = 0; j < code->mc; ++j)
-            ldpc_decode_layered(code, llr, &j, 1, 1);
+        // for test code
+        ldpc_decode_layered(code, llr, LUT_testcode_CN_subset_1, 400, 1);
+        ldpc_decode_layered(code, llr, LUT_testcode_CN_subset_2, 400, 1);
+        ldpc_decode_layered(code, llr, LUT_testcode_CN_subset_3, 400, 1);
     }
 
     return MaxIter;

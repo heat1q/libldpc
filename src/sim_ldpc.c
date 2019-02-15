@@ -193,9 +193,9 @@ int main(int argc, char* argv[]) {
                 #if defined QUANT
                 iters += ldpc_decode_quant(code, l_in, l_out, sim.bp_iter);
                 #elif defined LAYERED_DEC
-                iters += ldpc_decode_layered_init(&code, &l_in, 1);
+                iters += ldpc_decode_layered_init(&code, &l_in, 25);
                 #else
-                iters += ldpc_decode(code, l_in, &l_out, 1, sim.decoder_terminate_early);//sim.bp_iter
+                iters += ldpc_decode(code, l_in, &l_out, 25, sim.decoder_terminate_early);//sim.bp_iter
                 #endif
 
 
