@@ -2,10 +2,9 @@
 #include "../function/ldpc_functions.h"
 
 
-void ldpc_decode_layered(ldpc_code_t* code, double** llr, uint64_t *cn_subset, const uint64_t cn_size, const size_t SubIter)
+void ldpc_decode_layered(ldpc_code_t* code, double* llr_in, double** llr_out, double* l_c2v, uint64_t* cn_subset, const uint64_t cn_size)
 {
     double* l_v2c;
-    double* l_c2v;
 
     size_t* vn;
     size_t* cn;
@@ -18,64 +17,106 @@ void ldpc_decode_layered(ldpc_code_t* code, double** llr, uint64_t *cn_subset, c
 
     // set to all zero
     l_v2c = calloc(code->nnz, sizeof(double));
-    l_c2v = calloc(code->nnz, sizeof(double));
 
-    for (size_t it = 0; it < SubIter; ++it)
+    /* VN node intialization */
+    for(size_t i = 0; i < code->nc; i++)
     {
+        double tmp = llr_in[i];
+        vw = code->vw[i];
+        vn = code->vn[i];
+        while(vw--)
+            tmp += l_c2v[*vn++];
 
-        /* VN node intialization */
-        for(size_t i = 0; i < code->nnz; i++) //TODO - optimize
-        {
-            l_v2c[i] = (*llr)[code->c[i]];
-            l_c2v[i] = 0.0;
-        }
-
-        /* CN node processing */
-        for(size_t i = 0; i < cn_size; i++)
-        {
-            cw = code->cw[cn_subset[i]];
-            cn = code->cn[cn_subset[i]];
-            f[0] = l_v2c[*cn];
-            b[cw-1] = l_v2c[*(cn+cw-1)];
-            for(size_t j = 1; j < cw; j++)
-            {
-                f[j] = jacobian(f[j-1], l_v2c[*(cn+j)]);
-                b[cw-1-j] = jacobian(b[cw-j], l_v2c[*(cn + cw-j-1)]);
-            }
-
-            l_c2v[*cn] = b[1];
-            l_c2v[*(cn+cw-1)] = f[cw-2];
-
-            for(size_t j = 1; j < cw-1; j++)
-                l_c2v[*(cn+j)] = jacobian(f[j-1], b[j+1]);
-        }
-
-        // app calculation
-        for(size_t i = 0; i < code->nc; ++i)
-        {
-            vn = code->vn[i];
-            vw = code->vw[i];
-            while(vw--)
-                (*llr)[i] += l_c2v[*vn++];
+        vn = code->vn[i];
+        vw = code->vw[i];
+        while(vw--) {
+            l_v2c[*vn] = tmp - l_c2v[*vn];
+            vn++;
         }
     }
 
-    free(l_c2v);
+    /* CN node processing */
+    for(size_t i = 0; i < cn_size; i++)
+    {
+        cw = code->cw[cn_subset[i]];
+        cn = code->cn[cn_subset[i]];
+        f[0] = l_v2c[*cn];
+        b[cw-1] = l_v2c[*(cn+cw-1)];
+        for(size_t j = 1; j < cw; j++)
+        {
+            f[j] = jacobian(f[j-1], l_v2c[*(cn+j)]);
+            b[cw-1-j] = jacobian(b[cw-j], l_v2c[*(cn + cw-j-1)]);
+        }
+
+        l_c2v[*cn] = b[1];
+        l_c2v[*(cn+cw-1)] = f[cw-2];
+
+        for(size_t j = 1; j < cw-1; j++)
+            l_c2v[*(cn+j)] = jacobian(f[j-1], b[j+1]);
+    }
+
+    // app calculation
+    for(size_t i = 0; i < code->nc; i++)
+    {
+        vn = code->vn[i];
+        vw = code->vw[i];
+        while(vw--)
+            (*llr_out)[i] += l_c2v[*vn++];
+    }
+
     free(l_v2c);
 
     free(b);
     free(f);
 }
 
-uint64_t ldpc_decode_layered_init(ldpc_code_t* code, double** llr, const uint64_t MaxIter)
+uint64_t ldpc_decode_layered_init(ldpc_code_t* code, double *llr_in, const uint64_t MaxIter)
 {
-    for (uint64_t i = 0; i < MaxIter; ++i)
+    uint64_t set1[3] = {0,2,4};
+    uint64_t set2[3] = {1,3,5};
+
+    double test[6] = {0.0};
+    double x[12] = {0.0};
+    bits_t bits[6] = {0};
+
+    double *l_c2v_1 = calloc(code->nnz, sizeof (double));
+    double *l_c2v_2 = calloc(code->nnz, sizeof (double));
+    double *llr_out = calloc(code->nc, sizeof (double));
+    for (int i=0; i<code->nc; ++i)
     {
-        // for test code
-        ldpc_decode_layered(code, llr, LUT_testcode_CN_subset_1, 400, 1);
-        ldpc_decode_layered(code, llr, LUT_testcode_CN_subset_2, 400, 1);
-        ldpc_decode_layered(code, llr, LUT_testcode_CN_subset_3, 400, 1);
+        llr_out[i] = llr_in[i];
     }
+
+
+    for (size_t I = 0; I < MaxIter; ++I)
+    {
+        //parallel
+        ldpc_decode_layered(code, llr_in, &llr_out, l_c2v_1, set1, 3);
+        ldpc_decode_layered(code, llr_in, &llr_out, l_c2v_2, set2, 3);
+
+        //interchange check node messages
+        for(int i=0; i<code->nnz; ++i)
+        {
+            x[i] = l_c2v_1[i];
+            l_c2v_1[i] = l_c2v_2[i];
+            l_c2v_2[i] = x[i];
+        }
+
+        printf("Layerd @Iter: %lu :: \t", I);
+        printVectorDouble(llr_out, code->nc);
+        for(int i=0; i<code->nc; ++i)
+            bits[i] = llr_out[i] <= 0;
+        printf("Is codeword: %i \n", is_codeword(*code, bits));
+
+
+        for (int i=0; i<code->nc; ++i)
+        {
+            llr_out[i] = llr_in[i];
+        }
+    }
+
+
+    free(l_c2v_1);free(l_c2v_2);free(llr_out);
 
     return MaxIter;
 }
