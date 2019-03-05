@@ -16,7 +16,7 @@ int main()
     llr1[0] = -1;llr1[1] = 2;llr1[2] = -3;
     llr1[3] = 4;llr1[4] = -5;llr1[5] = 6;
 
-    ldpc_decode_layered_init(code, llr1, 100);
+    ldpc_decode_layered_start(code, llr1, llr_out, 100);
 
     for(int i=0; i<code->nnz; ++i)
         llr_out[i] = 0.0;

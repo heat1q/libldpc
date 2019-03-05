@@ -2,7 +2,7 @@
 #include "../function/ldpc_functions.h"
 
 
-void ldpc_decode_layered(ldpc_code_t* code, double* llr_in, double** llr_out, double* l_c2v, uint64_t* cn_subset, const uint64_t cn_size)
+void ldpc_decode_layered(ldpc_code_t* code, double* llr_in, double* l_c2v, double *l_c2v_sum, uint64_t* cn_subset, const uint64_t cn_size)
 {
     double* l_v2c;
 
@@ -18,6 +18,9 @@ void ldpc_decode_layered(ldpc_code_t* code, double* llr_in, double** llr_out, do
     // set to all zero
     l_v2c = calloc(code->nnz, sizeof(double));
 
+    for(size_t i = 0; i < code->nnz; ++i)
+        l_c2v[i] = l_c2v_sum[i] - l_c2v[i];
+
     /* VN node intialization */
     for(size_t i = 0; i < code->nc; i++)
     {
@@ -29,9 +32,10 @@ void ldpc_decode_layered(ldpc_code_t* code, double* llr_in, double** llr_out, do
 
         vn = code->vn[i];
         vw = code->vw[i];
-        while(vw--) {
+        while(vw--)
+        {
             l_v2c[*vn] = tmp - l_c2v[*vn];
-            vn++;
+            ++vn;
         }
     }
 
@@ -55,51 +59,50 @@ void ldpc_decode_layered(ldpc_code_t* code, double* llr_in, double** llr_out, do
             l_c2v[*(cn+j)] = jacobian(f[j-1], b[j+1]);
     }
 
-    // app calculation
-    for(size_t i = 0; i < code->nc; i++)
-    {
-        vn = code->vn[i];
-        vw = code->vw[i];
-        while(vw--)
-            (*llr_out)[i] += l_c2v[*vn++];
-    }
-
     free(l_v2c);
 
     free(b);
     free(f);
 }
 
-uint64_t ldpc_decode_layered_init(ldpc_code_t* code, double *llr_in, const uint64_t MaxIter)
+uint64_t ldpc_decode_layered_start(ldpc_code_t* code, double *llr_in, double* llr_out, const uint64_t MaxIter)
 {
     uint64_t set1[3] = {0,2,4};
     uint64_t set2[3] = {1,3,5};
 
-    double test[6] = {0.0};
-    double x[12] = {0.0};
+    size_t* vn;
+    size_t vw;
+
+    double lsum[12] = {0.0};
     bits_t bits[6] = {0};
 
     double *l_c2v_1 = calloc(code->nnz, sizeof (double));
     double *l_c2v_2 = calloc(code->nnz, sizeof (double));
-    double *llr_out = calloc(code->nc, sizeof (double));
-    for (int i=0; i<code->nc; ++i)
-    {
-        llr_out[i] = llr_in[i];
-    }
 
 
     for (size_t I = 0; I < MaxIter; ++I)
     {
+
         //parallel
-        ldpc_decode_layered(code, llr_in, &llr_out, l_c2v_1, set1, 3);
-        ldpc_decode_layered(code, llr_in, &llr_out, l_c2v_2, set2, 3);
+        ldpc_decode_layered(code, llr_in, l_c2v_1, lsum, set1, 3);
+        ldpc_decode_layered(code, llr_in, l_c2v_2, lsum, set2, 3);
 
         //interchange check node messages
         for(int i=0; i<code->nnz; ++i)
         {
-            x[i] = l_c2v_1[i];
-            l_c2v_1[i] = l_c2v_2[i];
-            l_c2v_2[i] = x[i];
+            lsum[i] = l_c2v_1[i] + l_c2v_2[i];
+            //l_c2v_2[i] = lsum[i] - l_c2v_2[i];
+            //l_c2v_1[i] = lsum[i] - l_c2v_1[i];
+        }
+
+        // app calculation
+        for(size_t i = 0; i < code->nc; i++)
+        {
+            llr_out[i] = llr_in[i];
+            vn = code->vn[i];
+            vw = code->vw[i];
+            while(vw--)
+                llr_out[i] += lsum[*vn++];
         }
 
         printf("Layerd @Iter: %lu :: \t", I);
@@ -109,14 +112,10 @@ uint64_t ldpc_decode_layered_init(ldpc_code_t* code, double *llr_in, const uint6
         printf("Is codeword: %i \n", is_codeword(*code, bits));
 
 
-        for (int i=0; i<code->nc; ++i)
-        {
-            llr_out[i] = llr_in[i];
-        }
     }
 
 
-    free(l_c2v_1);free(l_c2v_2);free(llr_out);
+    free(l_c2v_1);free(l_c2v_2);
 
     return MaxIter;
 }
