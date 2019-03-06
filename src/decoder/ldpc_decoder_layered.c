@@ -10,8 +10,8 @@ void layered_dec(ldpc_code_t* code, double* llr_in, double* l_c2v, double* l_c2v
     size_t vw;
     size_t cw;
 
-    for(size_t i = 0; i < code->nnz; ++i)
-        l_c2v[i] = l_c2v_sum[i] - l_c2v[i];
+    //for(size_t i = 0; i < code->nnz; ++i)
+    //    l_c2v[i] = l_c2v_sum[i] - l_c2v[i];
 
     /* VN node intialization */
     for(size_t i = 0; i < code->nc; i++)
@@ -20,13 +20,16 @@ void layered_dec(ldpc_code_t* code, double* llr_in, double* l_c2v, double* l_c2v
         vw = code->vw[i];
         vn = code->vn[i];
         while(vw--)
-            tmp += l_c2v[*vn++];
+        {
+            tmp += (l_c2v_sum[*vn] - l_c2v[*vn]);
+            vn++;
+        }
 
         vn = code->vn[i];
         vw = code->vw[i];
         while(vw--)
         {
-            l_v2c[*vn] = tmp - l_c2v[*vn];
+            l_v2c[*vn] = tmp - l_c2v_sum[*vn] + l_c2v[*vn];
             ++vn;
         }
     }
@@ -73,7 +76,8 @@ uint64_t ldpc_decode_layered(ldpc_code_t* code, double* llr_in, double* llr_out,
         b[i] = calloc(code->max_dc, sizeof(double));
     }
 
-    for (size_t I = 0; I < MaxIter; ++I)
+    size_t I = 0;
+    while (I < MaxIter)
     {
         //parallel
         for (size_t i = 0; i < code->nl; ++i)
@@ -97,6 +101,14 @@ uint64_t ldpc_decode_layered(ldpc_code_t* code, double* llr_in, double* llr_out,
                 llr_out[i] += lsum[*vn++];
             c_out[i] = (llr_out[i] <= 0);
         }
+
+        ++I;
+
+        if (early_termination)
+        {
+            if (is_codeword(*code, c_out))
+                break;
+        }
     }
 
     //free memory
@@ -114,7 +126,7 @@ uint64_t ldpc_decode_layered(ldpc_code_t* code, double* llr_in, double* llr_out,
     free(lsum);
     free(c_out);
 
-    return MaxIter;
+    return I;
 }
 
 uint8_t layered_dec_setup(ldpc_code_t* code, char* clfile)

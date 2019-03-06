@@ -1,4 +1,4 @@
-//#define LAYERED_DEC
+#define LAYERED_DEC
 
 #include <stdio.h>
 #include <stdint.h>
