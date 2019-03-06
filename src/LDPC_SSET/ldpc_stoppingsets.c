@@ -52,7 +52,7 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const
             for (size_t i = 0; i < ImaxBP; ++i)
             {
                 // run the belief propagation decoder for one interation
-                ldpc_decode(*code, llr, &llr, 1, 0);
+                ldpc_decode(*code, llr, llr, 1, 0);
 
                 // set the threshold
                 int64_t t = -1;

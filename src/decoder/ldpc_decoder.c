@@ -6,7 +6,7 @@
 #include "../function/ldpc_functions.h"
 
 
-uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double** llr_out, uint64_t max_iter, uint8_t early_termination) {
+uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double* llr_out, uint64_t max_iter, uint8_t early_termination) {
     size_t it;
 
     double* l_v2c;
@@ -71,13 +71,13 @@ uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double** llr_out, uint64_
 
         // app calculation
         for(size_t i = 0; i < code.nc; i++) {
-            (*llr_out)[i] = llr_in[i];
+            llr_out[i] = llr_in[i];
             vn = code.vn[i];
             vw = code.vw[i];
             while(vw--) {
-                (*llr_out)[i] += l_c2v[*vn++];
+                llr_out[i] += l_c2v[*vn++];
             }
-            c_out[i] = ((*llr_out)[i] <= 0);
+            c_out[i] = (llr_out[i] <= 0);
         }
 
         it++;

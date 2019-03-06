@@ -43,6 +43,10 @@ struct {
     char** st;
     //size_t* dw;
     //size_t** ds;
+    uint64_t nl; //number of layers
+    uint64_t* lw; //layer weight
+    uint64_t** layers;
+
 } typedef ldpc_code_t;
 
 struct {

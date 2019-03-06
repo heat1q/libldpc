@@ -11,9 +11,9 @@ int main(int argc, char* argv[])
 {
     uint8_t abort = 0;
 
-    char codeName[100];
-    char stFile[100];
-    char stcountFile[100];
+    char codeName[128];
+    char stFile[128];
+    char stcountFile[128];
     uint64_t maxSize = 0;
     uint64_t ImaxBP = 10;
     int ImaxE = 10;

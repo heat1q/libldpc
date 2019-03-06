@@ -740,7 +740,11 @@ int read_ldpc_file(ldpc_code_t* code, const char* filename) {
         }
     }
 
+    //Stopping sets
     code->st_max_size = 0;
+
+    //Layered Decoding
+    code->nl = 0;
 
 #ifdef ENCODE
     code->genmat = malloc(sizeof(uint8_t*) * code->kc);
@@ -897,13 +901,14 @@ void destroy_ldpc_code_t(ldpc_code_t* code) {
         for(size_t i = 0; i < code->st_max_size + 1; i++)
             free(code->st[i]);
         free(code->st);
+    }
 
-        /*
-        free(code->dw);
-        for(size_t i = 0; i < code->st_max_size + 1; i++)
-            free(code->ds[i]);
-        free(code->ds);
-        */
+    if (code->nl)
+    {
+        free(code->lw);
+        for(size_t i = 0; i < code->nl; i++)
+            free(code->layers[i]);
+        free(code->layers);
     }
 }
 
