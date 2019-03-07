@@ -17,16 +17,13 @@ void layered_dec(ldpc_code_t* code, double* llr_in, double* l_c2v, double* l_c2v
         vw = code->vw[i];
         vn = code->vn[i];
         while(vw--)
-        {
-            tmp += (l_c2v_sum[*vn] - l_c2v[*vn]);
-            vn++;
-        }
+            tmp += l_c2v_sum[*vn++];
 
         vn = code->vn[i];
         vw = code->vw[i];
         while(vw--)
         {
-            l_v2c[*vn] = tmp - l_c2v_sum[*vn] + l_c2v[*vn];
+            l_v2c[*vn] = tmp - l_c2v[*vn];
             ++vn;
         }
     }
