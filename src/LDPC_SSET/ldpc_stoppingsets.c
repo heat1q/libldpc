@@ -23,24 +23,27 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const
     double* llr;
     bits_t* bits;
     size_t* st_set;
-    const uint64_t MaxStrEntrySize = (floor(log10(code->nc)) + 1);
+    const uint64_t MaxStrEntrySize = (ceil(log10(code->nc))) + 1; // +space
     const uint64_t MaxStrStSize = MaxStrEntrySize * MaxStSize + 2;
     char* st_set_str;
 
-    FILE* file_count = fopen(fileName_count, "w");
-    FILE* file_st = fopen(fileName_st, "w");
+    char* fp_tmpstr;
+    char* fp_str_tok;
+    FILE* file_count;
+    FILE* file_st;
 
     printf("Result Files: %s %s\n", fileName_st, fileName_count);
 
     struct timespec tstart={0,0}, tend={0,0};
     clock_gettime(CLOCK_MONOTONIC, &tstart);
 
-    #pragma omp parallel for default(none) private(llr, bits, st_set, st_set_size, st_set_str) shared(code, time, st_found)
+    #pragma omp parallel for default(none) private(llr, bits, st_set, st_set_size, st_set_str, fp_tmpstr) shared(code, time, st_found, file_count, fileName_count, file_st, fileName_st, fp_str_tok)
     for (size_t j = 0; j < code->nc; ++j)
     {
         llr = calloc(code->nc, sizeof(double));
         bits = calloc(code->nc, sizeof(bits_t));
-        st_set_str = calloc(MaxStrStSize*2, sizeof(char)); //TODO
+        st_set_str = calloc(MaxStrStSize*2, sizeof(char));
+        fp_tmpstr = calloc(0, sizeof(char));
 
         for (size_t l = j+1; l < code->nc; ++l)
         {
@@ -71,22 +74,49 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const
                         strcpy(st_set_str, "");
                         int index = 0;
                         for (size_t s = 0; s < st_set_size; ++s)
-                           index += sprintf(&st_set_str[index], "%lu ", st_set[s]);
-                        strcat(st_set_str, "| ");
+                            index += sprintf(&st_set_str[index], "%lu ", st_set[s]);
+                        strcat(st_set_str, "|");
 
                         #pragma omp critical
                         {
-                            size_t cur_stw = code->stw[st_set_size];
-
                             if(strstr(code->st[st_set_size], st_set_str) == NULL)
                             {
+                                size_t cur_strsize = 1 + strlen(st_set_str) + strlen(code->st[st_set_size]);
+
                                 //store
-                                code->st[st_set_size] = realloc(code->st[st_set_size], (cur_stw + 1) * MaxStrStSize*2 * sizeof(char));
+                                code->st[st_set_size] = realloc(code->st[st_set_size], cur_strsize * sizeof(char));
                                 strcat(code->st[st_set_size], st_set_str);
 
                                 ++code->stw[st_set_size];
 
                                 ++st_found;
+
+                                //print to file
+                                file_count = fopen(fileName_count, "w");
+                                file_st = fopen(fileName_st, "w");
+                                for (size_t i = 1; i <= MaxStSize; ++i)
+                                    fprintf(file_count, "%lu ", code->stw[i]);
+
+                                for (size_t i = 1; i <= MaxStSize; ++i)
+                                {
+                                    //print multiplicities
+                                    fprintf(file_count, "%lu ", code->stw[i]);
+
+                                    fp_tmpstr = realloc(fp_tmpstr, (strlen(code->st[i])+1) * sizeof(char));
+                                    strcpy(fp_tmpstr, code->st[i]);
+
+                                    //print sets
+                                    fprintf(file_st, "size=%lu multiplicity=%lu\n", i, code->stw[i]);
+                                    fp_str_tok = strtok(fp_tmpstr, "|");
+                                    while (fp_str_tok != NULL)
+                                    {
+                                        fprintf(file_st, "%s\n", fp_str_tok);
+                                        fp_str_tok = strtok(NULL, "|");
+                                    }
+                                }
+
+                                fclose(file_count);
+                                fclose(file_st);
                             }
                             free(st_set);
                         }
@@ -99,28 +129,13 @@ void lpdc_code_t_stopping_sets(ldpc_code_t* code, const char* fileName_st, const
         free(llr);
         free(bits);
         free(st_set_str);
+        free(fp_tmpstr);
     }
-    printf("\n");
 
     clock_gettime(CLOCK_MONOTONIC, &tend);
-    printf("Total Time taken:  %.5f seconds\n", ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) - ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec));
-
-    /*
-    printVectorToFile(code->stw, MaxStSize+1, file_count, 0);
-
-    for (size_t i = 1; i <= MaxStSize; ++i)
-    {
-        fprintf(file_st, "size=%lu multiplicity=%lu\n", i, code->stw[i]);
-        for (size_t j = 0; j < code->stw[i]; ++j)
-        {
-            printVectorToFile(code->st[i], i, file_st, j*i);
-            fprintf(file_st, "\n");
-        }
-    }
-    */
+    printf("\nTotal Time taken:  %.5f seconds\n", ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) - ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec));
 
     printf("================================================================\n");
-
 }
 
 size_t lpdc_code_t_erasure_decoding(ldpc_code_t* code, bits_t** in_bits, size_t** set)
@@ -253,6 +268,7 @@ void generate_submatrix(ldpc_code_t* code, ldpc_code_t* erasure_code, size_t* ep
     erasure_code->puncture = NULL;
     erasure_code->shorten = NULL;
     erasure_code->st_max_size = 0;
+    erasure_code->nl = 0; //layers
 }
 
 void ldpc_code_t_st_setup(ldpc_code_t* code, const size_t ST_MAX_SIZE)
