@@ -132,6 +132,8 @@ int main(int argc, char* argv[])
 
     /* read config */
 
+    setup_ldpc_sim(&sim, &code, &cstll, simFileName, codeFileName, mapFileName);
+
     #ifdef LAYERED_DEC
     if(!layered_dec_setup(&code, codelayerFileName))
     {
@@ -139,8 +141,6 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
     #endif
-
-    setup_ldpc_sim(&sim, &code, &cstll, simFileName, codeFileName, mapFileName);
 
     int opt;
     while((opt = getopt_long(argc, argv, short_opt, long_opt, NULL)) != -1) {
@@ -277,9 +277,6 @@ int main(int argc, char* argv[])
                 #else
                 iters += ldpc_decode(code, l_in, l_out, sim.bp_iter, sim.decoder_terminate_early);
                 #endif
-
-
-
 
                 // we just processed one frame in this thread, so we increase the
                 // global frame count

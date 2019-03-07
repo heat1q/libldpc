@@ -10,9 +10,6 @@ void layered_dec(ldpc_code_t* code, double* llr_in, double* l_c2v, double* l_c2v
     size_t vw;
     size_t cw;
 
-    //for(size_t i = 0; i < code->nnz; ++i)
-    //    l_c2v[i] = l_c2v_sum[i] - l_c2v[i];
-
     /* VN node intialization */
     for(size_t i = 0; i < code->nc; i++)
     {
