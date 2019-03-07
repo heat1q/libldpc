@@ -1,10 +1,14 @@
+#pragma once
+
+#define _POSIX_C_SOURCE 199309L
 
 #include "scm_types.h"
-
-#ifndef _LDPC_TYPES_H
-#define _LDPC_TYPES_H
-
+#include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
+#include <time.h>
+#include <math.h>
 
 struct {
     uint64_t nc; /* blocklength of code */
@@ -33,6 +37,16 @@ struct {
     size_t** vn; /* denotes the var neighbors, i.e., connected CN, for each variable node as index in c/r; dimensions vn[nc][vw[i]] */
     size_t* r; /* non zero row indices; length nnz */
     size_t* c; /* non zero check indices; length nnz */
+    uint64_t girth;
+    size_t st_max_size;
+    size_t* stw;
+    char** st;
+    //size_t* dw;
+    //size_t** ds;
+    uint64_t nl; //number of layers
+    uint64_t* lw; //layer weight
+    uint64_t** layers;
+
 } typedef ldpc_code_t;
 
 struct {
@@ -52,5 +66,3 @@ struct {
     size_t** bit_mapper;
     size_t* bits_pos;
 } typedef ldpc_sim_t;
-
-#endif

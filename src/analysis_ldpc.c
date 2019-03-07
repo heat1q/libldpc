@@ -1,19 +1,19 @@
-#include "unistd.h"
-#include "string.h"
+#include <unistd.h>
+#include <string.h>
 
-#include "ldpc_types.h"
-#include "functions.h"
-#include "ldpc_cycles.h"
-#include "ldpc_decoder.h"
-#include "ldpc_stoppingsets.h"
+#include "function/ldpc_types.h"
+#include "function/ldpc_functions.h"
+#include "LDPC_SSET/ldpc_cycles.h"
+#include "decoder/ldpc_decoder.h"
+#include "LDPC_SSET/ldpc_stoppingsets.h"
 
 int main(int argc, char* argv[])
 {
     uint8_t abort = 0;
 
-    char codeName[100];
-    char stFile[100];
-    char stcountFile[100];
+    char codeName[128];
+    char stFile[128];
+    char stcountFile[128];
     uint64_t maxSize = 0;
     uint64_t ImaxBP = 10;
     int ImaxE = 10;

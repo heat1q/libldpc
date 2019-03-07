@@ -1,9 +1,11 @@
-#ifndef _SCM_TYPES_H
-#define _SCM_TYPES_H
+#pragma once
 
 #define MAX_FILENAME_LEN 256
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 #ifdef INTELMKL
 #include <mkl.h>
@@ -53,5 +55,3 @@ struct {
 typedef uint8_t bits_t;
 typedef uint16_t labels_t;
 typedef uint32_t symbols_t;
-
-#endif

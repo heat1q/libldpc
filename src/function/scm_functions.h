@@ -1,5 +1,4 @@
-#ifndef _SCM_FUNCTIONS_H
-#define _SCM_FUNCTIONS_H
+#pragma once
 
 #include "scm_types.h"
 
@@ -39,6 +38,3 @@ void destroy_dm_t(dm_t* dm);
 void dec2bin(uint64_t val, uint8_t pad);
 void print_cstll_t(cstll_t cstll);
 void print_dm_t(dm_t dm);
-
-
-#endif

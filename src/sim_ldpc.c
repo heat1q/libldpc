@@ -1,21 +1,105 @@
+#define LAYERED_DEC
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
 #include <omp.h>
+
+#ifdef INTELMKL
 #include <mkl.h>
-#include "scm_functions.h"
-#include "ldpc_functions.h"
+#endif
+#include "function/scm_functions.h"
+#include "function/ldpc_functions.h"
 #ifdef QUANT
 #include "ldpc_decoder_quant.h"
+#elif defined LAYERED_DEC
+#include "decoder/ldpc_decoder_layered.h"
 #else
-#include "ldpc_decoder.h"
+#include "decoder/ldpc_decoder.h"
 #endif
 
 
 
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[])
+{
+    /* =========================================================================== */
+    uint8_t abort = 0;
+    char codeFileName[128];
+    char mapFileName[128];
+    char simFileName[128];
+    char codelayerFileName[128];
+    const int numArgs = (argc-1)/2;
+
+    #ifdef LAYERED_DEC
+    if (argc == 9)
+    {
+        for (int i = 0; i < numArgs; ++i)
+        {
+            if (strcmp(argv[2*i+1], "+code") == 0)
+                strcpy(codeFileName, argv[2*i+2]);
+            else if (strcmp(argv[2*i+1], "+map") == 0)
+                strcpy(mapFileName, argv[2*i+2]);
+            else if (strcmp(argv[2*i+1], "+sim") == 0)
+                strcpy(simFileName, argv[2*i+2]);
+            else if (strcmp(argv[2*i+1], "+cl") == 0)
+                strcpy(codelayerFileName, argv[2*i+2]);
+            else
+                abort = 1;
+        }
+    }
+    else
+        abort = 1;
+
+    if (abort)
+    {
+        printf("======================== LDPC Simulation ========================\n");
+        printf("                        (Layered Decoding)                       \n");
+        printf("                         Usage Reminder:                         \n");
+        printf("         Main +code CodeFile +map CodeMapFile +sim SimFile       \n");
+        printf("              +cl CLFile                                         \n");
+        printf("                                                                 \n");
+        printf("                CodeFile: Name of the code file                  \n");
+        printf("               CodeMapFile: Name of mapping file                 \n");
+        printf("               SimFile: Name of simulation file                  \n");
+        printf("               CLFile: Name of code layer file                   \n");
+        printf("=================================================================\n");
+        exit(EXIT_FAILURE);
+    }
+    #else
+    if (argc == 7)
+    {
+        for (int i = 0; i < numArgs; ++i)
+        {
+            if (strcmp(argv[2*i+1], "+code") == 0)
+                strcpy(codeFileName, argv[2*i+2]);
+            else if (strcmp(argv[2*i+1], "+map") == 0)
+                strcpy(mapFileName, argv[2*i+2]);
+            else if (strcmp(argv[2*i+1], "+sim") == 0)
+                strcpy(simFileName, argv[2*i+2]);
+            else
+                abort = 1;
+        }
+    }
+    else
+        abort = 1;
+
+    if (abort)
+    {
+        printf("======================== LDPC Simulation ========================\n");
+        printf("                         Usage Reminder:                         \n");
+        printf("         Main +code CodeFile +map CodeMapFile +sim SimFile       \n");
+        printf("                                                                 \n");
+        printf("                CodeFile: Name of the code file                  \n");
+        printf("               CodeMapFile: Name of mapping file                 \n");
+        printf("               SimFile: Name of simulation file                  \n");
+        printf("=================================================================\n");
+        exit(EXIT_FAILURE);
+    }
+    #endif
+    /* =========================================================================== */
+
 
     ldpc_sim_t sim;
     ldpc_code_t code;
@@ -48,12 +132,15 @@ int main(int argc, char* argv[]) {
 
     /* read config */
 
-    if(argc < 4) {
-        printf("sim and/or code and/or mapping file is missing. please provide.\n");
+    setup_ldpc_sim(&sim, &code, &cstll, simFileName, codeFileName, mapFileName);
+
+    #ifdef LAYERED_DEC
+    if(!layered_dec_setup(&code, codelayerFileName))
+    {
+        printf("Can not setup decoder!\n");
         exit(EXIT_FAILURE);
     }
-
-    setup_ldpc_sim(&sim, &code, &cstll, argv[1], argv[2], argv[3]);
+    #endif
 
     int opt;
     while((opt = getopt_long(argc, argv, short_opt, long_opt, NULL)) != -1) {
@@ -99,6 +186,8 @@ int main(int argc, char* argv[]) {
     for(size_t i = 0; i < num_threads; i++) {
         vslNewStream(&rng_stream[i], VSL_BRNG_MT2203+i, 777777);
     }
+    #else
+    void *rng_stream = NULL;
     #endif
 
     /*
@@ -181,12 +270,13 @@ int main(int argc, char* argv[]) {
                 #endif
 
                 /* ldpc decoder */
-                #ifdef QUANT
+                #if defined QUANT
                 iters += ldpc_decode_quant(code, l_in, l_out, sim.bp_iter);
+                #elif defined LAYERED_DEC
+                iters += ldpc_decode_layered(&code, l_in, l_out, sim.bp_iter, sim.decoder_terminate_early);
                 #else
-                iters += ldpc_decode(code, l_in, l_out, sim.bp_iter, sim.decoder_terminate_early);                
+                iters += ldpc_decode(code, l_in, l_out, sim.bp_iter, sim.decoder_terminate_early);
                 #endif
-
 
                 // we just processed one frame in this thread, so we increase the
                 // global frame count
@@ -200,7 +290,8 @@ int main(int argc, char* argv[]) {
                     bec_tmp += ((l_out[j] <= 0) != c[j]);
                 }
                 #else
-                for(size_t j = 0; j < code.nc; j++) {
+                for(size_t j = 0; j < code.nc; j++)
+                {
                     bec_tmp += (l_out[j] <= 0);
                 }
                 #endif

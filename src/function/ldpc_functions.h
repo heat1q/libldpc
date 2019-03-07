@@ -1,5 +1,3 @@
-#include <math.h>
-#include <stdint.h>
 #include "ldpc_types.h"
 #include "scm_types.h"
 
@@ -40,3 +38,11 @@ void destroy_ldpc_sim_t(ldpc_sim_t *sim);
 
 void print_ldpc_code_t(ldpc_code_t code);
 void print_ldpc_sim_t(ldpc_sim_t sim);
+
+//stopping sets & cycles
+size_t NchooseK(const size_t n, const size_t k);
+void printVector(void *input, const size_t k);
+void printVectorDouble(double* x, const size_t k);
+void printBits(bits_t* x, const size_t k);
+
+void printVectorToFile(void* input, const size_t k, FILE* file, size_t a);

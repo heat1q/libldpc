@@ -1,8 +1,8 @@
-#include <stdint.h>
-#include "ldpc_types.h"
+#include "../function/ldpc_types.h"
+#include "../function/scm_types.h"
 
 uint64_t ldpc_decode_quant(ldpc_code_t code, double* llr_in, double* llr_out, uint64_t max_iter);
-uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double* llr_out, uint64_t max_iter, uint8_t early_termination);
+uint64_t ldpc_decode(ldpc_code_t code, double* llr_in, double *llr_out, uint64_t max_iter, uint8_t early_termination);
 
 void calc_syndrome(ldpc_code_t code, double* llr_out, bits_t* s);
 
