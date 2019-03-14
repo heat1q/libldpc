@@ -18,8 +18,8 @@ LDPC::~LDPC()
     free(cw_c);
     free(r_c);
     free(c_c);
-    free(puncture);
-    free(shorten);
+    free(puncture_c);
+    free(shorten_c);
 }
 
 bool LDPC::read_file(const char* filename)
@@ -39,36 +39,36 @@ bool LDPC::read_file(const char* filename)
     k_c = n_c-m_c;
     kct = nct-mct;
 
-    fscanf(fp, "puncture [%lu]: ", &(num_puncture));
-    num_puncture_sys = 0;
-    num_puncture_par = 0;
-    if(num_puncture != 0)
+    fscanf(fp, "puncture [%lu]: ", &(num_puncture_c));
+    num_puncture_sys_c = 0;
+    num_puncture_par_c = 0;
+    if(num_puncture_c != 0)
     {
-        puncture = new size_t[num_puncture];
-        for(size_t i = 0; i < num_puncture; i++)
+        puncture_c = new size_t[num_puncture_c];
+        for(size_t i = 0; i < num_puncture_c; i++)
         {
-            fscanf(fp, " %lu ", &(puncture[i]));
-            if(puncture[i] < k_c)
-                num_puncture_sys++;
+            fscanf(fp, " %lu ", &(puncture_c[i]));
+            if(puncture_c[i] < k_c)
+                num_puncture_sys_c++;
             else
-                num_puncture_par++;
+                num_puncture_par_c++;
 
         }
     }
     else
     {
-        puncture = nullptr;
+        puncture_c = nullptr;
     }
-    fscanf(fp, "shorten [%lu]: ", &num_shorten);
-    if(num_shorten != 0)
+    fscanf(fp, "shorten [%lu]: ", &num_shorten_c);
+    if(num_shorten_c != 0)
     {
-        shorten = new size_t[num_shorten];
-        for(size_t i = 0; i < num_shorten; i++)
-            fscanf(fp, " %lu ", &(shorten[i]));
+        shorten_c = new size_t[num_shorten_c];
+        for(size_t i = 0; i < num_shorten_c; i++)
+            fscanf(fp, " %lu ", &(shorten_c[i]));
     }
     else
     {
-        shorten = nullptr;
+        shorten_c = nullptr;
     }
 
     size_t* cw_tmp;
@@ -105,11 +105,11 @@ bool LDPC::read_file(const char* filename)
     delete[] cw_tmp;
     delete[] vw_tmp;
 
-    max_dc = 0;
+    max_dc_c = 0;
     for(size_t i = 0; i < m_c; i++)
     {
         if(cw_c[i] > max_dc)
-            max_dc = cw_c[i];
+            max_dc_c = cw_c[i];
     }
 
     fclose(fp);
@@ -124,28 +124,28 @@ void LDPC::print_ldpc_code()
     cout << "mc : " << m_c << endl;
     cout << "kc : " << k_c << endl;
     cout << "nnz : " << nnz_c << endl;
-    cout << "nct :" << nct << endl;
-    cout << "mct : " << mct << endl;
-    cout << "kct : " << kct << endl;
-    cout << "max dc : " << max_dc << endl;
-    cout << "num puncture: " << num_puncture << endl;
-    cout << "num puncture sys: " << num_puncture_sys << endl;
-    cout << "num puncture par: " << num_puncture_par << endl;
-    cout << "num shorten: " << num_shorten << endl;
+    cout << "nct :" << nct_c << endl;
+    cout << "mct : " << mct_c << endl;
+    cout << "kct : " << kct_c << endl;
+    cout << "max dc : " << max_dc_c << endl;
+    cout << "num puncture: " << num_puncture_c << endl;
+    cout << "num puncture sys: " << num_puncture_sys_c << endl;
+    cout << "num puncture par: " << num_puncture_par_c << endl;
+    cout << "num shorten: " << num_shorten_c << endl;
     cout << "=========== LDPC: END ===========" << endl;
 }
 
-uint64_t LDPC::n() const
+uint64_t LDPC::nc() const
 {
     return n_c;
 }
 
-uint64_t LDPC::k() const
+uint64_t LDPC::kc() const
 {
     return k_c;
 }
 
-uint64_t LDPC::m() const
+uint64_t LDPC::mc() const
 {
     return m_c;
 }
@@ -183,6 +183,41 @@ size_t *LDPC::r() const
 size_t *LDPC::c() const
 {
     return c_c;
+}
+
+uint64_t LDPC::nct() const
+{
+    return nct_c;
+}
+
+uint64_t LDPC::mct() const
+{
+    return mct_c;
+}
+
+size_t *LDPC::getPuncture_c() const
+{
+    return puncture_c;
+}
+
+size_t LDPC::getNum_puncture_c() const
+{
+    return num_puncture_c;
+}
+
+size_t *LDPC::getShorten_c() const
+{
+    return shorten_c;
+}
+
+size_t LDPC::getNum_shorten_c() const
+{
+    return num_shorten_c;
+}
+
+uint64_t LDPC::kct() const
+{
+    return kct_c;
 }
 
 
