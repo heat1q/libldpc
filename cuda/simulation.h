@@ -16,21 +16,23 @@ struct {
 } typedef cstll_t;
 
 
-class Sim
+class Sim_AWGN_cl
 {
 public:
-    Sim();
-    Sim(LDPC* code, const char* simFileName, const char* mapFileName);
+    Sim_AWGN_cl(ldpc::Ldpc_Code_cl* code, const char* simFileName, const char* mapFileName);
 
-    ~Sim();
+    ~Sim_AWGN_cl();
 
-    bool setup_sim(LDPC *code, const char *simFileName, const char *mapFileName);
+    void setup_sim(ldpc::Ldpc_Code_cl *code, const char *simFileName, const char *mapFileName);
     void read_bit_mapping_file(const char* filename);
+
+    void print_sim();
 
     void destroy_sim();
 
+
 private:
-    LDPC* ldpc_code;
+    ldpc::Ldpc_Code_cl* ldpc_code;
 
     cstll_t* cstll;
 

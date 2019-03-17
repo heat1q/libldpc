@@ -1,28 +1,19 @@
 #include "ldpc.h"
 
-LDPC::LDPC(const char *filename)
+using namespace std;
+using namespace ldpc;
+
+Ldpc_Code_cl::Ldpc_Code_cl(const char *filename)
 {
     read_file(filename);
 }
 
-LDPC::~LDPC()
+Ldpc_Code_cl::~Ldpc_Code_cl()
 {
-    for(size_t i = 0; i < n_c; i++)
-        free(vn_c[i]);
-    for(size_t i = 0; i < m_c; i++)
-        free(cn_c[i]);
 
-    free(vn_c);
-    free(cn_c);
-    free(vw_c);
-    free(cw_c);
-    free(r_c);
-    free(c_c);
-    free(puncture_c);
-    free(shorten_c);
 }
 
-bool LDPC::read_file(const char* filename)
+void Ldpc_Code_cl::read_file(const char* filename)
 {
     FILE *fp;
 
@@ -33,11 +24,11 @@ bool LDPC::read_file(const char* filename)
     }
     fscanf(fp, "nc: %lu\n", &n_c);
     fscanf(fp, "mc: %lu\n", &m_c);
-    fscanf(fp, "nct: %lu\n", &nct);
-    fscanf(fp, "mct: %lu\n", &mct);
+    fscanf(fp, "nct: %lu\n", &nct_c);
+    fscanf(fp, "mct: %lu\n", &mct_c);
     fscanf(fp,  "nnz: %lu\n", &nnz_c);
     k_c = n_c-m_c;
-    kct = nct-mct;
+    kct_c = nct_c-mct_c;
 
     fscanf(fp, "puncture [%lu]: ", &(num_puncture_c));
     num_puncture_sys_c = 0;
@@ -108,16 +99,32 @@ bool LDPC::read_file(const char* filename)
     max_dc_c = 0;
     for(size_t i = 0; i < m_c; i++)
     {
-        if(cw_c[i] > max_dc)
+        if(cw_c[i] > max_dc_c)
             max_dc_c = cw_c[i];
     }
 
     fclose(fp);
-
-    return true;
 }
 
-void LDPC::print_ldpc_code()
+void Ldpc_Code_cl::destroy_ldpc_code()
+{
+    for(size_t i = 0; i < n_c; i++)
+        delete[] vn_c[i];
+    for(size_t i = 0; i < m_c; i++)
+        delete[] cn_c[i];
+
+    delete[] vn_c;
+    delete[] cn_c;
+    delete[] vw_c;
+    delete[] cw_c;
+    delete[] r_c;
+    delete[] c_c;
+    delete[] puncture_c;
+    delete[] shorten_c;
+}
+
+
+void Ldpc_Code_cl::print_ldpc_code()
 {
     cout << "=========== LDPC ===========" << endl;
     cout << "nc : " << n_c << endl;
@@ -135,89 +142,95 @@ void LDPC::print_ldpc_code()
     cout << "=========== LDPC: END ===========" << endl;
 }
 
-uint64_t LDPC::nc() const
+uint64_t Ldpc_Code_cl::nc() const
 {
     return n_c;
 }
 
-uint64_t LDPC::kc() const
+uint64_t Ldpc_Code_cl::kc() const
 {
     return k_c;
 }
 
-uint64_t LDPC::mc() const
+uint64_t Ldpc_Code_cl::mc() const
 {
     return m_c;
 }
 
-uint64_t LDPC::nnz() const
+uint64_t Ldpc_Code_cl::nnz() const
 {
     return nnz_c;
 }
 
-size_t *LDPC::cw() const
+size_t *Ldpc_Code_cl::cw() const
 {
     return cw_c;
 }
 
-size_t *LDPC::vw() const
+size_t *Ldpc_Code_cl::vw() const
 {
     return vw_c;
 }
 
-size_t **LDPC::cn() const
+size_t **Ldpc_Code_cl::cn() const
 {
     return cn_c;
 }
 
-size_t **LDPC::vn() const
+size_t **Ldpc_Code_cl::vn() const
 {
     return vn_c;
 }
 
-size_t *LDPC::r() const
+size_t *Ldpc_Code_cl::r() const
 {
     return r_c;
 }
 
-size_t *LDPC::c() const
+size_t *Ldpc_Code_cl::c() const
 {
     return c_c;
 }
 
-uint64_t LDPC::nct() const
+uint64_t Ldpc_Code_cl::nct() const
 {
     return nct_c;
 }
 
-uint64_t LDPC::mct() const
+uint64_t Ldpc_Code_cl::mct() const
 {
     return mct_c;
 }
 
-size_t *LDPC::getPuncture_c() const
+size_t *Ldpc_Code_cl::puncture() const
 {
     return puncture_c;
 }
 
-size_t LDPC::getNum_puncture_c() const
+size_t Ldpc_Code_cl::num_puncture() const
 {
     return num_puncture_c;
 }
 
-size_t *LDPC::getShorten_c() const
+size_t *Ldpc_Code_cl::shorten() const
 {
     return shorten_c;
 }
 
-size_t LDPC::getNum_shorten_c() const
+size_t Ldpc_Code_cl::num_shorten() const
 {
     return num_shorten_c;
 }
 
-uint64_t LDPC::kct() const
+uint64_t Ldpc_Code_cl::kct() const
 {
     return kct_c;
 }
 
 
+
+void ldpc::dec2bin(uint64_t val, uint8_t m)
+{
+    for(size_t i = 0; i < m; i++)
+        printf("%lu", (val>>(m-i-1) & 0x01));
+}

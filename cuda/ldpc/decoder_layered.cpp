@@ -1,6 +1,8 @@
 #include "ldpc.h"
 
-void LDPC::decode_layered()
+using namespace ldpc;
+
+void Ldpc_Code_cl::decode_layered()
 {
 
 }

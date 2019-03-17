@@ -3,26 +3,25 @@
 #include <iostream>
 #include <stdint.h>
 
-using namespace std;
-
 typedef uint8_t bits_t;
 typedef uint16_t labels_t;
 typedef uint32_t symbols_t;
 
-class LDPC
+namespace ldpc {
+
+class Ldpc_Code_cl
 {
 public:
-    LDPC(const char *filename);
-    ~LDPC();
+    Ldpc_Code_cl(const char *filename);
+    ~Ldpc_Code_cl();
 
-    bool read_file(const char *filename);
+    void read_file(const char *filename);
     void print_ldpc_code();
 
     void encode_all0();
     void decode_layered();
 
-
-
+    void destroy_ldpc_code();
 
 
     //getter functions
@@ -69,3 +68,7 @@ private:
     size_t max_dc_c;
 
 };
+
+
+void dec2bin(uint64_t val, uint8_t m);
+}

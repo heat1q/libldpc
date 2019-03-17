@@ -1,17 +1,17 @@
 #include "simulation.h"
 #include <string.h>
+#include <math.h>
 
-Sim::Sim()
-{
+using namespace ldpc;
 
-}
-
-Sim::Sim(LDPC *code, const char *simFileName, const char *mapFileName)
+Sim_AWGN_cl::Sim_AWGN_cl(Ldpc_Code_cl *code, const char *simFileName, const char *mapFileName)
 {
     setup_sim(code, simFileName, mapFileName);
 }
 
-bool Sim::setup_sim(LDPC *code, const char *simFileName, const char *mapFileName)
+Sim_AWGN_cl::~Sim_AWGN_cl() {}
+
+void Sim_AWGN_cl::setup_sim(Ldpc_Code_cl *code, const char *simFileName, const char *mapFileName)
 {
     ldpc_code = code;
 
@@ -32,35 +32,35 @@ bool Sim::setup_sim(LDPC *code, const char *simFileName, const char *mapFileName
     if(!fp)
     {
         printf("can not open sim file\n");
-        return false;
+        exit(EXIT_FAILURE);
     }
     fscanf(fp, "name: %256s\n", logfile);
     /*****************************************/
     fscanf(fp, "M: %hu\n", &M);
     cstll->M = M;
-    cstll->log2M = log2(cstll->M);
+    cstll->log2M = static_cast<uint16_t> (log2(cstll->M));
     /*****************************************/
     fscanf(fp, "bits: %hu\n", &bits);
     /*****************************************/
     fscanf(fp, "labels: %[^\n]\n", tmp);
     tokp = strtok(tmp, ", ");
     i = 0;
-    while(tokp != NULL)
+    while(tokp != nullptr)
     {
         tmpi[i] = atoi(tokp);
-        tokp = strtok(NULL, ", ");
+        tokp = strtok(nullptr, ", ");
         i++;
     }
     if(i != M)
     {
         printf("error parsing simfile: number of constellation points (%d) does not match label size (%lu)\n", M, i);
-        return false;
+        exit(EXIT_FAILURE);
     }
 
     labels = new uint16_t[M] ();
     labels_rev = new uint16_t[M] ();
     for(size_t j = 0; j < M; j++)
-        labels[j] = tmpi[j];
+        labels[j] = static_cast<uint16_t> (tmpi[j]);
 
     //reverse labels
     for(size_t i = 0; i < M; i++)
@@ -70,10 +70,10 @@ bool Sim::setup_sim(LDPC *code, const char *simFileName, const char *mapFileName
     fscanf(fp, "snrs: %[^\n]\n", tmp);
     tokp = strtok(tmp, ",");
     i = 0;
-    while(tokp != NULL)
+    while(tokp != nullptr)
     {
-        tmpd[i] = (double) atof(tokp);
-        tokp = strtok(NULL, ",");
+        tmpd[i] = static_cast<double> (atof(tokp));
+        tokp = strtok(nullptr, ",");
         i++;
     }
     snrs = new double[i];
@@ -90,7 +90,7 @@ bool Sim::setup_sim(LDPC *code, const char *simFileName, const char *mapFileName
     if(code->nct() % bits != 0)
     {
         printf("Chosen setting m = %hu and channel code with n_c = %lu does not work. Please correct.\n", bits, code->nct());
-        return false;
+        exit(EXIT_FAILURE);
     }
     n = code->nct()/bits;
 
@@ -103,13 +103,13 @@ bool Sim::setup_sim(LDPC *code, const char *simFileName, const char *mapFileName
     cstll->X = new double[M];
     for(size_t j = 0; j < M; j++)
     {
-        cstll->X[j] = (double) -M+1+2*j;
+        cstll->X[j] = static_cast<double> (-M+1+2*j);
         m += cstll->X[j] * cstll->X[j] * cstll->pX[j];
     }
     for(size_t j = 0; j < M; j++)
         cstll->X[j] = cstll->X[j]/sqrt(m);
 
-    SE = (((double) code->kct())/code->nct()) * bits;
+    SE = (static_cast<double>(code->kct())/code->nct()) * bits;
 
     bit_mapper = new size_t*[bits];
     for(size_t j = 0; j < bits; j++)
@@ -153,11 +153,9 @@ bool Sim::setup_sim(LDPC *code, const char *simFileName, const char *mapFileName
     }
 
     fclose(fp);
-
-    return true;
 }
 
-void Sim::read_bit_mapping_file(const char* filename)
+void Sim_AWGN_cl::read_bit_mapping_file(const char* filename)
 {
     FILE *fp;
 
@@ -178,12 +176,45 @@ void Sim::read_bit_mapping_file(const char* filename)
     fclose(fp);
 }
 
-void Sim::destroy_sim()
+void Sim_AWGN_cl::print_sim()
+{
+    printf("=========== SIM ===========\n");
+    printf("logfile: %s\n", logfile);
+    printf("n: %lu\n", n);
+    printf("M: %hu\n", M);
+    printf("bits: %hu\n", bits);
+    printf("SNRs: ");
+    for(size_t i = 0; i < num_snrs; i++)
+        printf("%lf ", snrs[i]);
+
+    printf("\n");
+    printf("labels:\n");
+    for(size_t i = 0; i < M; i++)
+    {
+        printf("\t%lu: ", i);
+        dec2bin(labels[i], bits);
+        printf("\n");
+    }
+    printf("max frames: %lu\n", max_frames);
+    printf("min fec: %lu\n", min_fec);
+    printf("bp iter: %lu\n", bp_iter);
+    printf("SE: %.4lf\n", SE);
+    // for(size_t i = 0; i < sim.bits; i++) {
+    //     printf("Bit Mapping B%lu: ", i);
+    //     for(size_t j = 0; j < sim.n; j++) {
+    //         printf("%lu, ", sim.bit_mapper[i][j]);
+    //     }
+    //     printf("\n");
+    // }
+    printf("=========== SIM: END ===========\n");
+}
+
+void Sim_AWGN_cl::destroy_sim()
 {
     delete[] snrs;
     delete[] labels;
     delete[] labels_rev;
-    for(size_t i = 0; i < sim->bits; i++)
+    for(size_t i = 0; i < bits; i++)
         delete[] bit_mapper[i];
 
     delete[] bits_pos;
@@ -194,3 +225,4 @@ void Sim::destroy_sim()
     delete[] cstll->X;
     delete cstll;
 }
+
