@@ -15,7 +15,6 @@ public:
     Ldpc_Code_cl(const char *filename);
     ~Ldpc_Code_cl();
 
-    void read_file(const char *filename);
     void print_ldpc_code();
 
     void encode_all0();

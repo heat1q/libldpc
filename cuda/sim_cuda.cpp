@@ -12,10 +12,7 @@ int main()
     sim->print_sim();
 
 
-    sim->destroy_sim();
     delete sim;
-
-    code->destroy_ldpc_code();
     delete code;
 
     return 0;

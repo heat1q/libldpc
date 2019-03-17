@@ -1,7 +1,11 @@
 #pragma once
 
-#define MAX_FILENAME_LEN 256
 #include "ldpc/ldpc.h"
+
+
+#define MAX_FILENAME_LEN 256
+#define MAX_LLR 9999.9
+#define MIN_LLR -9999.9
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846264338327
@@ -20,16 +24,15 @@ class Sim_AWGN_cl
 {
 public:
     Sim_AWGN_cl(ldpc::Ldpc_Code_cl* code, const char* simFileName, const char* mapFileName);
-
     ~Sim_AWGN_cl();
 
-    void setup_sim(ldpc::Ldpc_Code_cl *code, const char *simFileName, const char *mapFileName);
     void read_bit_mapping_file(const char* filename);
-
     void print_sim();
-
     void destroy_sim();
 
+    void calc_llrs(const double& y, const double& sigma2, double* llrs_out);
+    double simulate_awgn(uint64_t* x, double* y, const double& sigma2);
+    double randn();
 
 private:
     ldpc::Ldpc_Code_cl* ldpc_code;
