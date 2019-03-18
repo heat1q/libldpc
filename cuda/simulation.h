@@ -34,6 +34,12 @@ public:
     double simulate_awgn(uint64_t* x, double* y, const double& sigma2);
     double randn();
 
+    void encode() {}
+    void encode_all0(uint64_t* x, bits_t* c);
+    void map_c_to_x(bits_t* c, size_t* x);
+
+    void start_sim();
+
 private:
     ldpc::Ldpc_Code_cl* ldpc_code;
 

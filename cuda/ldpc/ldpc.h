@@ -1,5 +1,7 @@
 #pragma once
 
+#define QC_LYR_DEC
+
 #include <iostream>
 #include <stdint.h>
 
@@ -12,13 +14,18 @@ namespace ldpc {
 class Ldpc_Code_cl
 {
 public:
-    Ldpc_Code_cl(const char *filename);
+    Ldpc_Code_cl(const char* filename);
     ~Ldpc_Code_cl();
+
+    #ifdef QC_LYR_DEC
+    Ldpc_Code_cl(const char *filename, const char* clfile);
+    void setup_layers(const char* clfile);
+    #endif
 
     void print_ldpc_code();
 
-    void encode_all0();
-    void decode_layered();
+
+    uint64_t decode_layered();
 
     void destroy_ldpc_code();
 
@@ -43,7 +50,11 @@ public:
     size_t num_puncture() const;
     size_t *shorten() const;
     size_t num_shorten() const;
-
+    #ifdef QC_LYR_DEC
+    uint64_t nl() const;
+    uint64_t* lw() const;
+    uint64_t** layers() const;
+    #endif
 private:
     uint64_t n_c;
     uint64_t k_c;
@@ -65,9 +76,16 @@ private:
     uint64_t kct_c; /* number of transmitted information bits */
     uint64_t mct_c; /* number of transmitted parity check bits */
     size_t max_dc_c;
-
+    #ifdef QC_LYR_DEC
+    uint64_t nl_c; //number of layers
+    uint64_t* lw_c; //layer weight
+    uint64_t** layers_c;
+    #endif
 };
 
+
+template<typename T>
+extern void printVector(T* x, const size_t& l);
 
 void dec2bin(uint64_t val, uint8_t m);
 }

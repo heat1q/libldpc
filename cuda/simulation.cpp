@@ -161,8 +161,9 @@ Sim_AWGN_cl::Sim_AWGN_cl(Ldpc_Code_cl *code, const char *simFileName, const char
     catch(exception &e)
     {
         cout << "Error: " << e.what() << endl;
-
         destroy_sim();
+
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -318,4 +319,152 @@ double Sim_AWGN_cl::randn()
     phase = 1 - phase;
 
     return Z;
+}
+
+void Sim_AWGN_cl::encode_all0(uint64_t* x, bits_t* c)
+{
+    for(size_t i = 0; i < ldpc_code->nct(); i++)
+        c[bits_pos[i]] = rand() & 1;
+
+    for(size_t i = 0; i < ldpc_code->num_puncture(); i++)
+        c[ldpc_code->puncture()[i]] = rand() & 1;
+
+    for(size_t i = 0; i < ldpc_code->num_shorten(); i++)
+        c[ldpc_code->shorten()[i]] = 0;
+
+
+    map_c_to_x(c, x);
+}
+
+void Sim_AWGN_cl::map_c_to_x(bits_t* c, size_t* x)
+{
+    size_t tmp;
+
+    for(size_t i = 0; i < n; i++)
+    {
+        tmp = 0;
+        for(size_t j = 0; j < bits; j++)
+            tmp += c[bit_mapper[j][i]] << (bits-1-j);
+
+        x[i] = labels_rev[tmp];
+    }
+}
+
+void Sim_AWGN_cl::start_sim()
+{
+    uint64_t* x;
+    double* y;
+    double* l_in;
+    double* l_out;
+    bits_t* c;
+    double* l_tmp;
+
+    double sigma2;
+
+    uint64_t frames;
+    uint64_t bec = 0;
+    uint64_t fec = 0;
+    uint64_t iters;
+
+    size_t bec_tmp;
+
+    FILE* fp = fopen(logfile, "w");
+    if(!fp)
+        throw runtime_error("can not open logfile for writing");
+
+    fprintf(fp, "snr fer ber frames avg_iter\n");
+
+    /*
+     * START: SIMULATION PART
+     */
+
+    for (size_t i = 0; i < num_snrs; ++i)
+    {
+        bec = 0;
+        fec = 0;
+        frames = 0;
+        iters = 0;
+        sigma2 = pow(10, -snrs[i]/10);
+
+        /* parallel here */
+        {
+            x = new uint64_t[n];
+            c = new bits_t[ldpc_code->nc()];
+            y = new double[n];
+            l_in = new double[ldpc_code->nc()];
+            l_out = new double[ldpc_code->nc()];
+            l_tmp = new double[bits];
+
+            while (true)
+            {
+                #ifdef ENCODE
+                encode();
+                #else
+                encode_all0(x, c);
+                #endif
+
+                simulate_awgn(x, y, sigma2);
+
+                //puncturing & shortening
+                if(ldpc_code->num_puncture() != 0)
+                {
+                    for(size_t j = 0; j < ldpc_code->num_puncture(); j++)
+                        l_in[ldpc_code->puncture()[j]] = 0;
+                }
+                if(ldpc_code->num_shorten() != 0)
+                {
+                    for(size_t j = 0; j < ldpc_code->num_shorten(); j++)
+                        l_in[ldpc_code->shorten()[j]] = 99999.9;
+                }
+
+                for(size_t j = 0; j < n; j++)
+                {
+                    calc_llrs(y[j], sigma2, l_tmp);
+                    for(size_t k = 0; k < bits; k++)
+                        l_in[bit_mapper[k][j]] = l_tmp[k];
+                }
+
+                #ifndef ENCODE
+                for(size_t j = 0; j < ldpc_code->nc(); j++)
+                    l_in[j] *= (1-2*c[j]);
+                #endif
+
+                iters += ldpc_code->decode_layered();
+
+                frames++;
+
+                bec_tmp = 0;
+                for(size_t j = 0; j < ldpc_code->nc(); j++)
+                {
+                    bec_tmp += (l_out[j] <= 0);
+                }
+
+                if (bec_tmp > 0)
+                {
+                    bec += bec_tmp;
+                    fec++;
+
+                    printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e\n",
+                           fec, min_fec, frames, 10*log10(1/sigma2), static_cast<double>(bec/(frames*ldpc_code->nc())), static_cast<double>(fec/frames));
+
+                    //log_error(sim, code, cstll, c, l_out, frames, 10*log10(1/sigma2));
+                }
+
+                if (fec >= min_fec || frames >= max_frames)
+                    break;
+            }//end while
+
+            delete[] x;
+            delete[] c;
+            delete[] y;
+            delete[] l_in;
+            delete[] l_out;
+            delete[] l_tmp;
+        }//end parallel
+
+        fprintf(fp, "%lf %.3e %.3e %lu %.3e\n", snrs[i], static_cast<double>(fec/frames), static_cast<double>(bec/(frames*ldpc_code->nc())), frames, static_cast<double>(iters/frames));
+        fflush(fp);
+    }//end for
+
+    fclose(fp);
 }
