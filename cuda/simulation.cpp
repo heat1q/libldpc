@@ -370,7 +370,10 @@ void Sim_AWGN_cl::start_sim()
 
     FILE* fp = fopen(logfile, "w");
     if(!fp)
-        throw runtime_error("can not open logfile for writing");
+    {
+        cout << "can not open logfile " << logfile << " for writing" << endl;
+        exit(EXIT_FAILURE);
+    }
 
     fprintf(fp, "snr fer ber frames avg_iter\n");
 
@@ -394,6 +397,8 @@ void Sim_AWGN_cl::start_sim()
             l_in = new double[ldpc_code->nc()];
             l_out = new double[ldpc_code->nc()];
             l_tmp = new double[bits];
+
+            //Ldpc_Decoder_cl* dec = new Ldpc_Decoder_cl();
 
             while (true)
             {
@@ -429,7 +434,7 @@ void Sim_AWGN_cl::start_sim()
                     l_in[j] *= (1-2*c[j]);
                 #endif
 
-                iters += ldpc_code->decode_layered();
+                //iters += ldpc_code->decode_layered();
 
                 frames++;
 

@@ -15,7 +15,7 @@ class Ldpc_Code_cl
 {
 public:
     Ldpc_Code_cl(const char* filename);
-    ~Ldpc_Code_cl();
+    virtual ~Ldpc_Code_cl();
 
     #ifdef QC_LYR_DEC
     Ldpc_Code_cl(const char *filename, const char* clfile);
@@ -23,9 +23,6 @@ public:
     #endif
 
     void print_ldpc_code();
-
-
-    uint64_t decode_layered();
 
     void destroy_ldpc_code();
 
@@ -50,11 +47,14 @@ public:
     size_t num_puncture() const;
     size_t *shorten() const;
     size_t num_shorten() const;
+    size_t max_dc() const;
+
     #ifdef QC_LYR_DEC
     uint64_t nl() const;
     uint64_t* lw() const;
     uint64_t** layers() const;
     #endif
+
 private:
     uint64_t n_c;
     uint64_t k_c;
@@ -81,6 +81,29 @@ private:
     uint64_t* lw_c; //layer weight
     uint64_t** layers_c;
     #endif
+};
+
+
+class Ldpc_Decoder_cl
+{
+public:
+    Ldpc_Decoder_cl(Ldpc_Code_cl* code);
+    virtual ~Ldpc_Decoder_cl();
+
+    void destroy_dec();
+    const bool isCodeword(bits_t *c);
+
+    const uint64_t decode_layered(double* llr_in, double* llr_out, const uint64_t& MaxIter, const uint8_t& early_termination);
+private:
+    Ldpc_Code_cl* ldpc_code;
+    double* l_v2c;
+    double* l_c2v;
+    double* f;
+    double* b;
+    double* lsum;
+
+    bits_t* c_out;
+    bits_t* synd;
 };
 
 

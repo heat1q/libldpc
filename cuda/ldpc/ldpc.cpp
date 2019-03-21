@@ -339,6 +339,7 @@ size_t Ldpc_Code_cl::num_puncture() const { return num_puncture_c; }
 size_t *Ldpc_Code_cl::shorten() const { return shorten_c; }
 size_t Ldpc_Code_cl::num_shorten() const { return num_shorten_c; }
 uint64_t Ldpc_Code_cl::kct() const { return kct_c; }
+size_t Ldpc_Code_cl::max_dc() const { return max_dc_c; }
 
 #ifdef QC_LYR_DEC
 uint64_t Ldpc_Code_cl::nl() const { return nl_c; }
