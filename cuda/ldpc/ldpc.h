@@ -91,9 +91,14 @@ public:
     virtual ~Ldpc_Decoder_cl();
 
     void destroy_dec();
-    const bool isCodeword(bits_t *c);
+    bool is_codeword_global(bits_t *c);
 
-    const uint64_t decode_layered(double* llr_in, double* llr_out, const uint64_t& MaxIter, const uint8_t& early_termination);
+    #ifdef QC_LYR_DEC
+    uint64_t decode_layered(double* llr_in, double* llr_out, const uint64_t& MaxIter, const uint8_t& early_termination);
+    void decode_lyr_nodeupdate_global(double* llr_in);
+    void decode_lyr_sumllr_global();
+    void decode_lyr_appcalc_global(double* llr_in, double* llr_out);
+    #endif
 private:
     Ldpc_Code_cl* ldpc_code;
     double* l_v2c;
@@ -111,4 +116,7 @@ template<typename T>
 extern void printVector(T* x, const size_t& l);
 
 void dec2bin(uint64_t val, uint8_t m);
+double jacobian(const double& L1, const double& L2);
+double jacobian_lin_approx(const double& L);
+int8_t sign(const double& a);
 }

@@ -1,5 +1,6 @@
 #include "ldpc.h"
 #include <exception>
+#include <math.h>
 
 using namespace std;
 using namespace ldpc;
@@ -360,4 +361,33 @@ template<typename T> void ldpc::printVector(T *x, const size_t &l)
     for (size_t i = 0; i < l-1; ++i)
         cout << x[i] << " ";
     cout << x[l-1] << "]";
+}
+
+double ldpc::jacobian(const double& L1, const double& L2)
+{
+#ifdef CN_APPROX_LIN
+    return sign(L1) * sign(L2) * fmin(fabs(L1),fabs(L2)) + jacobian_lin_approx(L1+L2) - jacobian_lin_approx(L1-L2);
+#elif CN_APPROX_MINSUM
+    return sign(L1) * sign(L2) * fmin(fabs(L1), fabs(L2));
+#else
+    return sign(L1) * sign(L2) * fmin(fabs(L1),fabs(L2)) + log((1+exp(-fabs(L1+L2)))/(1+exp(-fabs(L1-L2))));
+#endif
+}
+
+double ldpc::jacobian_lin_approx(const double& L)
+{
+    double Labs = fabs(L);
+
+    if(Labs < 1.0) {
+        return -0.375 * Labs  + 0.6825;
+    } else if((Labs >= 1.0) && (Labs < 2.625)) {
+        return -0.1875 * Labs + 0.5;
+    } else {
+        return 0;
+    }
+}
+
+int8_t ldpc::sign(const double& a)
+{
+    return (a <= 0) ? -1 : 1;
 }
