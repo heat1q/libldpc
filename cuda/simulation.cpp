@@ -32,7 +32,7 @@ Sim_AWGN_cl::Sim_AWGN_cl(Ldpc_Code_cl *code, const char *simFileName, const char
         cstll->pX = nullptr;
         cstll->X = nullptr;
 
-        decoder_terminate_early = 1;
+        decoder_terminate_early = true;
 
         fp = fopen(simFileName, "r");
         if(!fp)

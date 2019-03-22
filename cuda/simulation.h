@@ -32,7 +32,7 @@ public:
 
     void calc_llrs(const double& y, const double& sigma2, double* llrs_out);
     double simulate_awgn(uint64_t* x, double* y, const double& sigma2);
-    double randn();
+    static double randn();
 
     void encode() {}
     void encode_all0(uint64_t* x, bits_t* c);
@@ -54,7 +54,7 @@ private:
     double* snrs;
     uint16_t* labels;
     uint16_t* labels_rev;
-    uint8_t decoder_terminate_early;
+    bool decoder_terminate_early;
     double SE;
     size_t num_snrs;
     char logfile[MAX_FILENAME_LEN];

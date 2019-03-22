@@ -7,7 +7,7 @@ SOURCES += \
     sim_cuda.cpp \
     ldpc/ldpc.cpp \
     simulation.cpp \
-    ldpc/decoder_layered.cpp
+    ldpc/decoder.cpp
 
 HEADERS += \
     ldpc/ldpc.h \

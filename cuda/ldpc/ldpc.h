@@ -93,8 +93,9 @@ public:
     void destroy_dec();
     bool is_codeword_global(bits_t *c);
 
+    uint64_t decode(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);
     #ifdef QC_LYR_DEC
-    uint64_t decode_layered(double* llr_in, double* llr_out, const uint64_t& MaxIter, const uint8_t& early_termination);
+    uint64_t decode_layered(double* llr_in, double* llr_out, const uint64_t& MaxIter, const bool& early_termination);
     void decode_lyr_nodeupdate_global(double* llr_in);
     void decode_lyr_sumllr_global();
     void decode_lyr_appcalc_global(double* llr_in, double* llr_out);

@@ -16,11 +16,11 @@ Ldpc_Decoder_cl::Ldpc_Decoder_cl(Ldpc_Code_cl* code) : ldpc_code(code)
     c_out = nullptr;
     synd = nullptr;
 
-    #ifdef QC_LYR_DEC
+#ifdef QC_LYR_DEC
     const uint64_t num_layers = ldpc_code->nl();
-    #else
+#else
     const uint64_t num_layers = 1;
-    #endif
+#endif
 
     try
     {
@@ -64,7 +64,7 @@ void Ldpc_Decoder_cl::destroy_dec()
 }
 
 #ifdef QC_LYR_DEC
-uint64_t Ldpc_Decoder_cl::decode_layered(double* llr_in, double* llr_out, const uint64_t& MaxIter, const uint8_t& early_termination)
+uint64_t Ldpc_Decoder_cl::decode_layered(double* llr_in, double* llr_out, const uint64_t& MaxIter, const bool& early_termination)
 {
     uint64_t I = 0;
     while (I < MaxIter)
@@ -112,7 +112,7 @@ void Ldpc_Decoder_cl::decode_lyr_nodeupdate_global(double* llr_in) //TODO - CUDA
             vw = ldpc_code->vw()[i];
             vn = ldpc_code->vn()[i];
             while(vw--)
-                tmp += lsum[index_msg + *vn++];
+                tmp += lsum[*vn++];
 
             vn = ldpc_code->vn()[i];
             vw = ldpc_code->vw()[i];
@@ -191,4 +191,86 @@ bool Ldpc_Decoder_cl::is_codeword_global(bits_t* c) //TODO - CUDA DEVICE FCT
     }
 
     return is_codeword;
+}
+
+uint64_t Ldpc_Decoder_cl::decode(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination)
+{
+    size_t it;
+
+    size_t* vn;
+    size_t* cn;
+
+    size_t vw;
+    size_t cw;
+
+    /* initialize with llrs */
+    for(size_t i = 0; i < ldpc_code->nnz(); i++) {
+        l_v2c[i] = llr_in[ldpc_code->c()[i]];
+    }
+
+    it = 0;
+    while(it < max_iter) {
+        for(size_t i = 0; i < ldpc_code->mc(); i++) {
+            cw = ldpc_code->cw()[i];
+            cn = ldpc_code->cn()[i];
+            f[0] = l_v2c[*cn];
+            b[cw-1] = l_v2c[*(cn+cw-1)];
+            for(size_t j = 1; j < cw; j++) {
+                f[j] = jacobian(f[j-1], l_v2c[*(cn+j)]);
+                b[cw-1-j] = jacobian(b[cw-j], l_v2c[*(cn + cw-j-1)]);
+            }
+
+            l_c2v[*cn] = b[1];
+            l_c2v[*(cn+cw-1)] = f[cw-2];
+            for(size_t j = 1; j < cw-1; j++) {
+                l_c2v[*(cn+j)] = jacobian(f[j-1], b[j+1]);
+            }
+        }
+
+        /* VN node processing */
+        for(size_t i = 0; i < ldpc_code->nc(); i++) {
+            double tmp = llr_in[i];
+            vw = ldpc_code->vw()[i];
+            vn = ldpc_code->vn()[i];
+            while(vw--) {
+                tmp += l_c2v[*vn++];
+            }
+            vn = ldpc_code->vn()[i];
+            vw = ldpc_code->vw()[i];
+            while(vw--) {
+                l_v2c[*vn] = tmp - l_c2v[*vn];
+                vn++;
+            }
+        }
+
+        // app calculation
+        for(size_t i = 0; i < ldpc_code->nc(); i++) {
+            llr_out[i] = llr_in[i];
+            vn = ldpc_code->vn()[i];
+            vw = ldpc_code->vw()[i];
+            while(vw--) {
+                llr_out[i] += l_c2v[*vn++];
+            }
+            c_out[i] = (llr_out[i] <= 0);
+        }
+
+        it++;
+
+        if(early_termination) {
+            if(is_codeword_global(c_out)) {
+                break;
+            }
+        }
+    }
+
+    return it;
+}
+
+//tmpl fcts need definition in each file?
+template<typename T> void ldpc::printVector(T *x, const size_t &l)
+{
+    cout << "[";
+    for (size_t i = 0; i < l-1; ++i)
+        cout << x[i] << " ";
+    cout << x[l-1] << "]";
 }

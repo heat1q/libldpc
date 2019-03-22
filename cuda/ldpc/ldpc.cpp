@@ -124,10 +124,10 @@ Ldpc_Code_cl::Ldpc_Code_cl(const char* filename, const char* clfile)
     vn_c = nullptr;
     r_c = nullptr;
     c_c = nullptr;
-    #ifdef QC_LYR_DEC
+#ifdef QC_LYR_DEC
     lw_c = nullptr;
     layers_c = nullptr;
-    #endif
+#endif
 
     try
     {
@@ -243,17 +243,6 @@ void Ldpc_Code_cl::setup_layers(const char *clfile)
         for (size_t j = 0; j < lw_c[i]; ++j)
             fscanf(fp, "%lu\n", &(layers_c[i][j]));
     }
-
-    printf("=========== LDPC LAYERS ===========\n");
-    printf("nl: %lu\n", nl_c);
-    for (size_t i = 0; i < nl_c; ++i)
-    {
-        printf("cn[%lu]: %lu\n", i, lw_c[i]);
-        printVector<uint64_t>(layers_c[i], lw_c[i]);
-        printf("\n");
-    }
-    printf("========= LDPC LAYERS: END ========\n");
-
     fclose(fp);
 }
 #endif
@@ -292,7 +281,7 @@ void Ldpc_Code_cl::destroy_ldpc_code()
     if (shorten_c != nullptr)
         delete[] shorten_c;
 
-    #ifdef QC_LYR_DEC
+#ifdef QC_LYR_DEC
     if (layers_c != nullptr)
     {
         for(size_t i = 0; i < nl_c; i++)
@@ -301,7 +290,7 @@ void Ldpc_Code_cl::destroy_ldpc_code()
     }
     if (lw_c != nullptr)
         delete[] lw_c;
-    #endif
+#endif
 }
 
 
@@ -321,6 +310,17 @@ void Ldpc_Code_cl::print_ldpc_code()
     cout << "num puncture par: " << num_puncture_par_c << endl;
     cout << "num shorten: " << num_shorten_c << endl;
     cout << "=========== LDPC: END ===========" << endl;
+#ifdef QC_LYR_DEC
+    printf("=========== LDPC LAYERS ===========\n");
+    printf("nl: %lu\n", nl_c);
+    for (size_t i = 0; i < nl_c; ++i)
+    {
+        printf("cn[%lu]: %lu\n", i, lw_c[i]);
+        printVector<uint64_t>(layers_c[i], lw_c[i]);
+        printf("\n");
+    }
+    printf("========= LDPC LAYERS: END ========\n");
+#endif
 }
 
 uint64_t Ldpc_Code_cl::nc() const { return n_c; }
