@@ -87,10 +87,13 @@ private:
 class Ldpc_Decoder_cl
 {
 public:
-    Ldpc_Decoder_cl(Ldpc_Code_cl* code);
-    virtual ~Ldpc_Decoder_cl();
+	Ldpc_Decoder_cl();
+	Ldpc_Decoder_cl(Ldpc_Code_cl* code);
+	virtual ~Ldpc_Decoder_cl();
 
-    void destroy_dec();
+	void setup_decoder(Ldpc_Code_cl* code);
+
+	void destroy_dec();
     bool is_codeword_global(bits_t *c);
 
     uint64_t decode(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);

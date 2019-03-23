@@ -1,4 +1,4 @@
-CFLAGS=-c
+CFLAGS=-c -dc
 
 INCLUDEPATH= -I.
 
@@ -6,7 +6,7 @@ LIBRARYPATH=
 
 LIBS=-lm
 
-SRC=sim_cuda.cpp simulation.cpp ldpc/ldpc.cpp ldpc/decoder.cpp
+SRC=sim_cuda.cu simulation.cu ldpc/ldpc.cu ldpc/decoder.cu
 
 OBJ=sim_cuda.o simulation.o ldpc.o decoder.o
 

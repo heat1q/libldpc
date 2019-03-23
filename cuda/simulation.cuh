@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ldpc/ldpc.h"
+#include "ldpc/ldpc.cuh"
 
 
 #define MAX_FILENAME_LEN 256

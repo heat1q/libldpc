@@ -1,4 +1,4 @@
-#include "ldpc.h"
+#include "ldpc.cuh"
 #include <exception>
 #include <math.h>
 

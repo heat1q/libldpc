@@ -1,4 +1,4 @@
-#include "simulation.h"
+#include "simulation.cuh"
 #include <string.h>
 #include <math.h>
 #include <exception>
@@ -274,9 +274,9 @@ void Sim_AWGN_cl::calc_llrs(const double &y, const double &sigma2, double *llrs_
         double val = log(tmp0/tmp1);
         // check usually required when PAS is used with large constellations
         // and severely shaped distributions
-        if(isinf(val) == +1) {
+        if(std::isinf(val) == +1) {
             llrs_out[i] = MAX_LLR;
-        } else if(isinf(val) == -1) {
+        } else if(std::isinf(val) == -1) {
             llrs_out[i] = MIN_LLR;
         } else {
             llrs_out[i] = val;
