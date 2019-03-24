@@ -4,6 +4,7 @@
 using namespace ldpc;
 using namespace std;
 
+
 __host__ __device__ Ldpc_Decoder_cl::Ldpc_Decoder_cl() {}
 Ldpc_Decoder_cl::Ldpc_Decoder_cl(Ldpc_Code_cl* code) { setup_decoder(code); }
 __host__ __device__ Ldpc_Decoder_cl::~Ldpc_Decoder_cl()
@@ -121,7 +122,7 @@ uint64_t Ldpc_Decoder_cl::decode_layered(double* llr_in, double* llr_out, const 
     return I;
 }
 
-void Ldpc_Decoder_cl::decode_lyr_nodeupdate_global(double* llr_in) //TODO - CUDA DEVICE FCT
+__host__ __device__ void Ldpc_Decoder_cl::decode_lyr_nodeupdate_global(double* llr_in) //TODO - CUDA DEVICE FCT
 {
     size_t index_msg;
     size_t index_fb;
@@ -181,7 +182,7 @@ void Ldpc_Decoder_cl::decode_lyr_nodeupdate_global(double* llr_in) //TODO - CUDA
     }
 }
 
-void Ldpc_Decoder_cl::decode_lyr_sumllr_global() //TODO - CUDA DEVICE FCT
+__host__ __device__ void Ldpc_Decoder_cl::decode_lyr_sumllr_global() //TODO - CUDA DEVICE FCT
 {
     for(size_t i = 0; i < ldpc_code->nnz(); ++i)
     {
@@ -191,7 +192,7 @@ void Ldpc_Decoder_cl::decode_lyr_sumllr_global() //TODO - CUDA DEVICE FCT
     }
 }
 
-void Ldpc_Decoder_cl::decode_lyr_appcalc_global(double* llr_in, double* llr_out) //TODO - CUDA DEVICE FCT
+__host__ __device__ void Ldpc_Decoder_cl::decode_lyr_appcalc_global(double* llr_in, double* llr_out) //TODO - CUDA DEVICE FCT
 {
     size_t* vn;
     size_t vw;
@@ -207,7 +208,7 @@ void Ldpc_Decoder_cl::decode_lyr_appcalc_global(double* llr_in, double* llr_out)
 }
 #endif
 
-bool Ldpc_Decoder_cl::is_codeword_global(bits_t* c) //TODO - CUDA DEVICE FCT
+__host__ __device__ bool Ldpc_Decoder_cl::is_codeword_global(bits_t* c) //TODO - CUDA DEVICE FCT
 {
     bool is_codeword = true;
 
@@ -300,6 +301,32 @@ uint64_t Ldpc_Decoder_cl::decode(double* llr_in, double* llr_out, const uint64_t
     }
 
     return it;
+}
+
+__global__ void cudakernel::setup_decoder(Ldpc_Code_cl* code_managed, Ldpc_Decoder_cl** dec_ptr)
+{
+	*dec_ptr = new Ldpc_Decoder_cl();
+	(**dec_ptr).setup_decoder_device(code_managed);
+	printf("Cuda Device :: Decoder set up!\n");
+}
+
+__global__ void cudakernel::destroy_decoder(Ldpc_Decoder_cl** dec_ptr)
+{
+	delete *dec_ptr;
+	printf("Cuda Device :: Decoder destroyed!\n");
+}
+
+__global__ void cudakernel::decode(Ldpc_Decoder_cl** dec_ptr, double* llr_in, double* llr_out, const size_t MaxIter, const bool early_termination)
+{
+	uint64_t I = 0;
+    while (I < MaxIter)
+    {
+        (**dec_ptr).decode_lyr_nodeupdate_global(llr_in);
+        (**dec_ptr).decode_lyr_sumllr_global();
+        (**dec_ptr).decode_lyr_appcalc_global(llr_in, llr_out);
+
+        ++I;
+    }
 }
 
 //tmpl fcts need definition in each file?

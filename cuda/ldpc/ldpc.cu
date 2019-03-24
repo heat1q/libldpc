@@ -8,6 +8,7 @@ using namespace ldpc;
 Ldpc_Code_cl::Ldpc_Code_cl(const char* filename)
 {
     //init
+	level = 1;
     puncture_c = nullptr;
     shorten_c = nullptr;
     cw_c = nullptr;
@@ -110,13 +111,18 @@ Ldpc_Code_cl::Ldpc_Code_cl(const char* filename)
     }
 }
 
-Ldpc_Code_cl::~Ldpc_Code_cl() {}
+Ldpc_Code_cl::~Ldpc_Code_cl()
+{
+	if (level == 1)
+		destroy_ldpc_code();
+}
 
 #ifdef QC_LYR_DEC
 Ldpc_Code_cl::Ldpc_Code_cl() {}
 Ldpc_Code_cl::Ldpc_Code_cl(const char* filename, const char* clfile)
 {
 	//init
+	level = 1;
     puncture_c = nullptr;
     shorten_c = nullptr;
     cw_c = nullptr;
@@ -261,6 +267,11 @@ void Ldpc_Code_cl::setup_code_managed(const char* filename, const char* clfile)
 
     try
     {
+		if (level > 0)
+			throw runtime_error("Code already initialized!");
+
+		level = 2;
+
         FILE *fp;
 
         fp = fopen(filename, "r");
@@ -548,7 +559,7 @@ template<typename T> void ldpc::printVector(T *x, const size_t &l)
     cout << x[l-1] << "]";
 }
 
-double ldpc::jacobian(const double& L1, const double& L2)
+__host__ __device__ double ldpc::jacobian(const double& L1, const double& L2)
 {
 #ifdef CN_APPROX_LIN
     return sign(L1) * sign(L2) * fmin(fabs(L1),fabs(L2)) + jacobian_lin_approx(L1+L2) - jacobian_lin_approx(L1-L2);
@@ -559,7 +570,7 @@ double ldpc::jacobian(const double& L1, const double& L2)
 #endif
 }
 
-double ldpc::jacobian_lin_approx(const double& L)
+__host__ __device__ double ldpc::jacobian_lin_approx(const double& L)
 {
     double Labs = fabs(L);
 
@@ -572,7 +583,7 @@ double ldpc::jacobian_lin_approx(const double& L)
     }
 }
 
-int8_t ldpc::sign(const double& a)
+__host__ __device__ int8_t ldpc::sign(const double& a)
 {
     return (a <= 0) ? -1 : 1;
 }

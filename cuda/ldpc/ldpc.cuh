@@ -60,6 +60,7 @@ public:
     #endif
 
 private:
+	uint8_t level = 0;
     uint64_t n_c;
     uint64_t k_c;
     uint64_t m_c;
@@ -99,14 +100,14 @@ public:
 	__device__ void setup_decoder_device(Ldpc_Code_cl* code);
 
 	__host__ __device__ void destroy_dec();
-    bool is_codeword_global(bits_t *c);
+    __host__ __device__ bool is_codeword_global(bits_t *c);
 
     uint64_t decode(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);
     #ifdef QC_LYR_DEC
     uint64_t decode_layered(double* llr_in, double* llr_out, const uint64_t& MaxIter, const bool& early_termination);
-    void decode_lyr_nodeupdate_global(double* llr_in);
-    void decode_lyr_sumllr_global();
-    void decode_lyr_appcalc_global(double* llr_in, double* llr_out);
+    __host__ __device__ void decode_lyr_nodeupdate_global(double* llr_in);
+    __host__ __device__ void decode_lyr_sumllr_global();
+    __host__ __device__ void decode_lyr_appcalc_global(double* llr_in, double* llr_out);
     #endif
 private:
 	bool init = false;
@@ -127,7 +128,15 @@ template<typename T>
 extern void printVector(T* x, const size_t& l);
 
 void dec2bin(uint64_t val, uint8_t m);
-double jacobian(const double& L1, const double& L2);
-double jacobian_lin_approx(const double& L);
-int8_t sign(const double& a);
+__host__ __device__ double jacobian(const double& L1, const double& L2);
+__host__ __device__ double jacobian_lin_approx(const double& L);
+__host__ __device__ int8_t sign(const double& a);
+
+
+namespace cudakernel {
+	__global__ void setup_decoder(Ldpc_Code_cl* code_managed, Ldpc_Decoder_cl** dec_ptr);
+	__global__ void destroy_decoder(Ldpc_Decoder_cl** dec_ptr);
+	__global__ void decode(Ldpc_Decoder_cl** dec_ptr, double* llr_in, double* llr_out, const size_t MaxIter, const bool early_termination);
+}
+
 }
