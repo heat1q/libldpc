@@ -1,4 +1,4 @@
-CFLAGS=-c -dc
+CFLAGS=-x cu -dc
 
 INCLUDEPATH= -I.
 

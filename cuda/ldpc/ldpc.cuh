@@ -18,8 +18,12 @@ public:
     virtual ~Ldpc_Code_cl();
 
     #ifdef QC_LYR_DEC
+	Ldpc_Code_cl();
     Ldpc_Code_cl(const char *filename, const char* clfile);
     void setup_layers(const char* clfile);
+	void setup_layers_managed(const char* clfile);
+	void setup_code_managed(const char *filename, const char* clfile);
+	void destroy_ldpc_code_managed();
     #endif
 
     void print_ldpc_code();
@@ -28,31 +32,31 @@ public:
 
 
     //getter functions
-    uint64_t nc() const;
-    uint64_t kc() const;
-    uint64_t mc() const;
-    uint64_t nnz() const;
-    size_t *cw() const;
-    size_t *vw() const;
-    size_t **cn() const;
-    size_t **vn() const;
-    size_t *r() const;
-    size_t *c() const;
+    __host__ __device__ uint64_t nc() const;
+    __host__ __device__ uint64_t kc() const;
+    __host__ __device__ uint64_t mc() const;
+    __host__ __device__ uint64_t nnz() const;
+    __host__ __device__ size_t *cw() const;
+    __host__ __device__ size_t *vw() const;
+    __host__ __device__ size_t **cn() const;
+    __host__ __device__ size_t **vn() const;
+    __host__ __device__ size_t *r() const;
+    __host__ __device__ size_t *c() const;
 
-    uint64_t nct() const;
-    uint64_t kct() const;
-    uint64_t mct() const;
+    __host__ __device__ uint64_t nct() const;
+    __host__ __device__ uint64_t kct() const;
+    __host__ __device__ uint64_t mct() const;
 
-    size_t *puncture() const;
-    size_t num_puncture() const;
-    size_t *shorten() const;
-    size_t num_shorten() const;
-    size_t max_dc() const;
+    __host__ __device__ size_t *puncture() const;
+    __host__ __device__ size_t num_puncture() const;
+    __host__ __device__ size_t *shorten() const;
+    __host__ __device__ size_t num_shorten() const;
+    __host__ __device__ size_t max_dc() const;
 
     #ifdef QC_LYR_DEC
-    uint64_t nl() const;
-    uint64_t* lw() const;
-    uint64_t** layers() const;
+    __host__ __device__ uint64_t nl() const;
+    __host__ __device__ uint64_t* lw() const;
+    __host__ __device__ uint64_t** layers() const;
     #endif
 
 private:
@@ -87,13 +91,14 @@ private:
 class Ldpc_Decoder_cl
 {
 public:
-	Ldpc_Decoder_cl();
+	__host__ __device__ Ldpc_Decoder_cl();
 	Ldpc_Decoder_cl(Ldpc_Code_cl* code);
-	virtual ~Ldpc_Decoder_cl();
+	__host__ __device__ ~Ldpc_Decoder_cl();
 
 	void setup_decoder(Ldpc_Code_cl* code);
+	__device__ void setup_decoder_device(Ldpc_Code_cl* code);
 
-	void destroy_dec();
+	__host__ __device__ void destroy_dec();
     bool is_codeword_global(bits_t *c);
 
     uint64_t decode(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);
@@ -104,6 +109,8 @@ public:
     void decode_lyr_appcalc_global(double* llr_in, double* llr_out);
     #endif
 private:
+	bool init = false;
+
     Ldpc_Code_cl* ldpc_code;
     double* l_v2c;
     double* l_c2v;

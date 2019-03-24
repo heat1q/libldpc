@@ -110,12 +110,13 @@ Ldpc_Code_cl::Ldpc_Code_cl(const char* filename)
     }
 }
 
-Ldpc_Code_cl::~Ldpc_Code_cl() { destroy_ldpc_code(); }
+Ldpc_Code_cl::~Ldpc_Code_cl() {}
 
 #ifdef QC_LYR_DEC
+Ldpc_Code_cl::Ldpc_Code_cl() {}
 Ldpc_Code_cl::Ldpc_Code_cl(const char* filename, const char* clfile)
 {
-    //init
+	//init
     puncture_c = nullptr;
     shorten_c = nullptr;
     cw_c = nullptr;
@@ -124,10 +125,8 @@ Ldpc_Code_cl::Ldpc_Code_cl(const char* filename, const char* clfile)
     vn_c = nullptr;
     r_c = nullptr;
     c_c = nullptr;
-#ifdef QC_LYR_DEC
     lw_c = nullptr;
     layers_c = nullptr;
-#endif
 
     try
     {
@@ -225,6 +224,148 @@ Ldpc_Code_cl::Ldpc_Code_cl(const char* filename, const char* clfile)
     }
 }
 
+void Ldpc_Code_cl::setup_layers_managed(const char *clfile)
+{
+    FILE *fp = fopen(clfile, "r");
+    if(!fp)
+        throw runtime_error("Can not open layer file");
+
+    fscanf(fp, "nl: %lu\n", &nl_c);
+
+	cudaMallocManaged(&lw_c, nl_c*sizeof(uint64_t));
+	cudaMallocManaged(&layers_c, nl_c*sizeof(uint64_t*));
+
+    for (size_t i = 0; i < nl_c; ++i)
+    {
+        fscanf(fp, "cn[i]: %lu\n", &(lw_c[i]));
+		cudaMallocManaged(&layers_c[i], lw_c[i]*sizeof(uint64_t));
+        for (size_t j = 0; j < lw_c[i]; ++j)
+            fscanf(fp, "%lu\n", &(layers_c[i][j]));
+    }
+    fclose(fp);
+}
+
+void Ldpc_Code_cl::setup_code_managed(const char* filename, const char* clfile)
+{
+	//init
+    puncture_c = nullptr;
+    shorten_c = nullptr;
+    cw_c = nullptr;
+    cn_c = nullptr;
+    vw_c = nullptr;
+    vn_c = nullptr;
+    r_c = nullptr;
+    c_c = nullptr;
+    lw_c = nullptr;
+    layers_c = nullptr;
+
+    try
+    {
+        FILE *fp;
+
+        fp = fopen(filename, "r");
+        if(!fp)
+            throw runtime_error("can not open codefile for reading.");
+
+        fscanf(fp, "nc: %lu\n", &n_c);
+        fscanf(fp, "mc: %lu\n", &m_c);
+        fscanf(fp, "nct: %lu\n", &nct_c);
+        fscanf(fp, "mct: %lu\n", &mct_c);
+        fscanf(fp,  "nnz: %lu\n", &nnz_c);
+        k_c = n_c-m_c;
+        kct_c = nct_c-mct_c;
+
+        fscanf(fp, "puncture [%lu]: ", &(num_puncture_c));
+        num_puncture_sys_c = 0;
+        num_puncture_par_c = 0;
+        if(num_puncture_c != 0)
+        {
+			cudaMallocManaged(&puncture_c, num_puncture_c*sizeof(size_t));
+            for(size_t i = 0; i < num_puncture_c; i++)
+            {
+                fscanf(fp, " %lu ", &(puncture_c[i]));
+                if(puncture_c[i] < k_c)
+                    num_puncture_sys_c++;
+                else
+                    num_puncture_par_c++;
+            }
+        }
+
+        fscanf(fp, "shorten [%lu]: ", &num_shorten_c);
+        if(num_shorten_c != 0)
+        {
+			cudaMallocManaged(&shorten_c, num_shorten_c*sizeof(size_t));
+            for(size_t i = 0; i < num_shorten_c; i++)
+                fscanf(fp, " %lu ", &(shorten_c[i]));
+        }
+
+        size_t* cw_tmp;
+        size_t* vw_tmp;
+
+		cw_tmp = new size_t[m_c]();
+		vw_tmp = new size_t[n_c]();
+
+		cudaMallocManaged(&cw_c, m_c*sizeof(size_t));
+		cudaMallocManaged(&vw_c, n_c*sizeof(size_t));
+		cudaMallocManaged(&r_c, nnz_c*sizeof(size_t));
+		cudaMallocManaged(&c_c, nnz_c*sizeof(size_t));
+
+		for(size_t i = 0; i < m_c; i++)
+		{
+	        cw_c[i] = 0;
+	        cw_tmp[i] = 0;
+	    }
+	    for(size_t i = 0; i < n_c; i++)
+		{
+	        vw_c[i] = 0;
+	        vw_tmp[i] = 0;
+	    }
+
+        for(size_t i = 0; i < nnz_c; i++)
+        {
+            fscanf(fp, "%lu %lu\n", &(r_c[i]), &(c_c[i]));
+            cw_c[r_c[i]]++;
+            vw_c[c_c[i]]++;
+        }
+
+		cudaMallocManaged(&cn_c, m_c*sizeof(size_t*));
+        for(size_t i = 0; i < m_c; i++)
+			cudaMallocManaged(&cn_c[i], cw_c[i]*sizeof(size_t));
+
+		cudaMallocManaged(&vn_c, n_c*sizeof(size_t*));
+        for(size_t i = 0; i < n_c; i++)
+			cudaMallocManaged(&vn_c[i], vw_c[i]*sizeof(size_t));
+
+        for(size_t i = 0; i < nnz_c; i++)
+        {
+            cn_c[r_c[i]][cw_tmp[r_c[i]]++] = i;
+            vn_c[c_c[i]][vw_tmp[c_c[i]]++] = i;
+        }
+
+		delete[] cw_tmp;
+		delete[] vw_tmp;
+
+        max_dc_c = 0;
+        for(size_t i = 0; i < m_c; i++)
+        {
+            if(cw_c[i] > max_dc_c)
+                max_dc_c = cw_c[i];
+        }
+
+        fclose(fp);
+
+        //layers
+        setup_layers(clfile);
+    }
+    catch(exception &e)
+    {
+        cout << "Error: " << e.what() << endl;
+        //destroy_ldpc_code();
+
+        exit(EXIT_FAILURE);
+    }
+}
+
 void Ldpc_Code_cl::setup_layers(const char *clfile)
 {
     FILE *fp = fopen(clfile, "r");
@@ -244,6 +385,50 @@ void Ldpc_Code_cl::setup_layers(const char *clfile)
             fscanf(fp, "%lu\n", &(layers_c[i][j]));
     }
     fclose(fp);
+}
+
+void Ldpc_Code_cl::destroy_ldpc_code_managed()
+{
+    if (vn_c != nullptr)
+    {
+        for(size_t i = 0; i < n_c; i++)
+            cudaFree(vn_c[i]);
+        cudaFree(vn_c);
+    }
+
+    if (vn_c != nullptr)
+    {
+        for(size_t i = 0; i < m_c; i++)
+            cudaFree(cn_c[i]);
+        cudaFree(cn_c);
+    }
+
+    if (vw_c != nullptr)
+        cudaFree(vw_c);
+
+    if (cw_c != nullptr)
+        cudaFree(cw_c);
+
+    if (r_c != nullptr)
+        cudaFree(r_c);
+
+    if (c_c != nullptr)
+        cudaFree(c_c);
+
+    if (puncture_c != nullptr)
+        cudaFree(puncture_c);
+
+    if (shorten_c != nullptr)
+        cudaFree(shorten_c);
+
+    if (layers_c != nullptr)
+    {
+        for(size_t i = 0; i < nl_c; i++)
+            cudaFree(layers_c[i]);
+        cudaFree(layers_c);
+    }
+    if (lw_c != nullptr)
+        cudaFree(lw_c);
 }
 #endif
 
@@ -323,29 +508,29 @@ void Ldpc_Code_cl::print_ldpc_code()
 #endif
 }
 
-uint64_t Ldpc_Code_cl::nc() const { return n_c; }
-uint64_t Ldpc_Code_cl::kc() const { return k_c; }
-uint64_t Ldpc_Code_cl::mc() const { return m_c; }
-uint64_t Ldpc_Code_cl::nnz() const { return nnz_c; }
-size_t *Ldpc_Code_cl::cw() const { return cw_c; }
-size_t *Ldpc_Code_cl::vw() const { return vw_c; }
-size_t **Ldpc_Code_cl::cn() const { return cn_c; }
-size_t **Ldpc_Code_cl::vn() const { return vn_c; }
-size_t *Ldpc_Code_cl::r() const { return r_c; }
-size_t *Ldpc_Code_cl::c() const { return c_c; }
-uint64_t Ldpc_Code_cl::nct() const { return nct_c; }
-uint64_t Ldpc_Code_cl::mct() const { return mct_c; }
-size_t *Ldpc_Code_cl::puncture() const { return puncture_c; }
-size_t Ldpc_Code_cl::num_puncture() const { return num_puncture_c; }
-size_t *Ldpc_Code_cl::shorten() const { return shorten_c; }
-size_t Ldpc_Code_cl::num_shorten() const { return num_shorten_c; }
-uint64_t Ldpc_Code_cl::kct() const { return kct_c; }
-size_t Ldpc_Code_cl::max_dc() const { return max_dc_c; }
+__host__ __device__ uint64_t Ldpc_Code_cl::nc() const { return n_c; }
+__host__ __device__ uint64_t Ldpc_Code_cl::kc() const { return k_c; }
+__host__ __device__ uint64_t Ldpc_Code_cl::mc() const { return m_c; }
+__host__ __device__ uint64_t Ldpc_Code_cl::nnz() const { return nnz_c; }
+__host__ __device__ size_t *Ldpc_Code_cl::cw() const { return cw_c; }
+__host__ __device__ size_t *Ldpc_Code_cl::vw() const { return vw_c; }
+__host__ __device__ size_t **Ldpc_Code_cl::cn() const { return cn_c; }
+__host__ __device__ size_t **Ldpc_Code_cl::vn() const { return vn_c; }
+__host__ __device__ size_t *Ldpc_Code_cl::r() const { return r_c; }
+__host__ __device__ size_t *Ldpc_Code_cl::c() const { return c_c; }
+__host__ __device__ uint64_t Ldpc_Code_cl::nct() const { return nct_c; }
+__host__ __device__ uint64_t Ldpc_Code_cl::mct() const { return mct_c; }
+__host__ __device__ size_t *Ldpc_Code_cl::puncture() const { return puncture_c; }
+__host__ __device__ size_t Ldpc_Code_cl::num_puncture() const { return num_puncture_c; }
+__host__ __device__ size_t *Ldpc_Code_cl::shorten() const { return shorten_c; }
+__host__ __device__ size_t Ldpc_Code_cl::num_shorten() const { return num_shorten_c; }
+__host__ __device__ uint64_t Ldpc_Code_cl::kct() const { return kct_c; }
+__host__ __device__ size_t Ldpc_Code_cl::max_dc() const { return max_dc_c; }
 
 #ifdef QC_LYR_DEC
-uint64_t Ldpc_Code_cl::nl() const { return nl_c; }
-uint64_t *Ldpc_Code_cl::lw() const { return lw_c; }
-uint64_t **Ldpc_Code_cl::layers() const { return layers_c; }
+__host__ __device__ uint64_t Ldpc_Code_cl::nl() const { return nl_c; }
+__host__ __device__ uint64_t *Ldpc_Code_cl::lw() const { return lw_c; }
+__host__ __device__ uint64_t **Ldpc_Code_cl::layers() const { return layers_c; }
 #endif
 
 

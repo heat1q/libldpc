@@ -4,11 +4,17 @@
 using namespace ldpc;
 using namespace std;
 
-Ldpc_Decoder_cl::Ldpc_Decoder_cl() {}
+__host__ __device__ Ldpc_Decoder_cl::Ldpc_Decoder_cl() {}
 Ldpc_Decoder_cl::Ldpc_Decoder_cl(Ldpc_Code_cl* code) { setup_decoder(code); }
+__host__ __device__ Ldpc_Decoder_cl::~Ldpc_Decoder_cl()
+{
+	if (init)
+		destroy_dec();
+}
 
 void Ldpc_Decoder_cl::setup_decoder(Ldpc_Code_cl* code)
 {
+	init = true;
 	ldpc_code = code;
 
 	l_c2v = nullptr;
@@ -47,9 +53,35 @@ void Ldpc_Decoder_cl::setup_decoder(Ldpc_Code_cl* code)
 	}
 }
 
-Ldpc_Decoder_cl::~Ldpc_Decoder_cl() { destroy_dec(); }
+__device__ void Ldpc_Decoder_cl::setup_decoder_device(Ldpc_Code_cl* code)
+{
+	init = true;
+	ldpc_code = code;
 
-void Ldpc_Decoder_cl::destroy_dec()
+	l_c2v = nullptr;
+	l_v2c = nullptr;
+	f = nullptr;
+	b = nullptr;
+	lsum = nullptr;
+
+	c_out = nullptr;
+	synd = nullptr;
+
+	const uint64_t num_layers = ldpc_code->nl();
+
+	//num layers times num nnz
+	l_c2v = new double[num_layers * ldpc_code->nnz()]();
+	l_v2c = new double[num_layers * ldpc_code->nnz()]();
+	f = new double[num_layers * ldpc_code->max_dc()]();
+	b = new double[num_layers * ldpc_code->max_dc()]();
+
+	lsum = new double[ldpc_code->nnz()]();
+
+	c_out = new bits_t[ldpc_code->nc()]();
+	synd = new bits_t[ldpc_code->nc()]();
+}
+
+__host__ __device__ void Ldpc_Decoder_cl::destroy_dec()
 {
     if (l_c2v != nullptr)
         delete[] l_c2v;
