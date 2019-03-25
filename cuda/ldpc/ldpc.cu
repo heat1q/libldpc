@@ -366,7 +366,7 @@ void Ldpc_Code_cl::setup_code_managed(const char* filename, const char* clfile)
         fclose(fp);
 
         //layers
-        setup_layers(clfile);
+        setup_layers_managed(clfile);
     }
     catch(exception &e)
     {
