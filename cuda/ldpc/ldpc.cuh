@@ -100,15 +100,9 @@ public:
 	__device__ void setup_decoder_device(Ldpc_Code_cl* code);
 
 	__host__ __device__ void destroy_dec();
-    __host__ __device__ bool is_codeword_global(bits_t *c);
+    __host__ __device__ bool is_codeword();
 
-    uint64_t decode(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);
-    #ifdef QC_LYR_DEC
-    uint64_t decode_layered(double* llr_in, double* llr_out, const uint64_t& MaxIter, const bool& early_termination);
-    __host__ __device__ void decode_lyr_nodeupdate_global(double* llr_in);
-    __host__ __device__ void decode_lyr_sumllr_global();
-    __host__ __device__ void decode_lyr_appcalc_global(double* llr_in, double* llr_out);
-    #endif
+    uint64_t decode_legacy(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);
 private:
 	bool init = false;
 
@@ -136,7 +130,6 @@ __host__ __device__ int8_t sign(const double& a);
 namespace cudakernel {
 	__global__ void setup_decoder(Ldpc_Code_cl* code_managed, Ldpc_Decoder_cl** dec_ptr);
 	__global__ void destroy_decoder(Ldpc_Decoder_cl** dec_ptr);
-	__global__ void decode(Ldpc_Decoder_cl** dec_ptr, double* llr_in, double* llr_out, const size_t MaxIter, const bool early_termination);
 }
 
 }

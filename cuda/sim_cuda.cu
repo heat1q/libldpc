@@ -5,11 +5,12 @@ using namespace ldpc;
 using namespace std;
 
 
-//nvcc -std=c++11 sim_cuda.cu simulation.cu ldpc/ldpc.cu ldpc/decoder.cu -o sim_cuda
-// ??? -arch sm_35 -rdc=true
+//nvcc -std=c++11 sim_cuda.cu simulation.cu ldpc/ldpc.cu ldpc/decoder.cu -o sim_cuda -arch sm_35 -rdc=true -O
+
 int main()
 {
-	Ldpc_Code_cl* code_managed;// = new Ldpc_Code_cl("../src/code/test_code/code_rand_proto_3x6_400_4.txt", "../src/code/test_code/layer_rand_proto_3x6_400_4.txt");
+	/*
+	Ldpc_Code_cl* code_managed;
 	cudaMallocManaged(&code_managed, sizeof(Ldpc_Code_cl));
 	code_managed->setup_code_managed("../src/code/test_code/code_rand_proto_3x6_400_4.txt", "../src/code/test_code/layer_rand_proto_3x6_400_4.txt");
 
@@ -27,7 +28,7 @@ int main()
 
 
 	cudakernel::setup_decoder<<<1, 1>>>(code_managed, dec_ptr);
-	cudakernel::decode<<<1, 1>>>(dec_ptr, llrin, llrout, 1, false);
+	cudakernel::decode<<<1, 1>>>(dec_ptr, llrin, llrout, 50, false);
 
 	cudaDeviceSynchronize();
 
@@ -41,6 +42,13 @@ int main()
 	code_managed->destroy_ldpc_code_managed();
 	cudaFree(code_managed);
 	cudaFree(dec_ptr);
+	*/
+
+	Ldpc_Code_cl code = Ldpc_Code_cl("../src/code/test_code/code_rand_proto_3x6_400_4.txt", "../src/code/test_code/layer_rand_proto_3x6_400_4.txt");
+	Sim_AWGN_cl sim = Sim_AWGN_cl(&code, "../src/sim.txt", "../src/code/test_code/mapping_rand_proto_3x6_400_4.txt");
+	code.print_ldpc_code();
+	sim.print_sim();
+	sim.start_sim();
 
 	return 0;
 }

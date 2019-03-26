@@ -44,7 +44,7 @@ Sim_AWGN_cl::Sim_AWGN_cl(Ldpc_Code_cl *code, const char *simFileName, const char
         /*****************************************/
         fscanf(fp, "M: %hu\n", &M);
         cstll->M = M;
-        cstll->log2M = static_cast<uint16_t> (log2(cstll->M));
+        cstll->log2M = log2(cstll->M);
         /*****************************************/
         fscanf(fp, "bits: %hu\n", &bits);
         /*****************************************/
@@ -65,7 +65,7 @@ Sim_AWGN_cl::Sim_AWGN_cl(Ldpc_Code_cl *code, const char *simFileName, const char
         labels = new uint16_t[M] ();
         labels_rev = new uint16_t[M] ();
         for(size_t j = 0; j < M; j++)
-            labels[j] = static_cast<uint16_t> (tmpi[j]);
+            labels[j] = tmpi[j];
 
         //reverse labels
         for(size_t i = 0; i < M; i++)
@@ -107,13 +107,14 @@ Sim_AWGN_cl::Sim_AWGN_cl(Ldpc_Code_cl *code, const char *simFileName, const char
         cstll->X = new double[M];
         for(size_t j = 0; j < M; j++)
         {
-            cstll->X[j] = static_cast<double> (-M+1+2*j);
+            cstll->X[j] = (double) -M+1+2*j;
             m += cstll->X[j] * cstll->X[j] * cstll->pX[j];
         }
         for(size_t j = 0; j < M; j++)
             cstll->X[j] = cstll->X[j]/sqrt(m);
 
-        SE = (static_cast<double>(code->kct())/code->nct()) * bits;
+        SE = (((double) code->kct())/code->nct()) * bits;
+
 
         bit_mapper = new size_t*[bits];
         for(size_t j = 0; j < bits; j++)
@@ -350,6 +351,30 @@ void Sim_AWGN_cl::map_c_to_x(bits_t* c, size_t* x)
     }
 }
 
+uint_fast32_t Sim_AWGN_cl::decode_lyr(Ldpc_Decoder_cl** dev_dec, double* llrin_mgd, double* llrout_mgd, const uint_fast32_t& MaxIter, const bool& early_termination)
+{
+    uint_fast32_t I = 0;
+    for (; I < MaxIter; ++I)
+    {
+        for (uint64_t l = 0; l < ldpc_code->nl(); ++l)
+        {
+            //launch kernels here
+            //cudakernel::nodeupdate<<<1,1>>>(dev_dec, ldpc_code, llrin_mgd);
+            if (early_termination)
+            {
+                /*
+                if (cudakernel::is_codeword<<<1,1>>>())
+                {
+                    return I;
+                }
+                */
+            }
+        }
+    }
+
+    return I;
+}
+
 void Sim_AWGN_cl::start_sim()
 {
     uint64_t* x;
@@ -377,6 +402,9 @@ void Sim_AWGN_cl::start_sim()
 
     fprintf(fp, "snr fer ber frames avg_iter\n");
 
+    //legacy decoder
+    Ldpc_Decoder_cl* dec = new Ldpc_Decoder_cl(ldpc_code);
+
     /*
      * START: SIMULATION PART
      */
@@ -396,17 +424,12 @@ void Sim_AWGN_cl::start_sim()
             y = new double[n];
             l_in = new double[ldpc_code->nc()];
             l_out = new double[ldpc_code->nc()];
-            l_tmp = new double[bits];
 
             //Ldpc_Decoder_cl* dec = new Ldpc_Decoder_cl();
 
             while (true)
             {
-                #ifdef ENCODE
-                encode();
-                #else
                 encode_all0(x, c);
-                #endif
 
                 simulate_awgn(x, y, sigma2);
 
@@ -422,6 +445,7 @@ void Sim_AWGN_cl::start_sim()
                         l_in[ldpc_code->shorten()[j]] = 99999.9;
                 }
 
+                double l_tmp[bits];
                 for(size_t j = 0; j < n; j++)
                 {
                     calc_llrs(y[j], sigma2, l_tmp);
@@ -429,14 +453,14 @@ void Sim_AWGN_cl::start_sim()
                         l_in[bit_mapper[k][j]] = l_tmp[k];
                 }
 
-                #ifndef ENCODE
                 for(size_t j = 0; j < ldpc_code->nc(); j++)
                     l_in[j] *= (1-2*c[j]);
-                #endif
 
-                //iters += ldpc_code->decode_layered();
 
-                frames++;
+                //decode
+                iters += dec->decode_legacy(l_in, l_out, bp_iter, decoder_terminate_early);
+
+                frames += 1;
 
                 bec_tmp = 0;
                 for(size_t j = 0; j < ldpc_code->nc(); j++)
@@ -447,16 +471,18 @@ void Sim_AWGN_cl::start_sim()
                 if (bec_tmp > 0)
                 {
                     bec += bec_tmp;
-                    fec++;
+                    fec += 1;
 
                     printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e\n",
-                           fec, min_fec, frames, 10*log10(1/sigma2), static_cast<double>(bec/(frames*ldpc_code->nc())), static_cast<double>(fec/frames));
+                    fec, min_fec, frames, 10*log10(1/sigma2), (double) bec/(frames*ldpc_code->nc()), (double) fec/frames);
 
                     //log_error(sim, code, cstll, c, l_out, frames, 10*log10(1/sigma2));
                 }
 
                 if (fec >= min_fec || frames >= max_frames)
+                {
                     break;
+                }
             }//end while
 
             delete[] x;
@@ -464,12 +490,23 @@ void Sim_AWGN_cl::start_sim()
             delete[] y;
             delete[] l_in;
             delete[] l_out;
-            delete[] l_tmp;
         }//end parallel
 
         fprintf(fp, "%lf %.3e %.3e %lu %.3e\n", snrs[i], static_cast<double>(fec/frames), static_cast<double>(bec/(frames*ldpc_code->nc())), frames, static_cast<double>(iters/frames));
         fflush(fp);
     }//end for
 
+    //legacy decoder
+    delete dec;
+
     fclose(fp);
+}
+
+//tmpl fcts need definition in each file?
+template<typename T> void ldpc::printVector(T *x, const size_t &l)
+{
+	cout << "[";
+	for (size_t i = 0; i < l-1; ++i)
+	cout << x[i] << " ";
+	cout << x[l-1] << "]";
 }
