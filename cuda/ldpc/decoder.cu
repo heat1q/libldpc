@@ -23,9 +23,9 @@ void Ldpc_Decoder_cl::setup_decoder(Ldpc_Code_cl* code)
 	f = nullptr;
 	b = nullptr;
 	lsum = nullptr;
+	l_c2v_pre = nullptr;
 
 	c_out = nullptr;
-	synd = nullptr;
 
 	#ifdef QC_LYR_DEC
 	const uint64_t num_layers = ldpc_code->nl();
@@ -41,10 +41,10 @@ void Ldpc_Decoder_cl::setup_decoder(Ldpc_Code_cl* code)
 		f = new double[num_layers * ldpc_code->max_dc()]();
 		b = new double[num_layers * ldpc_code->max_dc()]();
 
+		l_c2v_pre = new double[num_layers * ldpc_code->nnz()]();
 		lsum = new double[ldpc_code->nnz()]();
 
 		c_out = new bits_t[ldpc_code->nc()]();
-		synd = new bits_t[ldpc_code->nc()]();
 	}
 	catch (exception& e)
 	{
@@ -64,9 +64,9 @@ __device__ void Ldpc_Decoder_cl::setup_decoder_device(Ldpc_Code_cl* code)
 	f = nullptr;
 	b = nullptr;
 	lsum = nullptr;
+	l_c2v_pre = nullptr;
 
 	c_out = nullptr;
-	synd = nullptr;
 
 	const uint64_t num_layers = ldpc_code->nl();
 
@@ -76,10 +76,10 @@ __device__ void Ldpc_Decoder_cl::setup_decoder_device(Ldpc_Code_cl* code)
 	f = new double[num_layers * ldpc_code->max_dc()]();
 	b = new double[num_layers * ldpc_code->max_dc()]();
 
+	l_c2v_pre = new double[num_layers * ldpc_code->nnz()]();
 	lsum = new double[ldpc_code->nnz()]();
 
 	c_out = new bits_t[ldpc_code->nc()]();
-	synd = new bits_t[ldpc_code->nc()]();
 }
 
 __host__ __device__ void Ldpc_Decoder_cl::destroy_dec()
@@ -96,8 +96,8 @@ __host__ __device__ void Ldpc_Decoder_cl::destroy_dec()
         delete[] lsum;
     if (c_out != nullptr)
         delete[] c_out;
-    if (synd != nullptr)
-        delete[] synd;
+	if (l_c2v_pre != nullptr)
+		delete[] l_c2v_pre;
 }
 
 
@@ -193,6 +193,106 @@ uint64_t Ldpc_Decoder_cl::decode_legacy(double* llr_in, double* llr_out, const u
     }
 
     return it;
+}
+
+uint64_t Ldpc_Decoder_cl::decode_layered_legacy(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination)
+{
+	size_t* vn;
+    size_t* cn;
+
+    size_t vw;
+    size_t cw;
+
+	size_t i_nnz;
+	size_t i_dc;
+
+    //initialize
+    for (size_t i = 0; i < ldpc_code->nnz(); ++i)
+    {
+        lsum[i] = 0.0;
+        for (size_t l = 0; l < ldpc_code->nl(); ++l)
+        {
+            l_c2v[l*ldpc_code->nnz()+i] = 0.0;
+            l_v2c[l*ldpc_code->nnz()+i] = 0.0;
+            l_c2v_pre[l*ldpc_code->nnz()+i] = 0.0;
+        }
+    }
+
+    size_t I = 0;
+    while (I < max_iter)
+    {
+        for (size_t l = 0; l < ldpc_code->nl(); ++l)
+        {
+			i_nnz = l*ldpc_code->nnz();
+			i_dc = l*ldpc_code->max_dc();
+
+            /* VN node intialization */
+            for(size_t i = 0; i < ldpc_code->nc(); i++)
+            {
+                double tmp = llr_in[i];
+                vw = ldpc_code->vw()[i];
+                vn = ldpc_code->vn()[i];
+                while(vw--)
+                    tmp += lsum[*vn++];
+
+                vn = ldpc_code->vn()[i];
+                vw = ldpc_code->vw()[i];
+                while(vw--)
+                {
+                    l_v2c[i_nnz + *vn] = tmp - l_c2v[i_nnz + *vn];
+                    ++vn;
+                }
+            }
+
+            /* CN node processing */
+            for(size_t i = 0; i < ldpc_code->lw()[l]; i++)
+            {
+                cw = ldpc_code->cw()[ldpc_code->layers()[l][i]];
+                cn = ldpc_code->cn()[ldpc_code->layers()[l][i]];
+                f[i_dc] = l_v2c[i_nnz + *cn];
+                b[i_dc + cw-1] = l_v2c[i_nnz + *(cn+cw-1)];
+                for(size_t j = 1; j < cw; j++)
+                {
+                    f[i_dc + j] = jacobian(f[i_dc + j-1], l_v2c[i_nnz + *(cn+j)]);
+                    b[i_dc + cw-1-j] = jacobian(b[i_dc + cw-j], l_v2c[i_nnz + *(cn + cw-j-1)]);
+                }
+
+                l_c2v[i_nnz + *cn] = b[i_dc + 1];
+                l_c2v[i_nnz + *(cn+cw-1)] = f[i_dc + cw-2];
+
+                for(size_t j = 1; j < cw-1; j++)
+                    l_c2v[i_nnz + *(cn+j)] = jacobian(f[i_dc + j-1], b[i_dc + j+1]);
+            }
+
+            //update the llr sum of layers, by replacing old llr of lyr l with new value
+            for (size_t i = 0; i < ldpc_code->nnz(); ++i)
+            {
+                lsum[i] += l_c2v[i_nnz + i] - l_c2v_pre[i_nnz + i];
+                l_c2v_pre[i_nnz + i] = l_c2v[i_nnz + i];
+            }
+
+            // app calculation
+            for(size_t i = 0; i < ldpc_code->nc(); ++i)
+            {
+                llr_out[i] = llr_in[i];
+                vn = ldpc_code->vn()[i];
+                vw = ldpc_code->vw()[i];
+                while(vw--)
+                    llr_out[i] += lsum[*vn++];
+                c_out[i] = (llr_out[i] <= 0);
+            }
+
+            if (early_termination)
+            {
+                if (is_codeword())
+                    return I;
+            }
+        }
+
+        ++I;
+    }
+
+    return I;
 }
 
 __global__ void cudakernel::setup_decoder(Ldpc_Code_cl* code_managed, Ldpc_Decoder_cl** dec_ptr)

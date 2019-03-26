@@ -103,6 +103,7 @@ public:
     __host__ __device__ bool is_codeword();
 
     uint64_t decode_legacy(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);
+    uint64_t decode_layered_legacy(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);
 private:
 	bool init = false;
 
@@ -112,9 +113,9 @@ private:
     double* f;
     double* b;
     double* lsum;
+    double* l_c2v_pre;
 
     bits_t* c_out;
-    bits_t* synd;
 };
 
 

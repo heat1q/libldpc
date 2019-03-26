@@ -1,57 +1,14 @@
 #include "ldpc_decoder_layered.h"
 #include "../function/ldpc_functions.h"
 
-void layered_dec(ldpc_code_t* code, double* llr_in, double* l_c2v, double* l_c2v_sum, double* l_v2c, uint64_t* cn_subset, const uint64_t cn_size, double* f, double* b)
+
+uint64_t ldpc_decode_layered(ldpc_decoder_lyr_t* dec, ldpc_code_t* code, double* llr_in, double* llr_out, const uint64_t MaxIter, const uint8_t early_termination)
 {
     size_t* vn;
     size_t* cn;
 
     size_t vw;
     size_t cw;
-
-    /* VN node intialization */
-    for(size_t i = 0; i < code->nc; i++)
-    {
-        double tmp = llr_in[i];
-        vw = code->vw[i];
-        vn = code->vn[i];
-        while(vw--)
-            tmp += l_c2v_sum[*vn++];
-
-        vn = code->vn[i];
-        vw = code->vw[i];
-        while(vw--)
-        {
-            l_v2c[*vn] = tmp - l_c2v[*vn];
-            ++vn;
-        }
-    }
-
-    /* CN node processing */
-    for(size_t i = 0; i < cn_size; i++)
-    {
-        cw = code->cw[cn_subset[i]];
-        cn = code->cn[cn_subset[i]];
-        f[0] = l_v2c[*cn];
-        b[cw-1] = l_v2c[*(cn+cw-1)];
-        for(size_t j = 1; j < cw; j++)
-        {
-            f[j] = jacobian(f[j-1], l_v2c[*(cn+j)]);
-            b[cw-1-j] = jacobian(b[cw-j], l_v2c[*(cn + cw-j-1)]);
-        }
-
-        l_c2v[*cn] = b[1];
-        l_c2v[*(cn+cw-1)] = f[cw-2];
-
-        for(size_t j = 1; j < cw-1; j++)
-            l_c2v[*(cn+j)] = jacobian(f[j-1], b[j+1]);
-    }
-}
-
-uint64_t ldpc_decode_layered(ldpc_decoder_lyr_t* dec, ldpc_code_t* code, double* llr_in, double* llr_out, const uint64_t MaxIter, const uint8_t early_termination)
-{
-    size_t* vn;
-    size_t vw;
 
     //initialize
     for (size_t i = 0; i < code->nnz; ++i)
@@ -68,10 +25,45 @@ uint64_t ldpc_decode_layered(ldpc_decoder_lyr_t* dec, ldpc_code_t* code, double*
     size_t I = 0;
     while (I < MaxIter)
     {
-        //parallel
         for (size_t l = 0; l < code->nl; ++l)
         {
-            layered_dec(code, llr_in, dec->l_c2v[l], dec->lsum, dec->l_v2c[l], code->layers[l], code->lw[l], dec->f[l], dec->b[l]);
+            /* VN node intialization */
+            for(size_t i = 0; i < code->nc; i++)
+            {
+                double tmp = llr_in[i];
+                vw = code->vw[i];
+                vn = code->vn[i];
+                while(vw--)
+                    tmp += dec->lsum[*vn++];
+
+                vn = code->vn[i];
+                vw = code->vw[i];
+                while(vw--)
+                {
+                    dec->l_v2c[l][*vn] = tmp - dec->l_c2v[l][*vn];
+                    ++vn;
+                }
+            }
+
+            /* CN node processing */
+            for(size_t i = 0; i < code->lw[l]; i++)
+            {
+                cw = code->cw[code->layers[l][i]];
+                cn = code->cn[code->layers[l][i]];
+                dec->f[l][0] = dec->l_v2c[l][*cn];
+                dec->b[l][cw-1] = dec->l_v2c[l][*(cn+cw-1)];
+                for(size_t j = 1; j < cw; j++)
+                {
+                    dec->f[l][j] = jacobian(dec->f[l][j-1], dec->l_v2c[l][*(cn+j)]);
+                    dec->b[l][cw-1-j] = jacobian(dec->b[l][cw-j], dec->l_v2c[l][*(cn + cw-j-1)]);
+                }
+
+                dec->l_c2v[l][*cn] = dec->b[l][1];
+                dec->l_c2v[l][*(cn+cw-1)] = dec->f[l][cw-2];
+
+                for(size_t j = 1; j < cw-1; j++)
+                    dec->l_c2v[l][*(cn+j)] = jacobian(dec->f[l][j-1], dec->b[l][j+1]);
+            }
 
             //update the llr sum of layers, by replacing old llr of lyr l with new value
             for (size_t i = 0; i < code->nnz; ++i)

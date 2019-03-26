@@ -457,9 +457,9 @@ void Sim_AWGN_cl::start_sim()
                 for(size_t j = 0; j < ldpc_code->nc(); j++)
                     l_in[j] *= (1-2*c[j]);
 
-
                 //decode
-                iters += dec->decode_legacy(l_in, l_out, bp_iter, decoder_terminate_early);
+                //iters += dec->decode_legacy(l_in, l_out, bp_iter, decoder_terminate_early);
+                iters += dec->decode_layered_legacy(l_in, l_out, bp_iter, decoder_terminate_early);
 
                 frames += 1;
 
@@ -474,8 +474,7 @@ void Sim_AWGN_cl::start_sim()
                     bec += bec_tmp;
                     fec += 1;
 
-                    printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e\n",
-                    fec, min_fec, frames, 10*log10(1/sigma2), (double) bec/(frames*ldpc_code->nc()), (double) fec/frames);
+                    printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e\n", fec, min_fec, frames, 10*log10(1/sigma2), (double) bec/(frames*ldpc_code->nc()), (double) fec/frames);
 
                     //log_error(sim, code, cstll, c, l_out, frames, 10*log10(1/sigma2));
                 }
