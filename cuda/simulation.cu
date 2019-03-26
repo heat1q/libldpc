@@ -424,6 +424,7 @@ void Sim_AWGN_cl::start_sim()
             y = new double[n];
             l_in = new double[ldpc_code->nc()];
             l_out = new double[ldpc_code->nc()];
+            l_tmp = new double[bits];
 
             //Ldpc_Decoder_cl* dec = new Ldpc_Decoder_cl();
 
@@ -445,7 +446,7 @@ void Sim_AWGN_cl::start_sim()
                         l_in[ldpc_code->shorten()[j]] = 99999.9;
                 }
 
-                double l_tmp[bits];
+
                 for(size_t j = 0; j < n; j++)
                 {
                     calc_llrs(y[j], sigma2, l_tmp);
@@ -490,6 +491,7 @@ void Sim_AWGN_cl::start_sim()
             delete[] y;
             delete[] l_in;
             delete[] l_out;
+            delete[] l_tmp;
         }//end parallel
 
         fprintf(fp, "%lf %.3e %.3e %lu %.3e\n", snrs[i], static_cast<double>(fec/frames), static_cast<double>(bec/(frames*ldpc_code->nc())), frames, static_cast<double>(iters/frames));

@@ -69,8 +69,9 @@ struct {
 
 struct {
     double* lsum;
-    double* lsum_tmp;
     bits_t* c_out;
+
+    double** l_c2v_pre;
 
     double** l_c2v;
     double** l_v2c;

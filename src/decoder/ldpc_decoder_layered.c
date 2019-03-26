@@ -57,11 +57,11 @@ uint64_t ldpc_decode_layered(ldpc_decoder_lyr_t* dec, ldpc_code_t* code, double*
     for (size_t i = 0; i < code->nnz; ++i)
     {
         dec->lsum[i] = 0.0;
-        dec->lsum_tmp[i] = 0.0;
         for (size_t l = 0; l < code->nl; ++l)
         {
             dec->l_c2v[l][i] = 0.0;
             dec->l_v2c[l][i] = 0.0;
+            dec->l_c2v_pre[l][i] = 0.0;
         }
     }
 
@@ -71,16 +71,13 @@ uint64_t ldpc_decode_layered(ldpc_decoder_lyr_t* dec, ldpc_code_t* code, double*
         //parallel
         for (size_t l = 0; l < code->nl; ++l)
         {
-            for (size_t i = 0; i < code->nnz; ++i)
-            {
-                dec->lsum_tmp[i] = dec->lsum[i] - dec->l_c2v[l][i];
-            }
-
             layered_dec(code, llr_in, dec->l_c2v[l], dec->lsum, dec->l_v2c[l], code->layers[l], code->lw[l], dec->f[l], dec->b[l]);
 
+            //update the llr sum of layers, by replacing old llr of lyr l with new value
             for (size_t i = 0; i < code->nnz; ++i)
             {
-                dec->lsum[i] = dec->lsum_tmp[i] + dec->l_c2v[l][i];
+                dec->lsum[i] += dec->l_c2v[l][i] - dec->l_c2v_pre[l][i];
+                dec->l_c2v_pre[l][i] = dec->l_c2v[l][i];
             }
 
             // app calculation
@@ -132,18 +129,19 @@ uint8_t layered_dec_setup(ldpc_decoder_lyr_t* dec, ldpc_code_t* code, char* clfi
     //intialize & allocate memory
     dec->lsum = calloc(code->nnz, sizeof(double));
     dec->c_out = calloc(code->nc, sizeof(bits_t));
-    dec->lsum_tmp = calloc(code->nnz, sizeof(double));
 
     dec->l_c2v = calloc(code->nl, sizeof(double*));
     dec->l_v2c = calloc(code->nl, sizeof(double*));
     dec->f = calloc(code->nl, sizeof(double*));
     dec->b = calloc(code->nl, sizeof(double*));
+    dec->l_c2v_pre = calloc(code->nl, sizeof(double*));
     for (size_t i = 0; i < code->nl; ++i)
     {
         dec->l_c2v[i] = calloc(code->nnz, sizeof(double));
         dec->l_v2c[i] = calloc(code->nnz, sizeof(double));
         dec->f[i] = calloc(code->max_dc, sizeof(double));
         dec->b[i] = calloc(code->max_dc, sizeof(double));
+        dec->l_c2v_pre[i] = calloc(code->nnz, sizeof(double));
     }
 
     printf("=========== LDPC LAYERS ===========\n");
@@ -169,12 +167,13 @@ void destroy_dec(ldpc_decoder_lyr_t *dec, ldpc_code_t* code)
         free(dec->l_v2c[i]);
         free(dec->f[i]);
         free(dec->b[i]);
+        free(dec->l_c2v_pre[i]);
     }
     free(dec->l_c2v);
     free(dec->l_v2c);
     free(dec->f);
     free(dec->b);
     free(dec->lsum);
-    free(dec->lsum_tmp);
+    free(dec->l_c2v_pre);
     free(dec->c_out);
 }
