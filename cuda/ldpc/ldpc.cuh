@@ -104,8 +104,6 @@ public:
 
     uint64_t decode_legacy(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);
     uint64_t decode_layered_legacy(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);
-private:
-	bool init = false;
 
     Ldpc_Code_cl* ldpc_code;
     double* l_v2c;
@@ -116,6 +114,9 @@ private:
     double* l_c2v_pre;
 
     bits_t* c_out;
+
+private:
+    	bool init = false;
 };
 
 
@@ -131,6 +132,11 @@ __host__ __device__ int8_t sign(const double& a);
 namespace cudakernel {
 	__global__ void setup_decoder(Ldpc_Code_cl* code_managed, Ldpc_Decoder_cl** dec_ptr);
 	__global__ void destroy_decoder(Ldpc_Decoder_cl** dec_ptr);
+    __global__ void clean_decoder(Ldpc_Decoder_cl** dec_ptr);
+    __global__ void decode_lyr_vnupdate(Ldpc_Decoder_cl** dec_ptr, double* llr_in, size_t i_nnz);
+    __global__ void decode_lyr_cnupdate(Ldpc_Decoder_cl** dec_ptr, size_t i_nnz, uint64_t L);
+    __global__ void decode_lyr_sumllr(Ldpc_Decoder_cl** dec_ptr, size_t i_nnz);
+    __global__ void decode_lyr_appcalc(Ldpc_Decoder_cl** dec_ptr, double* llr_in, double* llr_out);
 }
 
 }

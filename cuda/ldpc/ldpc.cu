@@ -268,7 +268,9 @@ void Ldpc_Code_cl::setup_code_managed(const char* filename, const char* clfile)
     try
     {
 		if (level > 0)
+		{
 			throw runtime_error("Code already initialized!");
+		}
 
 		level = 2;
 

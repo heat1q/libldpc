@@ -244,7 +244,7 @@ uint64_t Ldpc_Decoder_cl::decode_layered_legacy(double* llr_in, double* llr_out,
                 }
             }
 
-            /* CN node processing */
+            //CN processing
             for(size_t i = 0; i < ldpc_code->lw()[l]; i++)
             {
                 cw = ldpc_code->cw()[ldpc_code->layers()[l][i]];
@@ -295,6 +295,7 @@ uint64_t Ldpc_Decoder_cl::decode_layered_legacy(double* llr_in, double* llr_out,
     return I;
 }
 
+
 __global__ void cudakernel::setup_decoder(Ldpc_Code_cl* code_managed, Ldpc_Decoder_cl** dec_ptr)
 {
 	*dec_ptr = new Ldpc_Decoder_cl();
@@ -302,12 +303,126 @@ __global__ void cudakernel::setup_decoder(Ldpc_Code_cl* code_managed, Ldpc_Decod
 	printf("Cuda Device :: Decoder set up!\n");
 }
 
+
 __global__ void cudakernel::destroy_decoder(Ldpc_Decoder_cl** dec_ptr)
 {
 	delete *dec_ptr;
 	printf("Cuda Device :: Decoder destroyed!\n");
 }
 
+
+__global__ void cudakernel::clean_decoder(Ldpc_Decoder_cl** dec_ptr)
+{
+	uint_fast32_t index = blockIdx.x * blockDim.x + threadIdx.x;
+	uint_fast32_t stride = blockDim.x * gridDim.x;
+
+	for (size_t i = index; i < (**dec_ptr).ldpc_code->nnz(); i += stride)
+	{
+		(**dec_ptr).lsum[i] = 0.0;
+		for (size_t l = 0; l < (**dec_ptr).ldpc_code->nl(); ++l)
+		{
+			(**dec_ptr).l_c2v[l*(**dec_ptr).ldpc_code->nnz()+i] = 0.0;
+			(**dec_ptr).l_v2c[l*(**dec_ptr).ldpc_code->nnz()+i] = 0.0;
+			(**dec_ptr).l_c2v_pre[l*(**dec_ptr).ldpc_code->nnz()+i] = 0.0;
+		}
+	}
+}
+
+
+__global__ void cudakernel::decode_lyr_vnupdate(Ldpc_Decoder_cl** dec_ptr, double* llr_in, size_t i_nnz)
+{
+	size_t* vn;
+	size_t vw;
+
+	uint_fast32_t index = blockIdx.x * blockDim.x + threadIdx.x;
+	uint_fast32_t stride = blockDim.x * gridDim.x;
+
+	//VN processing
+	for (size_t i = index; i < (**dec_ptr).ldpc_code->nc(); i += stride)
+	{
+		double tmp = llr_in[i];
+		vw = (**dec_ptr).ldpc_code->vw()[i];
+		vn = (**dec_ptr).ldpc_code->vn()[i];
+		while(vw--)
+			tmp += (**dec_ptr).lsum[*vn++];
+
+		vn = (**dec_ptr).ldpc_code->vn()[i];
+		vw = (**dec_ptr).ldpc_code->vw()[i];
+		while(vw--)
+		{
+			(**dec_ptr).l_v2c[i_nnz + *vn] = tmp - (**dec_ptr).l_c2v[i_nnz + *vn];
+			++vn;
+		}
+	}
+}
+
+
+__global__ void cudakernel::decode_lyr_cnupdate(Ldpc_Decoder_cl** dec_ptr, size_t i_nnz, uint64_t L)
+{
+	size_t* cn;
+	size_t cw;
+
+	uint_fast32_t index = blockIdx.x * blockDim.x + threadIdx.x;
+	uint_fast32_t stride = blockDim.x * gridDim.x;
+
+	double f_tmp[10];//[sizeof((**dec_ptr).f[0])/8] = {0}; // - TODO
+	double b_tmp[10];//[sizeof((**dec_ptr).b[0])/8] = {0}; // - TODO
+
+	//CN processing
+	for (size_t i = index; i < (**dec_ptr).ldpc_code->lw()[L]; i += stride)
+	{
+		cw = (**dec_ptr).ldpc_code->cw()[(**dec_ptr).ldpc_code->layers()[L][i]];
+		cn = (**dec_ptr).ldpc_code->cn()[(**dec_ptr).ldpc_code->layers()[L][i]];
+		f_tmp[0] = (**dec_ptr).l_v2c[i_nnz + *cn];
+		b_tmp[cw-1] = (**dec_ptr).l_v2c[i_nnz + *(cn+cw-1)];
+		for(size_t j = 1; j < cw; j++)
+		{
+			f_tmp[j] = jacobian(f_tmp[j-1], (**dec_ptr).l_v2c[i_nnz + *(cn+j)]);
+			b_tmp[cw-1-j] = jacobian(b_tmp[cw-j], (**dec_ptr).l_v2c[i_nnz + *(cn + cw-j-1)]);
+		}
+
+		(**dec_ptr).l_c2v[i_nnz + *cn] = b_tmp[1];
+		(**dec_ptr).l_c2v[i_nnz + *(cn+cw-1)] = f_tmp[cw-2];
+
+		for(size_t j = 1; j < cw-1; j++)
+			(**dec_ptr).l_c2v[i_nnz + *(cn+j)] = jacobian(f_tmp[j-1], b_tmp[j+1]);
+	}
+}
+
+
+__global__ void cudakernel::decode_lyr_sumllr(Ldpc_Decoder_cl** dec_ptr, size_t i_nnz)
+{
+	uint_fast32_t index = blockIdx.x * blockDim.x + threadIdx.x;
+	uint_fast32_t stride = blockDim.x * gridDim.x;
+
+	//sum llrs
+	for (size_t i = index; i < (**dec_ptr).ldpc_code->nnz(); i += stride)
+	{
+		(**dec_ptr).lsum[i] += (**dec_ptr).l_c2v[i_nnz + i] - (**dec_ptr).l_c2v_pre[i_nnz + i];
+		(**dec_ptr).l_c2v_pre[i_nnz + i] = (**dec_ptr).l_c2v[i_nnz + i];
+	}
+}
+
+
+__global__ void cudakernel::decode_lyr_appcalc(Ldpc_Decoder_cl** dec_ptr, double* llr_in, double* llr_out)
+{
+	size_t* vn;
+	size_t vw;
+
+	uint_fast32_t index = blockIdx.x * blockDim.x + threadIdx.x;
+	uint_fast32_t stride = blockDim.x * gridDim.x;
+
+	//app calc
+	for (size_t i = index; i < (**dec_ptr).ldpc_code->nc(); i += stride)
+	{
+		llr_out[i] = llr_in[i];
+		vn = (**dec_ptr).ldpc_code->vn()[i];
+		vw = (**dec_ptr).ldpc_code->vw()[i];
+		while(vw--)
+			llr_out[i] += (**dec_ptr).lsum[*vn++];
+		(**dec_ptr).c_out[i] = (llr_out[i] <= 0);
+	}
+}
 
 
 //tmpl fcts need definition in each file?

@@ -353,13 +353,27 @@ void Sim_AWGN_cl::map_c_to_x(bits_t* c, size_t* x)
 
 uint_fast32_t Sim_AWGN_cl::decode_lyr(Ldpc_Decoder_cl** dev_dec, double* llrin_mgd, double* llrout_mgd, const uint_fast32_t& MaxIter, const bool& early_termination)
 {
+    size_t i_nnz;
+    size_t i_dc;
+
+    uint_fast32_t block_size = 256;
+    uint_fast32_t num_blocks = ceil((ldpc_code->nnz() + block_size - 1) / block_size);
+
+    //zero everything out
+    cudakernel::clean_decoder<<<num_blocks, block_size>>>(dev_dec);
+
     uint_fast32_t I = 0;
     for (; I < MaxIter; ++I)
     {
         for (uint64_t l = 0; l < ldpc_code->nl(); ++l)
         {
+            i_nnz = ldpc_code->nnz()*l;
+            i_dc = ldpc_code->max_dc()*l;
             //launch kernels here
-            //cudakernel::nodeupdate<<<1,1>>>(dev_dec, ldpc_code, llrin_mgd);
+            cudakernel::decode_lyr_vnupdate<<<num_blocks, block_size>>>(dev_dec, llrin_mgd, i_nnz);
+            cudakernel::decode_lyr_cnupdate<<<num_blocks, block_size>>>(dev_dec, i_nnz, l);
+            cudakernel::decode_lyr_sumllr<<<num_blocks, block_size>>>(dev_dec, i_nnz);
+            cudakernel::decode_lyr_appcalc<<<num_blocks, block_size>>>(dev_dec, llrin_mgd, llrout_mgd);
             if (early_termination)
             {
                 /*
@@ -424,7 +438,7 @@ void Sim_AWGN_cl::start_sim()
             y = new double[n];
             l_in = new double[ldpc_code->nc()];
             l_out = new double[ldpc_code->nc()];
-            l_tmp = new double[bits];
+            //l_tmp = new double[bits];
 
             //Ldpc_Decoder_cl* dec = new Ldpc_Decoder_cl();
 
@@ -446,7 +460,7 @@ void Sim_AWGN_cl::start_sim()
                         l_in[ldpc_code->shorten()[j]] = 99999.9;
                 }
 
-
+                double l_tmp[bits];
                 for(size_t j = 0; j < n; j++)
                 {
                     calc_llrs(y[j], sigma2, l_tmp);
@@ -490,7 +504,7 @@ void Sim_AWGN_cl::start_sim()
             delete[] y;
             delete[] l_in;
             delete[] l_out;
-            delete[] l_tmp;
+            //delete[] l_tmp;
         }//end parallel
 
         fprintf(fp, "%lf %.3e %.3e %lu %.3e\n", snrs[i], static_cast<double>(fec/frames), static_cast<double>(bec/(frames*ldpc_code->nc())), frames, static_cast<double>(iters/frames));

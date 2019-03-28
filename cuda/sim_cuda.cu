@@ -9,10 +9,12 @@ using namespace std;
 
 int main()
 {
-	/*
 	Ldpc_Code_cl* code_managed;
 	cudaMallocManaged(&code_managed, sizeof(Ldpc_Code_cl));
+	*code_managed = Ldpc_Code_cl();
 	code_managed->setup_code_managed("../src/code/test_code/code_rand_proto_3x6_400_4.txt", "../src/code/test_code/layer_rand_proto_3x6_400_4.txt");
+
+	Sim_AWGN_cl sim = Sim_AWGN_cl(code_managed, "../src/sim.txt", "../src/code/test_code/mapping_rand_proto_3x6_400_4.txt");
 
 	Ldpc_Decoder_cl** dec_ptr;
 	cudaMallocManaged(&dec_ptr, sizeof(Ldpc_Decoder_cl*));
@@ -28,12 +30,21 @@ int main()
 
 
 	cudakernel::setup_decoder<<<1, 1>>>(code_managed, dec_ptr);
-	cudakernel::decode<<<1, 1>>>(dec_ptr, llrin, llrout, 50, false);
 
+
+	struct timespec tstart={0,0}, tend={0,0};
+    clock_gettime(CLOCK_MONOTONIC, &tstart);
+	sim.decode_lyr(dec_ptr, llrin, llrout, 50, false);
 	cudaDeviceSynchronize();
+	clock_gettime(CLOCK_MONOTONIC, &tend);
+	printf("Time GPU: %.5f ms\n", (((double)tend.tv_nsec) - ((double)tstart.tv_nsec))*1e-6);
 
-	//printVector<double>(llrout, code_managed->nc());
 
+	Ldpc_Decoder_cl dec = Ldpc_Decoder_cl(code_managed);
+	clock_gettime(CLOCK_MONOTONIC, &tstart);
+	dec.decode_layered_legacy(llrin, llrout, 50, false);
+	clock_gettime(CLOCK_MONOTONIC, &tend);
+	printf("Time CPU: %.5f ms\n", (((double)tend.tv_nsec) - ((double)tstart.tv_nsec))*1e-6);
 
 	cudakernel::destroy_decoder<<<1, 1>>>(dec_ptr);
 
@@ -42,13 +53,6 @@ int main()
 	code_managed->destroy_ldpc_code_managed();
 	cudaFree(code_managed);
 	cudaFree(dec_ptr);
-	*/
-
-	Ldpc_Code_cl code = Ldpc_Code_cl("../src/code/test_code/code_rand_proto_3x6_400_4.txt", "../src/code/test_code/layer_rand_proto_3x6_400_4.txt");
-	Sim_AWGN_cl sim = Sim_AWGN_cl(&code, "../src/sim.txt", "../src/code/test_code/mapping_rand_proto_3x6_400_4.txt");
-	code.print_ldpc_code();
-	sim.print_sim();
-	sim.start_sim();
 
 	return 0;
 }
