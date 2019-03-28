@@ -386,6 +386,8 @@ uint_fast32_t Sim_AWGN_cl::decode_lyr(Ldpc_Decoder_cl** dev_dec, double* llrin_m
         }
     }
 
+    cudaDeviceSynchronize();
+    
     return I;
 }
 

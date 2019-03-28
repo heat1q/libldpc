@@ -1,7 +1,29 @@
 #pragma once
 
+#include <chrono>
 #include "ldpc/ldpc.cuh"
 
+#define TIME_PROF(__LOG, __EXEC, __UNIT) \
+		do { \
+			std::string str_unit = std::string(__UNIT);\
+			float a=1;\
+			if (str_unit == std::string("s")) {\
+				a=1e-9;\
+			} else if (str_unit == std::string("ms")) {\
+				a=1e-6;\
+			} else if (str_unit == std::string("us")) {\
+				a=1e-3;\
+			} else if (str_unit == std::string("ns")) {\
+				a=1;\
+			} else {\
+				a=1; str_unit=std::string("ns");\
+			}\
+			auto start = std::chrono::high_resolution_clock::now();\
+			__EXEC;\
+			auto elapsed = std::chrono::high_resolution_clock::now() - start;\
+			printf("[TIMEPROF]: " __LOG ": ");\
+			printf("%.3f %s\n", static_cast<double>(std::chrono::duration_cast<chrono::nanoseconds>(elapsed).count())*a, str_unit.c_str());\
+		} while(0);
 
 #define MAX_FILENAME_LEN 256
 #define MAX_LLR 9999.9

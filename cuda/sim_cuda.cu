@@ -6,7 +6,6 @@ using namespace std;
 
 
 //nvcc -std=c++11 sim_cuda.cu simulation.cu ldpc/ldpc.cu ldpc/decoder.cu -o sim_cuda -arch sm_35 -rdc=true -O3
-
 int main()
 {
 	Ldpc_Code_cl* code_managed;
@@ -32,19 +31,10 @@ int main()
 	cudakernel::setup_decoder<<<1, 1>>>(code_managed, dec_ptr);
 
 
-	struct timespec tstart={0,0}, tend={0,0};
-    clock_gettime(CLOCK_MONOTONIC, &tstart);
-	sim.decode_lyr(dec_ptr, llrin, llrout, 50, false);
-	cudaDeviceSynchronize();
-	clock_gettime(CLOCK_MONOTONIC, &tend);
-	printf("Time GPU: %.5f ms\n", (((double)tend.tv_nsec) - ((double)tstart.tv_nsec))*1e-6);
-
+	TIME_PROF("GPU", sim.decode_lyr(dec_ptr, llrin, llrout, 50, false), "ms");
 
 	Ldpc_Decoder_cl dec = Ldpc_Decoder_cl(code_managed);
-	clock_gettime(CLOCK_MONOTONIC, &tstart);
-	dec.decode_layered_legacy(llrin, llrout, 50, false);
-	clock_gettime(CLOCK_MONOTONIC, &tend);
-	printf("Time CPU: %.5f ms\n", (((double)tend.tv_nsec) - ((double)tstart.tv_nsec))*1e-6);
+	TIME_PROF("CPU", dec.decode_layered_legacy(llrin, llrout, 50, false), "ms");
 
 	cudakernel::destroy_decoder<<<1, 1>>>(dec_ptr);
 
@@ -66,3 +56,11 @@ template<typename T> void ldpc::printVector(T *x, const size_t &l)
 	cout << x[i] << " ";
 	cout << x[l-1] << "]";
 }
+
+/*
+struct timespec tstart={0,0}, tend={0,0};
+clock_gettime(CLOCK_MONOTONIC, &tstart);
+
+clock_gettime(CLOCK_MONOTONIC, &tend);
+printf("Time GPU: %.5f ms\n", (((double)tend.tv_nsec) - ((double)tstart.tv_nsec))*1e-6);
+*/
