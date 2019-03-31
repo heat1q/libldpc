@@ -11,9 +11,9 @@ int main()
 	Ldpc_Code_cl* code_managed;
 	cudaMallocManaged(&code_managed, sizeof(Ldpc_Code_cl));
 	*code_managed = Ldpc_Code_cl();
-	code_managed->setup_code_managed("../src/code/test_code/code_rand_proto_3x6_400_4.txt", "../src/code/test_code/layer_rand_proto_3x6_400_4.txt");
+	code_managed->setup_code_managed("../src/code/test_code/code10K.txt", "../src/code/test_code/layer10K.txt");
 
-	Sim_AWGN_cl sim = Sim_AWGN_cl(code_managed, "../src/sim.txt", "../src/code/test_code/mapping_rand_proto_3x6_400_4.txt");
+	Sim_AWGN_cl sim = Sim_AWGN_cl(code_managed, "../src/sim.txt", "../src/code/test_code/map10K.txt");
 
 	Ldpc_Decoder_cl** dec_ptr;
 	cudaMallocManaged(&dec_ptr, sizeof(Ldpc_Decoder_cl*));
