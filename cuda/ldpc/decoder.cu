@@ -105,7 +105,7 @@ void Ldpc_Decoder_cl::setup_decoder_managed(Ldpc_Code_cl* code)
 	cudaDeviceSynchronize();
 }
 
-void Ldpc_Code_cl::destroy_dec_managed()
+void Ldpc_Decoder_cl::destroy_dec_managed()
 {
 	if (l_c2v != nullptr) { cudaFree(l_c2v); }
 	if (l_v2c != nullptr) { cudaFree(l_v2c); }
@@ -346,10 +346,10 @@ uint_fast32_t Ldpc_Decoder_cl::decode_layered(double* llrin_ufd, double* llrout_
             i_nnz = ldpc_code->nnz()*l;
             i_dc = ldpc_code->max_dc()*l;
             //launch kernels here
-            cudakernel::decode_lyr_vnupdate<<<num_blocks, block_size>>>(this, llrin_mgd, i_nnz);
+            cudakernel::decode_lyr_vnupdate<<<num_blocks, block_size>>>(this, llrin_ufd, i_nnz);
             cudakernel::decode_lyr_cnupdate<<<num_blocks, block_size>>>(this, i_nnz, l);
             cudakernel::decode_lyr_sumllr<<<num_blocks, block_size>>>(this, i_nnz);
-            cudakernel::decode_lyr_appcalc<<<num_blocks, block_size>>>(this, llrin_mgd, llrout_mgd);
+            cudakernel::decode_lyr_appcalc<<<num_blocks, block_size>>>(this, llrin_ufd, llrout_ufd);
             if (early_termination)
             {
                 /*

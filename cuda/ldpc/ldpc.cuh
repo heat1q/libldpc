@@ -100,7 +100,7 @@ public:
 	void setup_decoder_managed(Ldpc_Code_cl* code);
 
 	void destroy_dec();
-	void destroy_dec_managed()
+	void destroy_dec_managed();
     bool is_codeword();
 
 	//decode on gpu

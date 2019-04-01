@@ -12,7 +12,7 @@ int main()
 	Ldpc_Code_cl* code_managed;
 	cudaMallocManaged(&code_managed, sizeof(Ldpc_Code_cl));
 	*code_managed = Ldpc_Code_cl();
-	code_managed->setup_code_managed("../src/code/test_code/code10K.txt", "../src/code/test_code/layer10K.txt");
+	code_managed->setup_code_managed("../src/code/test_code/code_rand_proto_3x6_400_4.txt", "../src/code/test_code/layer_rand_proto_3x6_400_4.txt");
 
 	//set up simulation
 	//Sim_AWGN_cl sim = Sim_AWGN_cl(code_managed, "../src/sim.txt", "../src/code/test_code/map10K.txt");
@@ -29,12 +29,12 @@ int main()
 	//set up decoder on unified memory
 	Ldpc_Decoder_cl* dec_ufd;
 	cudaMallocManaged(&dec_ufd, sizeof(Ldpc_Decoder_cl));
-	dec_ufd->setup_decoder_managed();
+	dec_ufd->setup_decoder_managed(code_managed);
 
+	for (int i=0; i<100; ++i)
+		TIME_PROF("GPU", dec_ufd->decode_layered(llrin, llrout, 50, false), "ms");
 
-	TIME_PROF("GPU", dec.decode_layered(llrin, llrout, 50, false), "ms");
-
-	TIME_PROF("CPU", dec.decode_layered_legacy(llrin, llrout, 50, false), "ms");
+	TIME_PROF("CPU", dec_ufd->decode_layered_legacy(llrin, llrout, 50, false), "ms");
 
 
 	cudaFree(llrin);
