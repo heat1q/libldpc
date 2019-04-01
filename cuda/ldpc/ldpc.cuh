@@ -141,9 +141,9 @@ __host__ __device__ int8_t sign(const double& a);
 namespace cudakernel {
     __global__ void clean_decoder(Ldpc_Decoder_cl* dec_ufd);
     __global__ void decode_layered(Ldpc_Decoder_cl* dec_ufd);
-    __global__ void decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_ufd);
-    __global__ void decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_ufd);
-    __global__ void decode_lyr_sumllr(Ldpc_Decoder_cl* dec_ufd);
+    __global__ void decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_ufd, size_t i_nnz);
+    __global__ void decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_ufd, size_t i_nnz, uint64_t l);
+    __global__ void decode_lyr_sumllr(Ldpc_Decoder_cl* dec_ufd, size_t i_nnz);
     __global__ void decode_lyr_appcalc(Ldpc_Decoder_cl* dec_ufd);
 }
 

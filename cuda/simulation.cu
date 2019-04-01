@@ -380,7 +380,7 @@ void Sim_AWGN_cl::start_sim()
     fprintf(fp, "snr fer ber frames avg_iter\n");
 
     //legacy decoder
-    Ldpc_Decoder_cl* dec = new Ldpc_Decoder_cl(ldpc_code);
+    //Ldpc_Decoder_cl* dec = new Ldpc_Decoder_cl(ldpc_code);
 
     /*
      * START: SIMULATION PART
@@ -436,7 +436,7 @@ void Sim_AWGN_cl::start_sim()
 
                 //decode
                 //iters += dec->decode_legacy(l_in, l_out, bp_iter, decoder_terminate_early);
-                iters += dec->decode_layered_legacy(l_in, l_out, bp_iter, decoder_terminate_early);
+                //iters += dec->decode_layered_legacy(l_in, l_out, bp_iter, decoder_terminate_early);
 
                 frames += 1;
 
@@ -475,7 +475,7 @@ void Sim_AWGN_cl::start_sim()
     }//end for
 
     //legacy decoder
-    delete dec;
+    //delete dec;
 
     fclose(fp);
 }

@@ -62,7 +62,7 @@ void Ldpc_Decoder_cl::setup_decoder_managed(Ldpc_Code_cl* code, const uint_fast3
 	}
 	
 	//zero everything out
-	cudakernel::clean_decoder<<<num_blocks, block_size>>>(this);
+	//TODO
 	
 	cudaDeviceSynchronize();
 }
@@ -71,16 +71,18 @@ void Ldpc_Decoder_cl::prefetch_gpu()
 {
 	int dev = -1;
 	cudaGetDevice(&dev);
+
+	const uint64_t num_layers = ldpc_code->nl();
 	
-	cudaMemPrefetchAsync(l_c2v, sizeof(double)*num_layers*code->nnz(), dev, NULL);
-	cudaMemPrefetchAsync(l_v2c, sizeof(double)*num_layers*code->nnz(), dev, NULL);
-	cudaMemPrefetchAsync(l_c2v_pre, sizeof(double)*num_layers*code->nnz(), dev, NULL);
+	cudaMemPrefetchAsync(l_c2v, sizeof(double)*num_layers*ldpc_code->nnz(), dev, NULL);
+	cudaMemPrefetchAsync(l_v2c, sizeof(double)*num_layers*ldpc_code->nnz(), dev, NULL);
+	cudaMemPrefetchAsync(l_c2v_pre, sizeof(double)*num_layers*ldpc_code->nnz(), dev, NULL);
 	
-	cudaMemPrefetchAsync(lsum, sizeof(double)*code->nnz(), dev, NULL);
+	cudaMemPrefetchAsync(lsum, sizeof(double)*ldpc_code->nnz(), dev, NULL);
 	
-	cudaMemPrefetchAsync(llr_in, sizeof(double)*code->nc(), dev, NULL);
-	cudaMemPrefetchAsync(llr_out, sizeof(double)*code->nc(), dev, NULL);
-	cudaMemPrefetchAsync(c_out, sizeof(double)*code->nc(), dev, NULL);
+	cudaMemPrefetchAsync(llr_in, sizeof(double)*ldpc_code->nc(), dev, NULL);
+	cudaMemPrefetchAsync(llr_out, sizeof(double)*ldpc_code->nc(), dev, NULL);
+	cudaMemPrefetchAsync(c_out, sizeof(double)*ldpc_code->nc(), dev, NULL);
 	
 	
 	cudaMemPrefetchAsync(this, sizeof(Ldpc_Decoder_cl), dev, NULL);
@@ -316,7 +318,6 @@ __global__ void cudakernel::clean_decoder(Ldpc_Decoder_cl* dec_ufd)
 __global__ void cudakernel::decode_layered(Ldpc_Decoder_cl* dec_ufd)
 {
     size_t i_nnz;
-    size_t i_dc;
 
     //zero everything out
     cudakernel::clean_decoder<<<dec_ufd->num_blocks, dec_ufd->block_size>>>(dec_ufd);
@@ -327,13 +328,12 @@ __global__ void cudakernel::decode_layered(Ldpc_Decoder_cl* dec_ufd)
         for (uint64_t l = 0; l < dec_ufd->ldpc_code->nl(); ++l)
         {
             i_nnz = dec_ufd->ldpc_code->nnz()*l;
-            i_dc = dec_ufd->ldpc_code->max_dc()*l;
             //launch kernels here
-            cudakernel::decode_lyr_vnupdate<<<dec_ufd->num_blocks, dec_ufd->block_size>>>(dec_ufd);
-            cudakernel::decode_lyr_cnupdate<<<dec_ufd->num_blocks, dec_ufd->block_size>>>(dec_ufd);
-            cudakernel::decode_lyr_sumllr<<<dec_ufd->num_blocks, dec_ufd->block_size>>>(dec_ufd);
+            cudakernel::decode_lyr_vnupdate<<<dec_ufd->num_blocks, dec_ufd->block_size>>>(dec_ufd, i_nnz);
+            cudakernel::decode_lyr_cnupdate<<<dec_ufd->num_blocks, dec_ufd->block_size>>>(dec_ufd, i_nnz, l);
+            cudakernel::decode_lyr_sumllr<<<dec_ufd->num_blocks, dec_ufd->block_size>>>(dec_ufd, i_nnz);
             cudakernel::decode_lyr_appcalc<<<dec_ufd->num_blocks, dec_ufd->block_size>>>(dec_ufd);
-            if (early_termination)
+            if (dec_ufd->early_termination)
             {
                 /*
                 if (cudakernel::is_codeword<<<1,1>>>())
@@ -345,12 +345,13 @@ __global__ void cudakernel::decode_layered(Ldpc_Decoder_cl* dec_ufd)
         }
     }
 
+    cudaDeviceSynchronize();
     
     //return I;
 }
 
 
-__global__ void cudakernel::decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_ufd)
+__global__ void cudakernel::decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_ufd, size_t i_nnz)
 {
 	size_t* vn;
 	size_t vw;
@@ -361,8 +362,8 @@ __global__ void cudakernel::decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_ufd)
 	//VN processing
 	for (size_t i = index; i < dec_ufd->ldpc_code->nc(); i += stride)
 	{
-		double tmp = llr_in[i];
-		vw = dec_ufd->ldpc_code->vw()[i];
+		double tmp = dec_ufd->llr_in[i];
+		vw =  dec_ufd->ldpc_code->vw()[i];
 		vn = dec_ufd->ldpc_code->vn()[i];
 		while(vw--)
 			tmp += dec_ufd->lsum[*vn++];
@@ -378,7 +379,7 @@ __global__ void cudakernel::decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_ufd)
 }
 
 
-__global__ void cudakernel::decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_ufd)
+__global__ void cudakernel::decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_ufd, size_t i_nnz, uint64_t l)
 {
 	size_t* cn;
 	size_t cw;
@@ -411,7 +412,7 @@ __global__ void cudakernel::decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_ufd)
 }
 
 
-__global__ void cudakernel::decode_lyr_sumllr(Ldpc_Decoder_cl* dec_ufd)
+__global__ void cudakernel::decode_lyr_sumllr(Ldpc_Decoder_cl* dec_ufd, size_t i_nnz)
 {
 	uint_fast32_t index = blockIdx.x * blockDim.x + threadIdx.x;
 	uint_fast32_t stride = blockDim.x * gridDim.x;
@@ -436,12 +437,12 @@ __global__ void cudakernel::decode_lyr_appcalc(Ldpc_Decoder_cl* dec_ufd)
 	//app calc
 	for (size_t i = index; i < dec_ufd->ldpc_code->nc(); i += stride)
 	{
-		llr_out[i] = llr_in[i];
+		dec_ufd->llr_out[i] = dec_ufd->llr_in[i];
 		vn = dec_ufd->ldpc_code->vn()[i];
 		vw = dec_ufd->ldpc_code->vw()[i];
 		while(vw--)
-			llr_out[i] += dec_ufd->lsum[*vn++];
-		dec_ufd->c_out[i] = (llr_out[i] <= 0);
+			dec_ufd->llr_out[i] += dec_ufd->lsum[*vn++];
+		dec_ufd->c_out[i] = (dec_ufd->llr_out[i] <= 0);
 	}
 }
 
