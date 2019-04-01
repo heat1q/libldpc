@@ -93,13 +93,12 @@ class Ldpc_Decoder_cl
 {
 public:
 	__host__ __device__ Ldpc_Decoder_cl();
-	Ldpc_Decoder_cl(Ldpc_Code_cl* code);
 	__host__ __device__ ~Ldpc_Decoder_cl();
 
-	void setup_decoder(Ldpc_Code_cl* code);
-	void setup_decoder_managed(Ldpc_Code_cl* code);
+	void setup_decoder_managed(Ldpc_Code_cl* code, const uint_fast32_t& I, const bool& early_term);
 
-	void destroy_dec();
+	void prefetch_gpu();
+
 	void destroy_dec_managed();
     bool is_codeword();
 
@@ -116,11 +115,15 @@ public:
     double* b;
     double* lsum;
     double* l_c2v_pre;
+	
+	double* llr_in;
+	double* llr_out;
 
     bits_t* c_out;
 
-private:
-	bool init = false;
+	uint_fast32_t max_iter;
+	bool early_termination;
+	
 	uint_fast32_t block_size;
 	uint_fast32_t num_blocks;
 };
@@ -137,10 +140,11 @@ __host__ __device__ int8_t sign(const double& a);
 
 namespace cudakernel {
     __global__ void clean_decoder(Ldpc_Decoder_cl* dec_ufd);
-    __global__ void decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_ufd, double* llr_in, size_t i_nnz);
-    __global__ void decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_ufd, size_t i_nnz, uint64_t L);
-    __global__ void decode_lyr_sumllr(Ldpc_Decoder_cl* dec_ufd, size_t i_nnz);
-    __global__ void decode_lyr_appcalc(Ldpc_Decoder_cl* dec_ufd, double* llr_in, double* llr_out);
+    __global__ void decode_layered(Ldpc_Decoder_cl* dec_ufd);
+    __global__ void decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_ufd);
+    __global__ void decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_ufd);
+    __global__ void decode_lyr_sumllr(Ldpc_Decoder_cl* dec_ufd);
+    __global__ void decode_lyr_appcalc(Ldpc_Decoder_cl* dec_ufd);
 }
 
 }

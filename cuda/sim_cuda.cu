@@ -17,29 +17,24 @@ int main()
 	//set up simulation
 	//Sim_AWGN_cl sim = Sim_AWGN_cl(code_managed, "../src/sim.txt", "../src/code/test_code/map10K.txt");
 
-	double *llrin, *llrout;
-	cudaMallocManaged(&llrin, code_managed->nc()*sizeof(double));
-	cudaMallocManaged(&llrout, code_managed->nc()*sizeof(double));
-	for (size_t i=0; i<code_managed->nc(); ++i)
-	{
-		llrin[i] = Sim_AWGN_cl::randn();
-		llrout[i] = 0.0;
-	}
-
 	//set up decoder on unified memory
 	Ldpc_Decoder_cl* dec_ufd;
 	cudaMallocManaged(&dec_ufd, sizeof(Ldpc_Decoder_cl));
 	dec_ufd->setup_decoder_managed(code_managed);
-
-	for (int i=0; i<100; ++i)
-		TIME_PROF("GPU", dec_ufd->decode_layered(llrin, llrout, 50, false), "ms");
-
-	TIME_PROF("CPU", dec_ufd->decode_layered_legacy(llrin, llrout, 50, false), "ms");
-
-
-	cudaFree(llrin);
-	cudaFree(llrout);
 	
+	for (size_t i=0; i<code_managed->nc(); ++i)
+	{
+		dec_ufd->llr_in[i] = Sim_AWGN_cl::randn();
+		dec_ufd->llr_out[i] = 0.0;
+	}
+	
+	dec_ufd->prefetch_gpu();
+	TIME_PROF("GPU", cudakernel::decode_layered<<<1,1>>>(dec_ufd), "ms");
+    cudaDeviceSynchronize();
+
+	//TIME_PROF("CPU", dec_ufd->decode_layered_legacy(llrin, llrout, 50, false), "ms");
+
+
 	//destroy decoder
 	dec_ufd->destroy_dec_managed();
 	cudaFree(dec_ufd);
