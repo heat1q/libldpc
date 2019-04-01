@@ -54,35 +54,69 @@ void Ldpc_Decoder_cl::setup_decoder(Ldpc_Code_cl* code)
 	}
 }
 
-__device__ void Ldpc_Decoder_cl::setup_decoder_device(Ldpc_Code_cl* code)
+void Ldpc_Decoder_cl::setup_decoder_managed(Ldpc_Code_cl* code)
 {
-	init = true;
+	init = false;
 	ldpc_code = code;
-
+	
+	block_size = 256;
+    num_blocks = ceil((code->nnz() + block_size - 1) / block_size);
+	
 	l_c2v = nullptr;
 	l_v2c = nullptr;
 	f = nullptr;
 	b = nullptr;
 	lsum = nullptr;
 	l_c2v_pre = nullptr;
-
 	c_out = nullptr;
 
-	const uint64_t num_layers = ldpc_code->nl();
+	const uint64_t num_layers = code->nl();
 
-	//num layers times num nnz
-	l_c2v = new double[num_layers * ldpc_code->nnz()]();
-	l_v2c = new double[num_layers * ldpc_code->nnz()]();
-	f = new double[num_layers * ldpc_code->max_dc()]();
-	b = new double[num_layers * ldpc_code->max_dc()]();
-
-	l_c2v_pre = new double[num_layers * ldpc_code->nnz()]();
-	lsum = new double[ldpc_code->nnz()]();
-
-	c_out = new bits_t[ldpc_code->nc()]();
+	try
+	{
+		//num layers times num nnz
+		cudaMallocManaged(&l_c2v, sizeof(double)*num_layers*code->nnz());
+		if (l_c2v == NULL || l_c2v == nullptr) { throw runtime_error("l_c2v alloc failed."); }
+		cudaMallocManaged(&l_v2c, sizeof(double)*num_layers*code->nnz());
+		if (l_v2c == NULL || l_v2c == nullptr) { throw runtime_error("l_v2c alloc failed."); }
+		cudaMallocManaged(&l_c2v_pre, sizeof(double)*num_layers*code->nnz());
+		if (l_c2v_pre == NULL || l_c2v_pre == nullptr) { throw runtime_error("l_c2v_pre alloc failed."); }
+		cudaMallocManaged(&f, sizeof(double)*num_layers*code->max_dc());
+		if (f == NULL || f == nullptr) { throw runtime_error("f alloc failed."); }
+		cudaMallocManaged(&b, sizeof(double)*num_layers*code->max_dc());
+		if (b == NULL || b == nullptr) { throw runtime_error("b alloc failed."); }
+		
+		
+		cudaMallocManaged(&lsum, sizeof(double)*code->nnz());
+		if (lsum == NULL || lsum == nullptr) { throw runtime_error("lsum alloc failed."); }
+		cudaMallocManaged(&c_out, sizeof(bits_t)*code->nc());
+		if (c_out == NULL || c_out == nullptr) { throw runtime_error("c_out alloc failed."); }
+	} 
+	catch (exception& e)
+	{
+		cout << "Error: " << e.what() << endl;
+		destroy_dec_managed();
+		exit(EXIT_FAILURE);
+	}
+	
+	//zero everything out
+	cudakernel::clean_decoder<<<num_blocks, block_size>>>(this);
+	
+	cudaDeviceSynchronize();
 }
 
-__host__ __device__ void Ldpc_Decoder_cl::destroy_dec()
+void Ldpc_Code_cl::destroy_dec_managed()
+{
+	if (l_c2v != nullptr) { cudaFree(l_c2v); }
+	if (l_v2c != nullptr) { cudaFree(l_v2c); }
+	if (l_c2v_pre != nullptr) { cudaFree(l_c2v_pre); }
+	if (f != nullptr) { cudaFree(f); }
+	if (b != nullptr) { cudaFree(b); }
+	if (lsum != nullptr) { cudaFree(lsum); }
+	if (c_out != nullptr) { cudaFree(c_out); }
+}
+
+void Ldpc_Decoder_cl::destroy_dec()
 {
     if (l_c2v != nullptr)
         delete[] l_c2v;
@@ -101,7 +135,7 @@ __host__ __device__ void Ldpc_Decoder_cl::destroy_dec()
 }
 
 
-__host__ __device__ bool Ldpc_Decoder_cl::is_codeword()
+bool Ldpc_Decoder_cl::is_codeword()
 {
     bool is_codeword = true;
 
@@ -296,40 +330,63 @@ uint64_t Ldpc_Decoder_cl::decode_layered_legacy(double* llr_in, double* llr_out,
 }
 
 
-__global__ void cudakernel::setup_decoder(Ldpc_Code_cl* code_managed, Ldpc_Decoder_cl** dec_ptr)
+uint_fast32_t Ldpc_Decoder_cl::decode_layered(double* llrin_ufd, double* llrout_ufd, const uint_fast32_t& MaxIter, const bool& early_termination)
 {
-	*dec_ptr = new Ldpc_Decoder_cl();
-	(**dec_ptr).setup_decoder_device(code_managed);
-	printf("Cuda Device :: Decoder set up!\n");
+    size_t i_nnz;
+    size_t i_dc;
+
+    //zero everything out
+    cudakernel::clean_decoder<<<num_blocks, block_size>>>(this);
+
+    uint_fast32_t I = 0;
+    for (; I < MaxIter; ++I)
+    {
+        for (uint64_t l = 0; l < ldpc_code->nl(); ++l)
+        {
+            i_nnz = ldpc_code->nnz()*l;
+            i_dc = ldpc_code->max_dc()*l;
+            //launch kernels here
+            cudakernel::decode_lyr_vnupdate<<<num_blocks, block_size>>>(this, llrin_mgd, i_nnz);
+            cudakernel::decode_lyr_cnupdate<<<num_blocks, block_size>>>(this, i_nnz, l);
+            cudakernel::decode_lyr_sumllr<<<num_blocks, block_size>>>(this, i_nnz);
+            cudakernel::decode_lyr_appcalc<<<num_blocks, block_size>>>(this, llrin_mgd, llrout_mgd);
+            if (early_termination)
+            {
+                /*
+                if (cudakernel::is_codeword<<<1,1>>>())
+                {
+                    return I;
+                }
+                */
+            }
+        }
+    }
+
+    cudaDeviceSynchronize();
+    
+    return I;
 }
 
 
-__global__ void cudakernel::destroy_decoder(Ldpc_Decoder_cl** dec_ptr)
-{
-	delete *dec_ptr;
-	printf("Cuda Device :: Decoder destroyed!\n");
-}
-
-
-__global__ void cudakernel::clean_decoder(Ldpc_Decoder_cl** dec_ptr)
+__global__ void cudakernel::clean_decoder(Ldpc_Decoder_cl* dec_ufd)
 {
 	uint_fast32_t index = blockIdx.x * blockDim.x + threadIdx.x;
 	uint_fast32_t stride = blockDim.x * gridDim.x;
 
-	for (size_t i = index; i < (**dec_ptr).ldpc_code->nnz(); i += stride)
+	for (size_t i = index; i < dec_ufd->ldpc_code->nnz(); i += stride)
 	{
-		(**dec_ptr).lsum[i] = 0.0;
-		for (size_t l = 0; l < (**dec_ptr).ldpc_code->nl(); ++l)
+		dec_ufd->lsum[i] = 0.0;
+		for (size_t l = 0; l < dec_ufd->ldpc_code->nl(); ++l)
 		{
-			(**dec_ptr).l_c2v[l*(**dec_ptr).ldpc_code->nnz()+i] = 0.0;
-			(**dec_ptr).l_v2c[l*(**dec_ptr).ldpc_code->nnz()+i] = 0.0;
-			(**dec_ptr).l_c2v_pre[l*(**dec_ptr).ldpc_code->nnz()+i] = 0.0;
+			dec_ufd->l_c2v[l*dec_ufd->ldpc_code->nnz()+i] = 0.0;
+			dec_ufd->l_v2c[l*dec_ufd->ldpc_code->nnz()+i] = 0.0;
+			dec_ufd->l_c2v_pre[l*dec_ufd->ldpc_code->nnz()+i] = 0.0;
 		}
 	}
 }
 
 
-__global__ void cudakernel::decode_lyr_vnupdate(Ldpc_Decoder_cl** dec_ptr, double* llr_in, size_t i_nnz)
+__global__ void cudakernel::decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_ufd, double* llr_in, size_t i_nnz)
 {
 	size_t* vn;
 	size_t vw;
@@ -338,26 +395,26 @@ __global__ void cudakernel::decode_lyr_vnupdate(Ldpc_Decoder_cl** dec_ptr, doubl
 	uint_fast32_t stride = blockDim.x * gridDim.x;
 
 	//VN processing
-	for (size_t i = index; i < (**dec_ptr).ldpc_code->nc(); i += stride)
+	for (size_t i = index; i < dec_ufd->ldpc_code->nc(); i += stride)
 	{
 		double tmp = llr_in[i];
-		vw = (**dec_ptr).ldpc_code->vw()[i];
-		vn = (**dec_ptr).ldpc_code->vn()[i];
+		vw = dec_ufd->ldpc_code->vw()[i];
+		vn = dec_ufd->ldpc_code->vn()[i];
 		while(vw--)
-			tmp += (**dec_ptr).lsum[*vn++];
+			tmp += dec_ufd->lsum[*vn++];
 
-		vn = (**dec_ptr).ldpc_code->vn()[i];
-		vw = (**dec_ptr).ldpc_code->vw()[i];
+		vn = dec_ufd->ldpc_code->vn()[i];
+		vw = dec_ufd->ldpc_code->vw()[i];
 		while(vw--)
 		{
-			(**dec_ptr).l_v2c[i_nnz + *vn] = tmp - (**dec_ptr).l_c2v[i_nnz + *vn];
+			dec_ufd->l_v2c[i_nnz + *vn] = tmp - dec_ufd->l_c2v[i_nnz + *vn];
 			++vn;
 		}
 	}
 }
 
 
-__global__ void cudakernel::decode_lyr_cnupdate(Ldpc_Decoder_cl** dec_ptr, size_t i_nnz, uint64_t L)
+__global__ void cudakernel::decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_ufd, size_t i_nnz, uint64_t L)
 {
 	size_t* cn;
 	size_t cw;
@@ -365,46 +422,46 @@ __global__ void cudakernel::decode_lyr_cnupdate(Ldpc_Decoder_cl** dec_ptr, size_
 	uint_fast32_t index = blockIdx.x * blockDim.x + threadIdx.x;
 	uint_fast32_t stride = blockDim.x * gridDim.x;
 
-	double f_tmp[10];//[sizeof((**dec_ptr).f[0])/8] = {0}; // - TODO
-	double b_tmp[10];//[sizeof((**dec_ptr).b[0])/8] = {0}; // - TODO
+	double f_tmp[10];//[sizeof(dec_ufd->f[0])/8] = {0}; // - TODO
+	double b_tmp[10];//[sizeof(dec_ufd->b[0])/8] = {0}; // - TODO
 
 	//CN processing
-	for (size_t i = index; i < (**dec_ptr).ldpc_code->lw()[L]; i += stride)
+	for (size_t i = index; i < dec_ufd->ldpc_code->lw()[L]; i += stride)
 	{
-		cw = (**dec_ptr).ldpc_code->cw()[(**dec_ptr).ldpc_code->layers()[L][i]];
-		cn = (**dec_ptr).ldpc_code->cn()[(**dec_ptr).ldpc_code->layers()[L][i]];
-		f_tmp[0] = (**dec_ptr).l_v2c[i_nnz + *cn];
-		b_tmp[cw-1] = (**dec_ptr).l_v2c[i_nnz + *(cn+cw-1)];
+		cw = dec_ufd->ldpc_code->cw()[dec_ufd->ldpc_code->layers()[L][i]];
+		cn = dec_ufd->ldpc_code->cn()[dec_ufd->ldpc_code->layers()[L][i]];
+		f_tmp[0] = dec_ufd->l_v2c[i_nnz + *cn];
+		b_tmp[cw-1] = dec_ufd->l_v2c[i_nnz + *(cn+cw-1)];
 		for(size_t j = 1; j < cw; j++)
 		{
-			f_tmp[j] = jacobian(f_tmp[j-1], (**dec_ptr).l_v2c[i_nnz + *(cn+j)]);
-			b_tmp[cw-1-j] = jacobian(b_tmp[cw-j], (**dec_ptr).l_v2c[i_nnz + *(cn + cw-j-1)]);
+			f_tmp[j] = jacobian(f_tmp[j-1], dec_ufd->l_v2c[i_nnz + *(cn+j)]);
+			b_tmp[cw-1-j] = jacobian(b_tmp[cw-j], dec_ufd->l_v2c[i_nnz + *(cn + cw-j-1)]);
 		}
 
-		(**dec_ptr).l_c2v[i_nnz + *cn] = b_tmp[1];
-		(**dec_ptr).l_c2v[i_nnz + *(cn+cw-1)] = f_tmp[cw-2];
+		dec_ufd->l_c2v[i_nnz + *cn] = b_tmp[1];
+		dec_ufd->l_c2v[i_nnz + *(cn+cw-1)] = f_tmp[cw-2];
 
 		for(size_t j = 1; j < cw-1; j++)
-			(**dec_ptr).l_c2v[i_nnz + *(cn+j)] = jacobian(f_tmp[j-1], b_tmp[j+1]);
+			dec_ufd->l_c2v[i_nnz + *(cn+j)] = jacobian(f_tmp[j-1], b_tmp[j+1]);
 	}
 }
 
 
-__global__ void cudakernel::decode_lyr_sumllr(Ldpc_Decoder_cl** dec_ptr, size_t i_nnz)
+__global__ void cudakernel::decode_lyr_sumllr(Ldpc_Decoder_cl* dec_ufd, size_t i_nnz)
 {
 	uint_fast32_t index = blockIdx.x * blockDim.x + threadIdx.x;
 	uint_fast32_t stride = blockDim.x * gridDim.x;
 
 	//sum llrs
-	for (size_t i = index; i < (**dec_ptr).ldpc_code->nnz(); i += stride)
+	for (size_t i = index; i < dec_ufd->ldpc_code->nnz(); i += stride)
 	{
-		(**dec_ptr).lsum[i] += (**dec_ptr).l_c2v[i_nnz + i] - (**dec_ptr).l_c2v_pre[i_nnz + i];
-		(**dec_ptr).l_c2v_pre[i_nnz + i] = (**dec_ptr).l_c2v[i_nnz + i];
+		dec_ufd->lsum[i] += dec_ufd->l_c2v[i_nnz + i] - dec_ufd->l_c2v_pre[i_nnz + i];
+		dec_ufd->l_c2v_pre[i_nnz + i] = dec_ufd->l_c2v[i_nnz + i];
 	}
 }
 
 
-__global__ void cudakernel::decode_lyr_appcalc(Ldpc_Decoder_cl** dec_ptr, double* llr_in, double* llr_out)
+__global__ void cudakernel::decode_lyr_appcalc(Ldpc_Decoder_cl* dec_ufd, double* llr_in, double* llr_out)
 {
 	size_t* vn;
 	size_t vw;
@@ -413,14 +470,14 @@ __global__ void cudakernel::decode_lyr_appcalc(Ldpc_Decoder_cl** dec_ptr, double
 	uint_fast32_t stride = blockDim.x * gridDim.x;
 
 	//app calc
-	for (size_t i = index; i < (**dec_ptr).ldpc_code->nc(); i += stride)
+	for (size_t i = index; i < dec_ufd->ldpc_code->nc(); i += stride)
 	{
 		llr_out[i] = llr_in[i];
-		vn = (**dec_ptr).ldpc_code->vn()[i];
-		vw = (**dec_ptr).ldpc_code->vw()[i];
+		vn = dec_ufd->ldpc_code->vn()[i];
+		vw = dec_ufd->ldpc_code->vw()[i];
 		while(vw--)
-			llr_out[i] += (**dec_ptr).lsum[*vn++];
-		(**dec_ptr).c_out[i] = (llr_out[i] <= 0);
+			llr_out[i] += dec_ufd->lsum[*vn++];
+		dec_ufd->c_out[i] = (llr_out[i] <= 0);
 	}
 }
 

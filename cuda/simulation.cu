@@ -351,45 +351,6 @@ void Sim_AWGN_cl::map_c_to_x(bits_t* c, size_t* x)
     }
 }
 
-uint_fast32_t Sim_AWGN_cl::decode_lyr(Ldpc_Decoder_cl** dev_dec, double* llrin_mgd, double* llrout_mgd, const uint_fast32_t& MaxIter, const bool& early_termination)
-{
-    size_t i_nnz;
-    size_t i_dc;
-
-    uint_fast32_t block_size = 256;
-    uint_fast32_t num_blocks = ceil((ldpc_code->nnz() + block_size - 1) / block_size);
-
-    //zero everything out
-    cudakernel::clean_decoder<<<num_blocks, block_size>>>(dev_dec);
-
-    uint_fast32_t I = 0;
-    for (; I < MaxIter; ++I)
-    {
-        for (uint64_t l = 0; l < ldpc_code->nl(); ++l)
-        {
-            i_nnz = ldpc_code->nnz()*l;
-            i_dc = ldpc_code->max_dc()*l;
-            //launch kernels here
-            cudakernel::decode_lyr_vnupdate<<<num_blocks, block_size>>>(dev_dec, llrin_mgd, i_nnz);
-            cudakernel::decode_lyr_cnupdate<<<num_blocks, block_size>>>(dev_dec, i_nnz, l);
-            cudakernel::decode_lyr_sumllr<<<num_blocks, block_size>>>(dev_dec, i_nnz);
-            cudakernel::decode_lyr_appcalc<<<num_blocks, block_size>>>(dev_dec, llrin_mgd, llrout_mgd);
-            if (early_termination)
-            {
-                /*
-                if (cudakernel::is_codeword<<<1,1>>>())
-                {
-                    return I;
-                }
-                */
-            }
-        }
-    }
-
-    cudaDeviceSynchronize();
-    
-    return I;
-}
 
 void Sim_AWGN_cl::start_sim()
 {

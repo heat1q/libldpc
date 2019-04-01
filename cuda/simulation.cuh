@@ -60,8 +60,6 @@ public:
     void encode_all0(uint64_t* x, bits_t* c);
     void map_c_to_x(bits_t* c, size_t* x);
 
-    uint_fast32_t decode_lyr(ldpc::Ldpc_Decoder_cl** dev_dec, double* llrin_mgd, double* llrout_mgd, const uint_fast32_t& MaxIter, const bool& early_termination);
-
     void start_sim();
 
 private:

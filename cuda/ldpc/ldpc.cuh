@@ -97,10 +97,14 @@ public:
 	__host__ __device__ ~Ldpc_Decoder_cl();
 
 	void setup_decoder(Ldpc_Code_cl* code);
-	__device__ void setup_decoder_device(Ldpc_Code_cl* code);
+	void setup_decoder_managed(Ldpc_Code_cl* code);
 
-	__host__ __device__ void destroy_dec();
-    __host__ __device__ bool is_codeword();
+	void destroy_dec();
+	void destroy_dec_managed()
+    bool is_codeword();
+
+	//decode on gpu
+    uint_fast32_t decode_layered(double* llrin_ufd, double* llrout_ufd, const uint_fast32_t& MaxIter, const bool& early_termination);
 
     uint64_t decode_legacy(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);
     uint64_t decode_layered_legacy(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);
@@ -116,7 +120,9 @@ public:
     bits_t* c_out;
 
 private:
-    	bool init = false;
+	bool init = false;
+	uint_fast32_t block_size;
+	uint_fast32_t num_blocks;
 };
 
 
@@ -130,13 +136,11 @@ __host__ __device__ int8_t sign(const double& a);
 
 
 namespace cudakernel {
-	__global__ void setup_decoder(Ldpc_Code_cl* code_managed, Ldpc_Decoder_cl** dec_ptr);
-	__global__ void destroy_decoder(Ldpc_Decoder_cl** dec_ptr);
-    __global__ void clean_decoder(Ldpc_Decoder_cl** dec_ptr);
-    __global__ void decode_lyr_vnupdate(Ldpc_Decoder_cl** dec_ptr, double* llr_in, size_t i_nnz);
-    __global__ void decode_lyr_cnupdate(Ldpc_Decoder_cl** dec_ptr, size_t i_nnz, uint64_t L);
-    __global__ void decode_lyr_sumllr(Ldpc_Decoder_cl** dec_ptr, size_t i_nnz);
-    __global__ void decode_lyr_appcalc(Ldpc_Decoder_cl** dec_ptr, double* llr_in, double* llr_out);
+    __global__ void clean_decoder(Ldpc_Decoder_cl* dec_ufd);
+    __global__ void decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_ufd, double* llr_in, size_t i_nnz);
+    __global__ void decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_ufd, size_t i_nnz, uint64_t L);
+    __global__ void decode_lyr_sumllr(Ldpc_Decoder_cl* dec_ufd, size_t i_nnz);
+    __global__ void decode_lyr_appcalc(Ldpc_Decoder_cl* dec_ufd, double* llr_in, double* llr_out);
 }
 
 }
