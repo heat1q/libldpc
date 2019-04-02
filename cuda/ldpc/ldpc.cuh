@@ -11,25 +11,34 @@ typedef uint32_t symbols_t;
 
 namespace ldpc {
 
-class Ldpc_Code_cl
+class Cuda_Mgd_cl
 {
 public:
-    Ldpc_Code_cl(const char* filename);
+    void* operator new(size_t len);
+    void operator delete(void* ptr);
+
+protected:
+    bool isMgd = false;
+};
+
+
+class Ldpc_Code_cl : public Cuda_Mgd_cl
+{
+public:
+    Ldpc_Code_cl(const char* filename, const char* clfile, const bool& mgd);
     virtual ~Ldpc_Code_cl();
 
-    #ifdef QC_LYR_DEC
-	Ldpc_Code_cl();
-    Ldpc_Code_cl(const char *filename, const char* clfile);
+    void setup_code(const char* filename);
     void setup_layers(const char* clfile);
-	void setup_layers_managed(const char* clfile);
-	void setup_code_managed(const char *filename, const char* clfile);
-	void destroy_ldpc_code_managed();
-    #endif
+
+	void setup_code_mgd(const char* filename);
+	void setup_layers_mgd(const char* clfile);
+    void prefetch_code();
+
+    void destroy_code();
+	void destroy_code_mgd();
 
     void print_ldpc_code();
-
-    void destroy_ldpc_code();
-
 
     //getter functions
     __host__ __device__ uint64_t nc() const;
@@ -42,25 +51,19 @@ public:
     __host__ __device__ size_t **vn() const;
     __host__ __device__ size_t *r() const;
     __host__ __device__ size_t *c() const;
-
     __host__ __device__ uint64_t nct() const;
     __host__ __device__ uint64_t kct() const;
     __host__ __device__ uint64_t mct() const;
-
     __host__ __device__ size_t *puncture() const;
     __host__ __device__ size_t num_puncture() const;
     __host__ __device__ size_t *shorten() const;
     __host__ __device__ size_t num_shorten() const;
     __host__ __device__ size_t max_dc() const;
-
-    #ifdef QC_LYR_DEC
     __host__ __device__ uint64_t nl() const;
     __host__ __device__ uint64_t* lw() const;
     __host__ __device__ uint64_t** layers() const;
-    #endif
 
 private:
-	uint8_t level = 0;
     uint64_t n_c;
     uint64_t k_c;
     uint64_t m_c;
@@ -81,32 +84,28 @@ private:
     uint64_t kct_c; /* number of transmitted information bits */
     uint64_t mct_c; /* number of transmitted parity check bits */
     size_t max_dc_c;
-    #ifdef QC_LYR_DEC
     uint64_t nl_c; //number of layers
     uint64_t* lw_c; //layer weight
     uint64_t** layers_c;
-    #endif
 };
 
 
-class Ldpc_Decoder_cl
+class Ldpc_Decoder_cl : public Cuda_Mgd_cl
 {
 public:
-	__host__ __device__ Ldpc_Decoder_cl();
-	__host__ __device__ ~Ldpc_Decoder_cl();
+	Ldpc_Decoder_cl(Ldpc_Code_cl* code, const uint_fast32_t I, const bool early_term, const bool mgd);
+	~Ldpc_Decoder_cl();
 
-	void setup_decoder_managed(Ldpc_Code_cl* code, const uint_fast32_t& I, const bool& early_term);
+    //void setup_dec();
+	void setup_dec_mgd();
 
-	void prefetch_gpu();
+	void prefetch_dec();
 
-	void destroy_dec_managed();
-    bool is_codeword();
+    //void destroy_dec();
+	void destroy_dec_mgd();
 
-	//decode on gpu
-    uint_fast32_t decode_layered(double* llrin_ufd, double* llrout_ufd, const uint_fast32_t& MaxIter, const bool& early_termination);
-
-    uint64_t decode_legacy(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);
-    uint64_t decode_layered_legacy(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);
+    //uint64_t decode_legacy(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);
+    //uint64_t decode_layered_legacy(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination);
 
     Ldpc_Code_cl* ldpc_code;
     double* l_v2c;
@@ -115,7 +114,7 @@ public:
     double* b;
     double* lsum;
     double* l_c2v_pre;
-	
+
 	double* llr_in;
 	double* llr_out;
 
@@ -123,7 +122,7 @@ public:
 
 	uint_fast32_t max_iter;
 	bool early_termination;
-	
+
 	uint_fast32_t block_size;
 	uint_fast32_t num_blocks;
 };
