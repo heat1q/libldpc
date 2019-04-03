@@ -135,7 +135,8 @@ int main(int argc, char* argv[])
     setup_ldpc_sim(&sim, &code, &cstll, simFileName, codeFileName, mapFileName);
 
     #ifdef LAYERED_DEC
-    if(!layered_dec_setup(&code, codelayerFileName))
+    ldpc_decoder_lyr_t decoder;
+    if(!layered_dec_setup(&decoder, &code, codelayerFileName))
     {
         printf("Can not setup decoder!\n");
         exit(EXIT_FAILURE);
@@ -273,7 +274,7 @@ int main(int argc, char* argv[])
                 #if defined QUANT
                 iters += ldpc_decode_quant(code, l_in, l_out, sim.bp_iter);
                 #elif defined LAYERED_DEC
-                iters += ldpc_decode_layered(&code, l_in, l_out, sim.bp_iter, sim.decoder_terminate_early);
+                iters += ldpc_decode_layered(&decoder, &code, l_in, l_out, sim.bp_iter, sim.decoder_terminate_early);
                 #else
                 iters += ldpc_decode(code, l_in, l_out, sim.bp_iter, sim.decoder_terminate_early);
                 #endif
@@ -337,6 +338,10 @@ int main(int argc, char* argv[])
     for(size_t i = 0; i < num_threads; i++) {
         vslDeleteStream(&rng_stream[i]);
     }
+    #endif
+
+    #ifdef LAYERED_DEC
+    destroy_dec(&decoder, &code);
     #endif
 
     destroy_ldpc_code_t(&code);

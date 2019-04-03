@@ -1,4 +1,4 @@
-CFLAGS=-c -pthread -Wall
+CFLAGS=-c -pthread -Wall -O3 -D_POSIX_C_SOURCE=199309L
 
 INCLUDEPATH= -I.
 

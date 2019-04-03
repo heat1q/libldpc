@@ -66,3 +66,15 @@ struct {
     size_t** bit_mapper;
     size_t* bits_pos;
 } typedef ldpc_sim_t;
+
+struct {
+    double* lsum;
+    bits_t* c_out;
+
+    double** l_c2v_pre;
+
+    double** l_c2v;
+    double** l_v2c;
+    double** f;
+    double** b;
+} typedef ldpc_decoder_lyr_t;
