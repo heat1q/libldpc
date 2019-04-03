@@ -120,8 +120,8 @@ void Ldpc_Decoder_cl::destroy_dec_mgd()
 	if (llr_out != nullptr) { cudaFree(llr_out); }
 }
 
-/*
-bool Ldpc_Decoder_cl::is_codeword()
+
+bool Ldpc_Decoder_cl::is_codeword_legacy()
 {
     bool is_codeword = true;
 
@@ -141,10 +141,9 @@ bool Ldpc_Decoder_cl::is_codeword()
 
     return is_codeword;
 }
-*/
 
-/*
-uint64_t Ldpc_Decoder_cl::decode_legacy(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination)
+
+uint64_t Ldpc_Decoder_cl::decode_legacy()
 {
     size_t it;
 
@@ -208,7 +207,7 @@ uint64_t Ldpc_Decoder_cl::decode_legacy(double* llr_in, double* llr_out, const u
         it++;
 
         if (early_termination) {
-            if (is_codeword()) {
+            if (is_codeword_legacy()) {
                 break;
             }
         }
@@ -217,7 +216,8 @@ uint64_t Ldpc_Decoder_cl::decode_legacy(double* llr_in, double* llr_out, const u
     return it;
 }
 
-uint64_t Ldpc_Decoder_cl::decode_layered_legacy(double* llr_in, double* llr_out, const uint64_t& max_iter, const bool& early_termination)
+
+uint64_t Ldpc_Decoder_cl::decode_layered_legacy()
 {
 	size_t* vn;
     size_t* cn;
@@ -306,8 +306,10 @@ uint64_t Ldpc_Decoder_cl::decode_layered_legacy(double* llr_in, double* llr_out,
 
             if (early_termination)
             {
-                if (is_codeword())
+                if (is_codeword_legacy())
+				{
                     return I;
+				}
             }
         }
 
@@ -316,46 +318,58 @@ uint64_t Ldpc_Decoder_cl::decode_layered_legacy(double* llr_in, double* llr_out,
 
     return I;
 }
+
+
+//tmpl fcts need definition in each file?
+template<typename T> void ldpc::printVector(T *x, const size_t &l)
+{
+    cout << "[";
+    for (size_t i = 0; i < l-1; ++i)
+        cout << x[i] << " ";
+    cout << x[l-1] << "]";
+}
+
+
+/*
+	Cudakernels
 */
-
-
-__global__ void cudakernel::clean_decoder(Ldpc_Decoder_cl* dec_ufd)
+__global__ void cudakernel::decoder::clean_decoder(Ldpc_Decoder_cl* dec_mgd)
 {
 	uint_fast32_t index = blockIdx.x * blockDim.x + threadIdx.x;
 	uint_fast32_t stride = blockDim.x * gridDim.x;
 
-	for (size_t i = index; i < dec_ufd->ldpc_code->nnz(); i += stride)
+	for (size_t i = index; i < dec_mgd->ldpc_code->nnz(); i += stride)
 	{
-		dec_ufd->lsum[i] = 0.0;
-		for (size_t l = 0; l < dec_ufd->ldpc_code->nl(); ++l)
+		dec_mgd->lsum[i] = 0.0;
+		for (size_t l = 0; l < dec_mgd->ldpc_code->nl(); ++l)
 		{
-			dec_ufd->l_c2v[l*dec_ufd->ldpc_code->nnz()+i] = 0.0;
-			dec_ufd->l_v2c[l*dec_ufd->ldpc_code->nnz()+i] = 0.0;
-			dec_ufd->l_c2v_pre[l*dec_ufd->ldpc_code->nnz()+i] = 0.0;
+			dec_mgd->l_c2v[l*dec_mgd->ldpc_code->nnz()+i] = 0.0;
+			dec_mgd->l_v2c[l*dec_mgd->ldpc_code->nnz()+i] = 0.0;
+			dec_mgd->l_c2v_pre[l*dec_mgd->ldpc_code->nnz()+i] = 0.0;
 		}
 	}
 }
 
 
-__global__ void cudakernel::decode_layered(Ldpc_Decoder_cl* dec_ufd)
+__global__ void cudakernel::decoder::decode_layered(Ldpc_Decoder_cl* dec_mgd)
 {
     size_t i_nnz;
 
     //zero everything out
-    cudakernel::clean_decoder<<<dec_ufd->num_blocks, dec_ufd->block_size>>>(dec_ufd);
+    cudakernel::decoder::clean_decoder<<<dec_mgd->num_blocks, dec_mgd->block_size>>>(dec_mgd);
 
     uint_fast32_t I = 0;
-    for (; I < dec_ufd->max_iter; ++I)
+    for (; I < dec_mgd->max_iter; ++I)
     {
-        for (uint64_t l = 0; l < dec_ufd->ldpc_code->nl(); ++l)
+        for (uint64_t l = 0; l < dec_mgd->ldpc_code->nl(); ++l)
         {
-            i_nnz = dec_ufd->ldpc_code->nnz()*l;
+            i_nnz = dec_mgd->ldpc_code->nnz()*l;
             //launch kernels here
-            cudakernel::decode_lyr_vnupdate<<<dec_ufd->num_blocks, dec_ufd->block_size>>>(dec_ufd, i_nnz);
-            cudakernel::decode_lyr_cnupdate<<<dec_ufd->num_blocks, dec_ufd->block_size>>>(dec_ufd, i_nnz, l);
-            cudakernel::decode_lyr_sumllr<<<dec_ufd->num_blocks, dec_ufd->block_size>>>(dec_ufd, i_nnz);
-            cudakernel::decode_lyr_appcalc<<<dec_ufd->num_blocks, dec_ufd->block_size>>>(dec_ufd);
-            if (dec_ufd->early_termination)
+            cudakernel::decoder::decode_lyr_vnupdate<<<dec_mgd->num_blocks, dec_mgd->block_size>>>(dec_mgd, i_nnz);
+            cudakernel::decoder::decode_lyr_cnupdate<<<dec_mgd->num_blocks, dec_mgd->block_size>>>(dec_mgd, i_nnz, l);
+            cudakernel::decoder::decode_lyr_sumllr<<<dec_mgd->num_blocks, dec_mgd->block_size>>>(dec_mgd, i_nnz);
+            cudakernel::decoder::decode_lyr_appcalc<<<dec_mgd->num_blocks, dec_mgd->block_size>>>(dec_mgd);
+            if (dec_mgd->early_termination)
             {
                 /*
                 if (cudakernel::is_codeword<<<1,1>>>())
@@ -373,7 +387,7 @@ __global__ void cudakernel::decode_layered(Ldpc_Decoder_cl* dec_ufd)
 }
 
 
-__global__ void cudakernel::decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_ufd, size_t i_nnz)
+__global__ void cudakernel::decoder::decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz)
 {
 	size_t* vn;
 	size_t vw;
@@ -382,26 +396,26 @@ __global__ void cudakernel::decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_ufd, size_t
 	uint_fast32_t stride = blockDim.x * gridDim.x;
 
 	//VN processing
-	for (size_t i = index; i < dec_ufd->ldpc_code->nc(); i += stride)
+	for (size_t i = index; i < dec_mgd->ldpc_code->nc(); i += stride)
 	{
-		double tmp = dec_ufd->llr_in[i];
-		vw =  dec_ufd->ldpc_code->vw()[i];
-		vn = dec_ufd->ldpc_code->vn()[i];
+		double tmp = dec_mgd->llr_in[i];
+		vw =  dec_mgd->ldpc_code->vw()[i];
+		vn = dec_mgd->ldpc_code->vn()[i];
 		while(vw--)
-			tmp += dec_ufd->lsum[*vn++];
+			tmp += dec_mgd->lsum[*vn++];
 
-		vn = dec_ufd->ldpc_code->vn()[i];
-		vw = dec_ufd->ldpc_code->vw()[i];
+		vn = dec_mgd->ldpc_code->vn()[i];
+		vw = dec_mgd->ldpc_code->vw()[i];
 		while(vw--)
 		{
-			dec_ufd->l_v2c[i_nnz + *vn] = tmp - dec_ufd->l_c2v[i_nnz + *vn];
+			dec_mgd->l_v2c[i_nnz + *vn] = tmp - dec_mgd->l_c2v[i_nnz + *vn];
 			++vn;
 		}
 	}
 }
 
 
-__global__ void cudakernel::decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_ufd, size_t i_nnz, uint64_t l)
+__global__ void cudakernel::decoder::decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz, uint64_t l)
 {
 	size_t* cn;
 	size_t cw;
@@ -409,46 +423,46 @@ __global__ void cudakernel::decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_ufd, size_t
 	uint_fast32_t index = blockIdx.x * blockDim.x + threadIdx.x;
 	uint_fast32_t stride = blockDim.x * gridDim.x;
 
-	double f_tmp[10];//[sizeof(dec_ufd->f[0])/8] = {0}; // - TODO
-	double b_tmp[10];//[sizeof(dec_ufd->b[0])/8] = {0}; // - TODO
+	double f_tmp[10];//[sizeof(dec_mgd->f[0])/8] = {0}; // - TODO
+	double b_tmp[10];//[sizeof(dec_mgd->b[0])/8] = {0}; // - TODO
 
 	//CN processing
-	for (size_t i = index; i < dec_ufd->ldpc_code->lw()[l]; i += stride)
+	for (size_t i = index; i < dec_mgd->ldpc_code->lw()[l]; i += stride)
 	{
-		cw = dec_ufd->ldpc_code->cw()[dec_ufd->ldpc_code->layers()[l][i]];
-		cn = dec_ufd->ldpc_code->cn()[dec_ufd->ldpc_code->layers()[l][i]];
-		f_tmp[0] = dec_ufd->l_v2c[i_nnz + *cn];
-		b_tmp[cw-1] = dec_ufd->l_v2c[i_nnz + *(cn+cw-1)];
+		cw = dec_mgd->ldpc_code->cw()[dec_mgd->ldpc_code->layers()[l][i]];
+		cn = dec_mgd->ldpc_code->cn()[dec_mgd->ldpc_code->layers()[l][i]];
+		f_tmp[0] = dec_mgd->l_v2c[i_nnz + *cn];
+		b_tmp[cw-1] = dec_mgd->l_v2c[i_nnz + *(cn+cw-1)];
 		for(size_t j = 1; j < cw; j++)
 		{
-			f_tmp[j] = jacobian(f_tmp[j-1], dec_ufd->l_v2c[i_nnz + *(cn+j)]);
-			b_tmp[cw-1-j] = jacobian(b_tmp[cw-j], dec_ufd->l_v2c[i_nnz + *(cn + cw-j-1)]);
+			f_tmp[j] = jacobian(f_tmp[j-1], dec_mgd->l_v2c[i_nnz + *(cn+j)]);
+			b_tmp[cw-1-j] = jacobian(b_tmp[cw-j], dec_mgd->l_v2c[i_nnz + *(cn + cw-j-1)]);
 		}
 
-		dec_ufd->l_c2v[i_nnz + *cn] = b_tmp[1];
-		dec_ufd->l_c2v[i_nnz + *(cn+cw-1)] = f_tmp[cw-2];
+		dec_mgd->l_c2v[i_nnz + *cn] = b_tmp[1];
+		dec_mgd->l_c2v[i_nnz + *(cn+cw-1)] = f_tmp[cw-2];
 
 		for(size_t j = 1; j < cw-1; j++)
-			dec_ufd->l_c2v[i_nnz + *(cn+j)] = jacobian(f_tmp[j-1], b_tmp[j+1]);
+			dec_mgd->l_c2v[i_nnz + *(cn+j)] = jacobian(f_tmp[j-1], b_tmp[j+1]);
 	}
 }
 
 
-__global__ void cudakernel::decode_lyr_sumllr(Ldpc_Decoder_cl* dec_ufd, size_t i_nnz)
+__global__ void cudakernel::decoder::decode_lyr_sumllr(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz)
 {
 	uint_fast32_t index = blockIdx.x * blockDim.x + threadIdx.x;
 	uint_fast32_t stride = blockDim.x * gridDim.x;
 
 	//sum llrs
-	for (size_t i = index; i < dec_ufd->ldpc_code->nnz(); i += stride)
+	for (size_t i = index; i < dec_mgd->ldpc_code->nnz(); i += stride)
 	{
-		dec_ufd->lsum[i] += dec_ufd->l_c2v[i_nnz + i] - dec_ufd->l_c2v_pre[i_nnz + i];
-		dec_ufd->l_c2v_pre[i_nnz + i] = dec_ufd->l_c2v[i_nnz + i];
+		dec_mgd->lsum[i] += dec_mgd->l_c2v[i_nnz + i] - dec_mgd->l_c2v_pre[i_nnz + i];
+		dec_mgd->l_c2v_pre[i_nnz + i] = dec_mgd->l_c2v[i_nnz + i];
 	}
 }
 
 
-__global__ void cudakernel::decode_lyr_appcalc(Ldpc_Decoder_cl* dec_ufd)
+__global__ void cudakernel::decoder::decode_lyr_appcalc(Ldpc_Decoder_cl* dec_mgd)
 {
 	size_t* vn;
 	size_t vw;
@@ -457,23 +471,13 @@ __global__ void cudakernel::decode_lyr_appcalc(Ldpc_Decoder_cl* dec_ufd)
 	uint_fast32_t stride = blockDim.x * gridDim.x;
 
 	//app calc
-	for (size_t i = index; i < dec_ufd->ldpc_code->nc(); i += stride)
+	for (size_t i = index; i < dec_mgd->ldpc_code->nc(); i += stride)
 	{
-		dec_ufd->llr_out[i] = dec_ufd->llr_in[i];
-		vn = dec_ufd->ldpc_code->vn()[i];
-		vw = dec_ufd->ldpc_code->vw()[i];
+		dec_mgd->llr_out[i] = dec_mgd->llr_in[i];
+		vn = dec_mgd->ldpc_code->vn()[i];
+		vw = dec_mgd->ldpc_code->vw()[i];
 		while(vw--)
-			dec_ufd->llr_out[i] += dec_ufd->lsum[*vn++];
-		dec_ufd->c_out[i] = (dec_ufd->llr_out[i] <= 0);
+			dec_mgd->llr_out[i] += dec_mgd->lsum[*vn++];
+		dec_mgd->c_out[i] = (dec_mgd->llr_out[i] <= 0);
 	}
-}
-
-
-//tmpl fcts need definition in each file?
-template<typename T> void ldpc::printVector(T *x, const size_t &l)
-{
-    cout << "[";
-    for (size_t i = 0; i < l-1; ++i)
-        cout << x[i] << " ";
-    cout << x[l-1] << "]";
 }

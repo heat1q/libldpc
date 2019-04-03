@@ -2,6 +2,8 @@
 #include <string.h>
 #include <math.h>
 #include <exception>
+#include <curand.h>
+#include <curand_kernel.h>
 
 using namespace std;
 using namespace ldpc;
@@ -302,7 +304,7 @@ double Sim_AWGN_cl::simulate_awgn(uint64_t *x, double *y, const double &sigma2)
     return Px/Pn;
 }
 
-double Sim_AWGN_cl::randn()
+__host__ __device__ double Sim_AWGN_cl::randn()
 {
     static double U, V;
     static int phase = 0;
@@ -487,4 +489,22 @@ template<typename T> void ldpc::printVector(T *x, const size_t &l)
 	for (size_t i = 0; i < l-1; ++i)
 	cout << x[i] << " ";
 	cout << x[l-1] << "]";
+}
+
+
+/*
+	Cudakernels
+*/
+__global__ void cudakernel::sim::sim_test(Ldpc_Decoder_cl* dec_mgd)
+{
+	curandState_t state;
+	curand_init(clock64(), 1, 0, &state);
+	for (size_t i=0; i<dec_mgd->ldpc_code->nc(); ++i)
+	{
+		dec_mgd->llr_in[i] = curand_normal(&state);
+		dec_mgd->llr_out[i] = 0.0;
+	}
+
+
+	cudakernel::decoder::decode_layered<<<1,1>>>(dec_mgd);
 }

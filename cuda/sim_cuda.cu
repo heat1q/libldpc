@@ -5,50 +5,34 @@ using namespace ldpc;
 using namespace std;
 
 
-//nvcc -std=c++11 sim_cuda.cu simulation.cu ldpc/ldpc.cu ldpc/decoder.cu -o sim_cuda -arch sm_35 -rdc=true -O3
+//nvcc -std=c++11 sim_cuda.cu simulation.cu ldpc/ldpc.cu ldpc/decoder.cu -o sim_cuda -arch sm_35 -rdc=true -O3 -w
 int main()
 {
-	Ldpc_Code_cl* code = new Ldpc_Code_cl("../src/code/test_code/code_rand_proto_3x6_400_4.txt", "../src/code/test_code/layer_rand_proto_3x6_400_4.txt", true);
-
-	code->print_ldpc_code();
-
-	delete code;
-/*
 	//set up code class on unified memory
-	Ldpc_Code_cl* code_managed;
-	cudaMallocManaged(&code_managed, sizeof(Ldpc_Code_cl));
-	*code_managed = Ldpc_Code_cl();
-	code_managed->setup_code_managed("../src/code/test_code/code_rand_proto_3x6_400_4.txt", "../src/code/test_code/layer_rand_proto_3x6_400_4.txt");
-	//code_managed->setup_code_managed("../src/code/test_code/code10K.txt", "../src/code/test_code/layer10K.txt");
+	Ldpc_Code_cl* code_dev = new Ldpc_Code_cl("../src/code/test_code/code_rand_proto_3x6_400_4.txt", "../src/code/test_code/layer_rand_proto_3x6_400_4.txt", true);
 
 	//set up simulation
 	//Sim_AWGN_cl sim = Sim_AWGN_cl(code_managed, "../src/sim.txt", "../src/code/test_code/map10K.txt");
 
 	//set up decoder on unified memory
-	Ldpc_Decoder_cl* dec_ufd;
-	cudaMallocManaged(&dec_ufd, sizeof(Ldpc_Decoder_cl));
-	dec_ufd->setup_decoder_managed(code_managed, 50, false);
+	Ldpc_Decoder_cl* dec_dev = new Ldpc_Decoder_cl(code_dev, 50, false, true);
 
-	for (size_t i=0; i<code_managed->nc(); ++i)
-	{
-		dec_ufd->llr_in[i] = Sim_AWGN_cl::randn();
-		dec_ufd->llr_out[i] = 0.0;
-	}
 
-	dec_ufd->prefetch_gpu();
-	cudakernel::decode_layered<<<1,1>>>(dec_ufd);
+	cudakernel::sim::sim_test<<<1,1>>>(dec_dev);
 
-	//TIME_PROF("CPU", dec_ufd->decode_layered_legacy(llrin, llrout, 50, false), "ms");
+	cudaDeviceSynchronize();
 
+
+	TIME_PROF("CPU", dec_dev->decode_layered_legacy(), "ms");
+	
+	TIME_PROF("CPU", dec_dev->decode_legacy(), "ms");
 
 	//destroy decoder
-	dec_ufd->destroy_dec_managed();
-	cudaFree(dec_ufd);
+	delete dec_dev;
 
 	//destroy code
-	code_managed->destroy_ldpc_code_managed();
-	cudaFree(code_managed);
-*/
+	delete code_dev;
+
 	return 0;
 }
 

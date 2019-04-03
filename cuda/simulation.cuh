@@ -3,6 +3,7 @@
 #include <chrono>
 #include "ldpc/ldpc.cuh"
 
+
 #define TIME_PROF(__LOG, __EXEC, __UNIT) \
 		do { \
 			std::string str_unit = std::string(__UNIT);\
@@ -24,6 +25,8 @@
 			printf("[TIMEPROF]: " __LOG ": ");\
 			printf("%.3f %s\n", static_cast<double>(std::chrono::duration_cast<chrono::nanoseconds>(elapsed).count())*a, str_unit.c_str());\
 		} while(0);
+
+
 
 #define MAX_FILENAME_LEN 256
 #define MAX_LLR 9999.9
@@ -54,7 +57,7 @@ public:
 
     void calc_llrs(const double& y, const double& sigma2, double* llrs_out);
     double simulate_awgn(uint64_t* x, double* y, const double& sigma2);
-    static double randn();
+    __host__ __device__ static double randn();
 
     void encode() {}
     void encode_all0(uint64_t* x, bits_t* c);
