@@ -8,16 +8,17 @@
 using namespace std;
 using namespace ldpc;
 
-Sim_AWGN_cl::Sim_AWGN_cl(Ldpc_Code_cl *code, const char *simFileName, const char *mapFileName)
+Sim_AWGN_cl::Sim_AWGN_cl(Ldpc_Code_cl* code, const char* simFileName, const char* mapFileName)
+	: ldpc_code(code)
 {
     //init
-    ldpc_code = code;
     cstll = nullptr;
     snrs = nullptr;
     labels = nullptr;
     labels_rev = nullptr;
     bit_mapper = nullptr;
     bits_pos = nullptr;
+	ldpc_dec = nullptr;
 
     try
     {
@@ -159,19 +160,45 @@ Sim_AWGN_cl::Sim_AWGN_cl(Ldpc_Code_cl *code, const char *simFileName, const char
             }
         }
 
+		//set up decoder
+		ldpc_dec = new Ldpc_Decoder_cl(code, bp_iter, decoder_terminate_early, true);
+
         fclose(fp);
     }
     catch(exception &e)
     {
         cout << "Error: " << e.what() << endl;
-        destroy_sim();
+        destroy();
 
         exit(EXIT_FAILURE);
     }
 }
 
-Sim_AWGN_cl::~Sim_AWGN_cl() { destroy_sim(); }
+Sim_AWGN_cl::~Sim_AWGN_cl() { destroy(); }
 
+
+void Sim_AWGN_cl::destroy()
+{
+    if (snrs != nullptr) { delete[] snrs; }
+    if (labels != nullptr) { delete[] labels; }
+	if (labels_rev != nullptr) { delete[] labels_rev; }
+	if (bits_pos != nullptr) { delete[] bits_pos; }
+	if (ldpc_dec != nullptr) { delete ldpc_dec; }
+
+    if (bit_mapper != nullptr)
+    {
+        for(size_t i = 0; i < bits; i++) { delete[] bit_mapper[i]; }
+        delete[] bit_mapper;
+    }
+
+    //constellation
+    if (cstll != nullptr)
+    {
+        if (cstll->pX != nullptr) { delete[] cstll->pX; }
+        if (cstll->X != nullptr) { delete[] cstll->X; }
+        delete cstll;
+    }
+}
 
 
 void Sim_AWGN_cl::read_bit_mapping_file(const char* filename)
@@ -194,8 +221,10 @@ void Sim_AWGN_cl::read_bit_mapping_file(const char* filename)
     fclose(fp);
 }
 
-void Sim_AWGN_cl::print_sim()
+void Sim_AWGN_cl::print()
 {
+	ldpc_code->print_ldpc_code();
+
     printf("=========== SIM ===========\n");
     printf("logfile: %s\n", logfile);
     printf("n: %lu\n", n);
@@ -227,37 +256,6 @@ void Sim_AWGN_cl::print_sim()
     printf("=========== SIM: END ===========\n");
 }
 
-void Sim_AWGN_cl::destroy_sim()
-{
-    if (snrs != nullptr)
-        delete[] snrs;
-
-    if (labels != nullptr)
-        delete[] labels;
-
-    if (labels_rev != nullptr)
-        delete[] labels_rev;
-
-    if (bit_mapper != nullptr)
-    {
-        for(size_t i = 0; i < bits; i++)
-            delete[] bit_mapper[i];
-        delete[] bit_mapper;
-    }
-
-    if (bits_pos != nullptr)
-        delete[] bits_pos;
-
-    //constellation
-    if (cstll != nullptr)
-    {
-        if (cstll->pX != nullptr)
-            delete[] cstll->pX;
-        if (cstll->X != nullptr)
-            delete[] cstll->X;
-        delete cstll;
-    }
-}
 
 void Sim_AWGN_cl::calc_llrs(const double &y, const double &sigma2, double *llrs_out)
 {
@@ -354,12 +352,10 @@ void Sim_AWGN_cl::map_c_to_x(bits_t* c, size_t* x)
 }
 
 
-void Sim_AWGN_cl::start_sim()
+void Sim_AWGN_cl::start()
 {
     uint64_t* x;
     double* y;
-    double* l_in;
-    double* l_out;
     bits_t* c;
     double* l_tmp;
 
@@ -381,8 +377,6 @@ void Sim_AWGN_cl::start_sim()
 
     fprintf(fp, "snr fer ber frames avg_iter\n");
 
-    //legacy decoder
-    //Ldpc_Decoder_cl* dec = new Ldpc_Decoder_cl(ldpc_code);
 
     /*
      * START: SIMULATION PART
@@ -401,13 +395,8 @@ void Sim_AWGN_cl::start_sim()
             x = new uint64_t[n];
             c = new bits_t[ldpc_code->nc()];
             y = new double[n];
-            l_in = new double[ldpc_code->nc()];
-            l_out = new double[ldpc_code->nc()];
-            //l_tmp = new double[bits];
 
-            //Ldpc_Decoder_cl* dec = new Ldpc_Decoder_cl();
-
-            while (true)
+            do
             {
                 encode_all0(x, c);
 
@@ -416,60 +405,58 @@ void Sim_AWGN_cl::start_sim()
                 //puncturing & shortening
                 if(ldpc_code->num_puncture() != 0)
                 {
-                    for(size_t j = 0; j < ldpc_code->num_puncture(); j++)
-                        l_in[ldpc_code->puncture()[j]] = 0;
+                    for(size_t j = 0; j < ldpc_code->num_puncture(); j++) {
+                        ldpc_dec->llr_in[ldpc_code->puncture()[j]] = 0;
+					}
                 }
                 if(ldpc_code->num_shorten() != 0)
                 {
-                    for(size_t j = 0; j < ldpc_code->num_shorten(); j++)
-                        l_in[ldpc_code->shorten()[j]] = 99999.9;
+                    for(size_t j = 0; j < ldpc_code->num_shorten(); j++) {
+                        ldpc_dec->llr_in[ldpc_code->shorten()[j]] = 99999.9;
+					}
                 }
 
                 double l_tmp[bits];
                 for(size_t j = 0; j < n; j++)
                 {
                     calc_llrs(y[j], sigma2, l_tmp);
-                    for(size_t k = 0; k < bits; k++)
-                        l_in[bit_mapper[k][j]] = l_tmp[k];
+                    for(size_t k = 0; k < bits; k++) {
+                        ldpc_dec->llr_in[bit_mapper[k][j]] = l_tmp[k];
+					}
                 }
 
-                for(size_t j = 0; j < ldpc_code->nc(); j++)
-                    l_in[j] *= (1-2*c[j]);
+                for(size_t j = 0; j < ldpc_code->nc(); j++) {
+                    ldpc_dec->llr_in[j] *= (1-2*c[j]);
+				}
 
                 //decode
-                //iters += dec->decode_legacy(l_in, l_out, bp_iter, decoder_terminate_early);
-                //iters += dec->decode_layered_legacy(l_in, l_out, bp_iter, decoder_terminate_early);
+                //iters += ldpc_dec->decode_legacy();
+                //iters += ldpc_dec->decode_layered_legacy();
+				iters += ldpc_dec->decode_layered();
 
-                frames += 1;
+                frames++;
 
                 bec_tmp = 0;
                 for(size_t j = 0; j < ldpc_code->nc(); j++)
                 {
-                    bec_tmp += (l_out[j] <= 0);
+                    bec_tmp += (ldpc_dec->llr_out[j] <= 0);
                 }
 
                 if (bec_tmp > 0)
                 {
                     bec += bec_tmp;
-                    fec += 1;
+                    fec++;
 
                     printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e\n", fec, min_fec, frames, 10*log10(1/sigma2), (double) bec/(frames*ldpc_code->nc()), (double) fec/frames);
 
                     //log_error(sim, code, cstll, c, l_out, frames, 10*log10(1/sigma2));
                 }
 
-                if (fec >= min_fec || frames >= max_frames)
-                {
-                    break;
-                }
-            }//end while
+            } while (fec < min_fec && frames < max_frames); //end while
 
             delete[] x;
             delete[] c;
             delete[] y;
-            delete[] l_in;
-            delete[] l_out;
-            //delete[] l_tmp;
         }//end parallel
 
         fprintf(fp, "%lf %.3e %.3e %lu %.3e\n", snrs[i], static_cast<double>(fec/frames), static_cast<double>(bec/(frames*ldpc_code->nc())), frames, static_cast<double>(iters/frames));
@@ -504,7 +491,4 @@ __global__ void cudakernel::sim::sim_test(Ldpc_Decoder_cl* dec_mgd)
 		dec_mgd->llr_in[i] = curand_normal(&state);
 		dec_mgd->llr_out[i] = 0.0;
 	}
-
-
-	cudakernel::decoder::decode_layered<<<1,1>>>(dec_mgd);
 }

@@ -12,20 +12,19 @@ int main()
 	Ldpc_Code_cl* code_dev = new Ldpc_Code_cl("../src/code/test_code/code_rand_proto_3x6_400_4.txt", "../src/code/test_code/layer_rand_proto_3x6_400_4.txt", true);
 
 	//set up simulation
-	//Sim_AWGN_cl sim = Sim_AWGN_cl(code_managed, "../src/sim.txt", "../src/code/test_code/map10K.txt");
+	Sim_AWGN_cl sim = Sim_AWGN_cl(code_dev, "../src/sim.txt", "../src/code/test_code/mapping_rand_proto_3x6_400_4.txt");
+	sim.print();
+	sim.start();
 
 	//set up decoder on unified memory
-	Ldpc_Decoder_cl* dec_dev = new Ldpc_Decoder_cl(code_dev, 50, false, true);
+	Ldpc_Decoder_cl* dec_dev = new Ldpc_Decoder_cl(code_dev, 50, true, true);
 
-
-	cudakernel::sim::sim_test<<<1,1>>>(dec_dev);
-
-	cudaDeviceSynchronize();
-
-
-	TIME_PROF("CPU", dec_dev->decode_layered_legacy(), "ms");
-	
-	TIME_PROF("CPU", dec_dev->decode_legacy(), "ms");
+	/*
+	cudakernel::sim::sim_test<<<1,1>>>(dec_dev); cudaDeviceSynchronize();
+	TIME_PROF("GPU Layered", dec_dev->decode_layered(), "ms");
+	TIME_PROF("CPU Layered", dec_dev->decode_layered_legacy(), "ms");
+	TIME_PROF("CPU Legacy", dec_dev->decode_legacy(), "ms");
+	*/
 
 	//destroy decoder
 	delete dec_dev;

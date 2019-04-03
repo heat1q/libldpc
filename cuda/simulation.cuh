@@ -52,8 +52,8 @@ public:
     ~Sim_AWGN_cl();
 
     void read_bit_mapping_file(const char* filename);
-    void print_sim();
-    void destroy_sim();
+    void print();
+    void destroy();
 
     void calc_llrs(const double& y, const double& sigma2, double* llrs_out);
     double simulate_awgn(uint64_t* x, double* y, const double& sigma2);
@@ -63,10 +63,11 @@ public:
     void encode_all0(uint64_t* x, bits_t* c);
     void map_c_to_x(bits_t* c, size_t* x);
 
-    void start_sim();
+    void start();
 
 private:
     ldpc::Ldpc_Code_cl* ldpc_code;
+	ldpc::Ldpc_Decoder_cl* ldpc_dec;
 
     cstll_t* cstll;
 

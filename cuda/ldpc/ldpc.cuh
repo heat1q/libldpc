@@ -10,19 +10,18 @@ typedef uint8_t bits_t;
 typedef uint16_t labels_t;
 typedef uint32_t symbols_t;
 
+namespace ldpc {
 
 class Cuda_Mgd_cl
 {
 public:
-    void* operator new(size_t len);
-    void operator delete(void* ptr);
+	void* operator new(size_t len);
+	void operator delete(void* ptr);
 
 protected:
-    bool isMgd = false;
+	bool isMgd = false;
 };
 
-
-namespace ldpc {
 
 class Ldpc_Code_cl : public Cuda_Mgd_cl
 {
@@ -95,7 +94,7 @@ private:
 class Ldpc_Decoder_cl : public Cuda_Mgd_cl
 {
 public:
-	Ldpc_Decoder_cl(Ldpc_Code_cl* code, const uint_fast32_t I, const bool early_term, const bool mgd);
+	Ldpc_Decoder_cl(Ldpc_Code_cl* code, const uint16_t I, const bool early_term, const bool mgd);
 	~Ldpc_Decoder_cl();
 
     //void setup_dec();
@@ -106,9 +105,13 @@ public:
     //void destroy_dec();
 	void destroy_dec_mgd();
 
-	bool is_codeword_legacy();
-    uint64_t decode_legacy();
-    uint64_t decode_layered_legacy();
+	__host__ __device__ bool is_codeword();
+	__host__ __device__ bool is_codeword_legacy();
+
+    uint16_t decode_legacy();
+    uint16_t decode_layered_legacy();
+
+	uint16_t decode_layered();
 
     Ldpc_Code_cl* ldpc_code;
     double* l_v2c;
@@ -121,13 +124,18 @@ public:
 	double* llr_in;
 	double* llr_out;
 
+	bits_t* synd;
     bits_t* c_out;
 
-	uint_fast32_t max_iter;
+	uint16_t max_iter;
+	uint16_t iter;
 	bool early_termination;
 
 	uint_fast32_t block_size;
 	uint_fast32_t num_blocks;
+
+	bool is_cw;
+	void* fb_ref;
 };
 
 
@@ -140,16 +148,19 @@ __host__ __device__ double jacobian_lin_approx(const double& L);
 __host__ __device__ int8_t sign(const double& a);
 
 
+__host__ __device__ inline uint64_t get_num_size(const uint64_t length, const uint16_t block_size) { return ceil((length+block_size-1)/block_size); }
+
 namespace cudakernel
 {
 	namespace decoder
 	{
-	    __global__ void clean_decoder(Ldpc_Decoder_cl* dec_mgd);
-	    __global__ void decode_layered(Ldpc_Decoder_cl* dec_mgd);
-	    __global__ void decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz);
-	    __global__ void decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz, uint64_t l);
-	    __global__ void decode_lyr_sumllr(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz);
-	    __global__ void decode_lyr_appcalc(Ldpc_Decoder_cl* dec_mgd);
+		__global__ void clean_decoder(Ldpc_Decoder_cl* dec_mgd);
+		__global__ void decode_layered(Ldpc_Decoder_cl* dec_mgd);
+		__global__ void decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz);
+		__global__ void decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz, uint64_t l);
+		__global__ void decode_lyr_sumllr(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz);
+		__global__ void decode_lyr_appcalc(Ldpc_Decoder_cl* dec_mgd);
+		__global__ void calc_synd(Ldpc_Decoder_cl* dec_mgd);
 	}
 
 	namespace sim

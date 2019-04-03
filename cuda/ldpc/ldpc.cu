@@ -326,7 +326,7 @@ void Ldpc_Code_cl::setup_layers_mgd(const char* clfile)
 void Ldpc_Code_cl::prefetch_code()
 {
 	cudaDeviceSynchronize();
-	
+
 	int dev = -1;
 	cudaGetDevice(&dev);
 
