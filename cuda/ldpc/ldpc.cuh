@@ -15,11 +15,11 @@ namespace ldpc {
 class Cuda_Mgd_cl
 {
 public:
-	void* operator new(size_t len);
-	void operator delete(void* ptr);
+    void* operator new(size_t len);
+    void operator delete(void* ptr);
 
 protected:
-	bool isMgd = false;
+    bool isMgd = false;
 };
 
 
@@ -32,12 +32,12 @@ public:
     void setup_code(const char* filename);
     void setup_layers(const char* clfile);
 
-	void setup_code_mgd(const char* filename);
-	void setup_layers_mgd(const char* clfile);
+    void setup_code_mgd(const char* filename);
+    void setup_layers_mgd(const char* clfile);
     void prefetch_code();
 
     void destroy_code();
-	void destroy_code_mgd();
+    void destroy_code_mgd();
 
     void print_ldpc_code();
 
@@ -85,8 +85,8 @@ private:
     uint64_t kct_c; /* number of transmitted information bits */
     uint64_t mct_c; /* number of transmitted parity check bits */
     size_t max_dc_c;
-    uint64_t nl_c; //number of layers
-    uint64_t* lw_c; //layer weight
+    uint64_t nl_c;                                          //number of layers
+    uint64_t* lw_c;                                         //layer weight
     uint64_t** layers_c;
 };
 
@@ -94,24 +94,24 @@ private:
 class Ldpc_Decoder_cl : public Cuda_Mgd_cl
 {
 public:
-	Ldpc_Decoder_cl(Ldpc_Code_cl* code, const uint16_t I, const bool early_term, const bool mgd);
-	~Ldpc_Decoder_cl();
+    Ldpc_Decoder_cl(Ldpc_Code_cl* code, const uint16_t I, const bool early_term, const bool mgd);
+    ~Ldpc_Decoder_cl();
 
     //void setup_dec();
-	void setup_dec_mgd();
+    void setup_dec_mgd();
 
-	void prefetch_dec();
+    void prefetch_dec();
 
     //void destroy_dec();
-	void destroy_dec_mgd();
+    void destroy_dec_mgd();
 
-	__host__ __device__ bool is_codeword();
-	__host__ __device__ bool is_codeword_legacy();
+    __host__ __device__ bool is_codeword();
+    __host__ __device__ bool is_codeword_legacy();
 
     uint16_t decode_legacy();
     uint16_t decode_layered_legacy();
 
-	uint16_t decode_layered();
+    uint16_t decode_layered();
 
     Ldpc_Code_cl* ldpc_code;
     double* l_v2c;
@@ -121,21 +121,21 @@ public:
     double* lsum;
     double* l_c2v_pre;
 
-	double* llr_in;
-	double* llr_out;
+    double* llr_in;
+    double* llr_out;
 
-	bits_t* synd;
+    bits_t* synd;
     bits_t* c_out;
 
-	uint16_t max_iter;
-	uint16_t iter;
-	bool early_termination;
+    uint16_t max_iter;
+    uint16_t iter;
+    bool early_termination;
 
-	uint_fast32_t block_size;
-	uint_fast32_t num_blocks;
+    uint_fast32_t block_size;
+    uint_fast32_t num_blocks;
 
-	bool is_cw;
-	void* fb_ref;
+    bool is_cw;
+    void* fb_ref;
 };
 
 
@@ -152,21 +152,21 @@ __host__ __device__ inline uint64_t get_num_size(const uint64_t length, const ui
 
 namespace cudakernel
 {
-	namespace decoder
-	{
-		__global__ void clean_decoder(Ldpc_Decoder_cl* dec_mgd);
-		__global__ void decode_layered(Ldpc_Decoder_cl* dec_mgd);
-		__global__ void decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz);
-		__global__ void decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz, uint64_t l);
-		__global__ void decode_lyr_sumllr(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz);
-		__global__ void decode_lyr_appcalc(Ldpc_Decoder_cl* dec_mgd);
-		__global__ void calc_synd(Ldpc_Decoder_cl* dec_mgd);
-	}
+    namespace decoder
+    {
+        __global__ void clean_decoder(Ldpc_Decoder_cl* dec_mgd);
+        __global__ void decode_layered(Ldpc_Decoder_cl* dec_mgd);
+        __global__ void decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz);
+        __global__ void decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz, uint64_t l);
+        __global__ void decode_lyr_sumllr(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz);
+        __global__ void decode_lyr_appcalc(Ldpc_Decoder_cl* dec_mgd);
+        __global__ void calc_synd(Ldpc_Decoder_cl* dec_mgd);
+    }
 
-	namespace sim
-	{
-		__global__ void sim_test(Ldpc_Decoder_cl* dec_mgd);
-	}
+    namespace sim
+    {
+        __global__ void sim_test(Ldpc_Decoder_cl* dec_mgd);
+    }
 }
 
 }
