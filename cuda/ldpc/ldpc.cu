@@ -257,7 +257,7 @@ void Ldpc_Code_cl::setup_code_mgd(const char* filename)
 	        vw_c[i] = 0;
 	        vw_tmp[i] = 0;
 	    }
-
+		
         for(size_t i = 0; i < nnz_c; i++)
         {
             fscanf(fp, "%lu %lu\n", &(r_c[i]), &(c_c[i]));
