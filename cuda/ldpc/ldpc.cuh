@@ -150,7 +150,8 @@ __host__ __device__ double jacobian_lin_approx(const double& L);
 __host__ __device__ int8_t sign(const double& a);
 
 
-__host__ __device__ inline uint64_t get_num_size(const uint64_t length, const uint16_t block_size) { return ceil((length+block_size-1)/block_size); }
+__host__ __device__ const inline uint64_t get_num_size(const uint64_t length, const uint16_t block_size) { return ceil((length+block_size-1)/block_size); }
+__host__ __device__ const inline dim3 get_gridsize_2d(const dim3& length, const dim3& block_size) { return dim3(ceil((length.x+block_size.x-1)/block_size.x), ceil((length.y+block_size.y-1)/block_size.y)); }
 
 namespace cudakernel
 {

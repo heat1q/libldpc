@@ -406,7 +406,7 @@ __global__ void cudakernel::decoder::decode_layered(Ldpc_Decoder_cl* dec_mgd)
 
             if (dec_mgd->early_termination)
             {
-                if (dec_mgd->is_codeword_legacy()) //break
+                if (dec_mgd->is_codeword()) //break
                 {
                     //l = dec_mgd->ldpc_code->nl();
                     //I += dec_mgd->max_iter;
