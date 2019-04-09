@@ -5,6 +5,7 @@
 using namespace std;
 using namespace ldpc;
 
+Cuda_Mgd_cl::Cuda_Mgd_cl(const bool mgd) : is_mgd(mgd) {}
 
 void* Cuda_Mgd_cl::operator new(size_t len)
 {
@@ -20,10 +21,10 @@ void Cuda_Mgd_cl::operator delete(void* ptr)
 	cudaFree(ptr);
 }
 
-
-Ldpc_Code_cl::Ldpc_Code_cl(const char* filename, const char* clfile, const bool& mgd)
+Ldpc_Code_cl::Ldpc_Code_cl(const char* filename, const char* clfile, const bool mgd)
+	: Cuda_Mgd_cl(mgd)
 {
-	if (mgd)
+	if (is_mgd)
 	{
 		setup_code_mgd(filename);
 		setup_layers_mgd(clfile);
@@ -34,14 +35,12 @@ Ldpc_Code_cl::Ldpc_Code_cl(const char* filename, const char* clfile, const bool&
 		setup_code(filename);
 		setup_layers(clfile);
 	}
-
-	isMgd = mgd;
 }
 
 
 Ldpc_Code_cl::~Ldpc_Code_cl()
 {
-	if (isMgd)
+	if (is_mgd)
 	{
 		destroy_code_mgd();
 	}
@@ -257,7 +256,7 @@ void Ldpc_Code_cl::setup_code_mgd(const char* filename)
 	        vw_c[i] = 0;
 	        vw_tmp[i] = 0;
 	    }
-		
+
         for(size_t i = 0; i < nnz_c; i++)
         {
             fscanf(fp, "%lu %lu\n", &(r_c[i]), &(c_c[i]));

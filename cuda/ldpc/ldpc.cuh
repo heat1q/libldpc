@@ -10,23 +10,25 @@ typedef uint8_t bits_t;
 typedef uint16_t labels_t;
 typedef uint32_t symbols_t;
 
-namespace ldpc {
 
 class Cuda_Mgd_cl
 {
 public:
+	Cuda_Mgd_cl(const bool mgd);
+
     void* operator new(size_t len);
     void operator delete(void* ptr);
 
 protected:
-    bool isMgd = false;
+    bool is_mgd = false;
 };
 
+namespace ldpc {
 
 class Ldpc_Code_cl : public Cuda_Mgd_cl
 {
 public:
-    Ldpc_Code_cl(const char* filename, const char* clfile, const bool& mgd);
+    Ldpc_Code_cl(const char* filename, const char* clfile, const bool mgd);
     virtual ~Ldpc_Code_cl();
 
     void setup_code(const char* filename);

@@ -6,9 +6,9 @@ using namespace std;
 
 
 Ldpc_Decoder_cl::Ldpc_Decoder_cl(Ldpc_Code_cl* code, const uint16_t I, const bool early_term, const bool mgd)
-: ldpc_code(code), max_iter(I), early_termination(early_term)
+: ldpc_code(code), max_iter(I), early_termination(early_term), Cuda_Mgd_cl(mgd)
 {
-    if (mgd)
+    if (is_mgd)
     {
         setup_dec_mgd();
         prefetch_dec();
@@ -17,14 +17,12 @@ Ldpc_Decoder_cl::Ldpc_Decoder_cl(Ldpc_Code_cl* code, const uint16_t I, const boo
     {
         //setup_dec();
     }
-
-    isMgd = mgd;
 }
 
 
 Ldpc_Decoder_cl::~Ldpc_Decoder_cl()
 {
-    if (isMgd)
+    if (is_mgd)
     {
         destroy_dec_mgd();
     }
