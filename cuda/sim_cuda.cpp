@@ -18,9 +18,12 @@ int main()
 
 /*
 	//set up decoder on unified memory
-	Ldpc_Decoder_cl* dec_dev = new Ldpc_Decoder_cl(code_dev, 1, false, true);
+	Ldpc_Decoder_cl* dec_dev = new Ldpc_Decoder_cl(code_dev, 50, false, true);
 
-	cudakernel::sim::sim_test<<<1,1>>>(dec_dev); cudaDeviceSynchronize();
+	for (size_t i = 0; i < code_dev->nc(); ++i) {
+		dec_dev->llr_in[i] = Sim_AWGN_cl::randn();
+	}
+
 	dec_dev->decode_layered();
 	TIME_PROF("GPU Layered", dec_dev->decode_layered(), "ms");
 	TIME_PROF("CPU Layered", dec_dev->decode_layered_legacy(), "ms");

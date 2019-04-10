@@ -10,6 +10,7 @@ typedef uint8_t bits_t;
 typedef uint16_t labels_t;
 typedef uint32_t symbols_t;
 
+#define NUM_THREADS 128
 
 class Cuda_Mgd_cl
 {
@@ -132,9 +133,6 @@ public:
     uint16_t max_iter;
     uint16_t iter;
     bool early_termination;
-
-    uint_fast32_t block_size;
-    uint_fast32_t num_blocks;
 
     bool is_cw;
     void* fb_ref;
