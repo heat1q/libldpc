@@ -1,7 +1,10 @@
 #pragma once
 
+#include "ldpc/ldpc.h"
+
 #include <chrono>
-#include "ldpc/ldpc.cuh"
+#include <vector>
+
 
 
 #define TIME_PROF(__LOG, __EXEC, __UNIT) \
@@ -65,7 +68,8 @@ public:
 
     void calc_llrs(const double& y, const double& sigma2, double* llrs_out);
     double simulate_awgn(uint64_t* x, double* y, const double& sigma2);
-    __host__ __device__ static double randn();
+
+	void log_error(bits_t* c, const uint64_t frame_num, const double snr);
 
     void encode() {}
     void encode_all0(uint64_t* x, bits_t* c);
@@ -73,6 +77,7 @@ public:
 
     void start();
 
+	static double randn();
 private:
     ldpc::Ldpc_Code_cl* ldpc_code;
 	ldpc::Ldpc_Decoder_cl* ldpc_dec;

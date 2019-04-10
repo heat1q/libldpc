@@ -1,4 +1,5 @@
-#include "simulation.cuh"
+#include "simulation.h"
+
 #include <string.h>
 #include <math.h>
 #include <exception>
@@ -301,7 +302,7 @@ double Sim_AWGN_cl::simulate_awgn(uint64_t *x, double *y, const double &sigma2)
     return Px/Pn;
 }
 
-__host__ __device__ double Sim_AWGN_cl::randn()
+double Sim_AWGN_cl::randn()
 {
     static double U, V;
     static int phase = 0;
@@ -353,18 +354,16 @@ void Sim_AWGN_cl::map_c_to_x(bits_t* c, size_t* x)
 
 void Sim_AWGN_cl::start()
 {
-    uint64_t* x;
-    double* y;
-    bits_t* c;
-    double* l_tmp;
+    uint64_t* x = new uint64_t[n];
+    double* y = new double[n];
+    bits_t* c = new bits_t[ldpc_code->nc()];
+    double* l_tmp = new double[bits];
 
     double sigma2;
-
     uint64_t frames;
     uint64_t bec = 0;
     uint64_t fec = 0;
     uint64_t iters;
-
     size_t bec_tmp;
 
     FILE* fp = fopen(logfile, "w");
@@ -376,108 +375,185 @@ void Sim_AWGN_cl::start()
 
     fprintf(fp, "snr fer ber frames avg_iter\n");
 
+	/*
+	* START: SIMULATION PART
+	*/
 
-    /*
-     * START: SIMULATION PART
-     */
+	for (size_t i = 0; i < num_snrs; ++i)
+	{
+		bec = 0;
+		fec = 0;
+		frames = 0;
+		iters = 0;
+		sigma2 = pow(10, -snrs[i]/10);
+		auto time_start = chrono::high_resolution_clock::now();
 
-    for (size_t i = 0; i < num_snrs; ++i)
-    {
-        bec = 0;
-        fec = 0;
-        frames = 0;
-        iters = 0;
-        sigma2 = pow(10, -snrs[i]/10);
+		do
+		{
+			encode_all0(x, c);
 
-        /* parallel here */
-        {
-            x = new uint64_t[n];
-            c = new bits_t[ldpc_code->nc()];
-            y = new double[n];
-			double l_tmp[bits];
+			simulate_awgn(x, y, sigma2);
 
-			auto time_start = chrono::high_resolution_clock::now();
-
-            do
-            {
-				encode_all0(x, c);
-
-				simulate_awgn(x, y, sigma2);
-
-                //puncturing & shortening
-                if(ldpc_code->num_puncture() != 0)
-                {
-                    for(size_t j = 0; j < ldpc_code->num_puncture(); j++) {
-                        ldpc_dec->llr_in[ldpc_code->puncture()[j]] = 0;
-                    }
-                }
-                if(ldpc_code->num_shorten() != 0)
-                {
-                    for(size_t j = 0; j < ldpc_code->num_shorten(); j++) {
-                        ldpc_dec->llr_in[ldpc_code->shorten()[j]] = 99999.9;
-                    }
-                }
-
-                for(size_t j = 0; j < n; j++)
-                {
-                    calc_llrs(y[j], sigma2, l_tmp);
-                    for(size_t k = 0; k < bits; k++) {
-                        ldpc_dec->llr_in[bit_mapper[k][j]] = l_tmp[k];
-                    }
-                }
-
-                for(size_t j = 0; j < ldpc_code->nc(); j++) {
-                    ldpc_dec->llr_in[j] *= (1-2*c[j]);
-                }
-
-                //decode
-                //iters += ldpc_dec->decode_legacy();
-                //iters += ldpc_dec->decode_layered_legacy();
-				iters += ldpc_dec->decode_layered();
-
-
-				frames++;
-
-				bec_tmp = 0;
-				for(size_t j = 0; j < ldpc_code->nc(); j++)
-				{
-					bec_tmp += (ldpc_dec->llr_out[j] <= 0);
+			//puncturing & shortening
+			if(ldpc_code->num_puncture() != 0)
+			{
+				for(size_t j = 0; j < ldpc_code->num_puncture(); j++) {
+					ldpc_dec->llr_in[ldpc_code->puncture()[j]] = 0;
 				}
+			}
+			if(ldpc_code->num_shorten() != 0)
+			{
+				for(size_t j = 0; j < ldpc_code->num_shorten(); j++) {
+					ldpc_dec->llr_in[ldpc_code->shorten()[j]] = 99999.9;
+				}
+			}
 
-				if (bec_tmp > 0)
-				{
-					bec += bec_tmp;
-					fec++;
+			for(size_t j = 0; j < n; j++)
+			{
+				calc_llrs(y[j], sigma2, l_tmp);
+				for(size_t k = 0; k < bits; k++) {
+					ldpc_dec->llr_in[bit_mapper[k][j]] = l_tmp[k];
+				}
+			}
 
-					auto time_dur = chrono::high_resolution_clock::now() - time_start;
-					uint64_t t = static_cast<uint64_t>(chrono::duration_cast<chrono::microseconds>(time_dur).count());
-                    printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e, TIME/FRAME=%.3f ms, AVGITERS=%.2f\n",
-						fec, min_fec, frames, 10*log10(1/sigma2),
-						(double) bec/(frames*ldpc_code->nc()), (double) fec/frames,
-						(double) t/frames * 1e-3,
-						(double) iters/frames
-					);
+			for(size_t j = 0; j < ldpc_code->nc(); j++) {
+				ldpc_dec->llr_in[j] *= (1-2*c[j]);
+			}
 
-                    //log_error(sim, code, cstll, c, l_out, frames, 10*log10(1/sigma2));
-
-					//time_start = chrono::high_resolution_clock::now();
-                }
-
-
-            } while (fec < min_fec && frames < max_frames); //end while
-
-            delete[] x;
-            delete[] c;
-            delete[] y;
-        }//end parallel
-
-        fprintf(fp, "%lf %.3e %.3e %lu %.3e\n", snrs[i], (double) fec/frames, (double) bec/(frames*ldpc_code->nc()), frames, (double) iters/frames);
-        fflush(fp);
-    }//end for
+			//decode
+			//iters += ldpc_dec->decode_legacy();
+			//iters += ldpc_dec->decode_layered_legacy();
+			iters += ldpc_dec->decode_layered();
 
 
-    fclose(fp);
+			frames++;
+
+			bec_tmp = 0;
+			for(size_t j = 0; j < ldpc_code->nc(); j++)
+			{
+				bec_tmp += (ldpc_dec->llr_out[j] <= 0);
+			}
+
+			if (bec_tmp > 0)
+			{
+				bec += bec_tmp;
+				fec++;
+
+				auto time_dur = chrono::high_resolution_clock::now() - time_start;
+				uint64_t t = static_cast<uint64_t>(chrono::duration_cast<chrono::microseconds>(time_dur).count());
+				printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e, TIME/FRAME=%.3f ms, AVGITERS=%.2f\n",
+					fec, min_fec, frames, 10*log10(1/sigma2),
+					(double) bec/(frames*ldpc_code->nc()), (double) fec/frames,
+					(double) t/frames * 1e-3,
+					(double) iters/frames
+				);
+
+				log_error(c, frames, snrs[i]);
+			}
+
+
+		} while (fec < min_fec && frames < max_frames); //end while
+
+		fprintf(fp, "%lf %.3e %.3e %lu %.3e\n", snrs[i], (double) fec/frames, (double) bec/(frames*ldpc_code->nc()), frames, (double) iters/frames);
+		fflush(fp);
+	}//end for
+
+	fclose(fp);
+
+	delete[] x;
+	delete[] y;
+	delete[] c;
+	delete[] l_tmp;
 }
+
+
+void Sim_AWGN_cl::log_error(bits_t* c, const uint64_t frame_num, const double snr)
+{
+	char errors_file[MAX_FILENAME_LEN];
+    snprintf(errors_file, MAX_FILENAME_LEN, "errors_%s", logfile);
+
+    FILE *fp = fopen(errors_file, "a+");
+    if(!fp)
+	{
+        printf("can not open error log file.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    /* calculation of syndrome and failed syndrome checks */
+    size_t synd_weight = 0;
+    for (size_t i = 0; i < ldpc_code->mc(); i++) {
+        synd_weight += (size_t) ldpc_dec->synd[i];
+    }
+	vector<size_t> failed_checks_idx(synd_weight);
+    size_t j = 0;
+    for (size_t i = 0; i < ldpc_code->mc(); i++)
+	{
+        if(ldpc_dec->synd[i] == 1)
+		{
+            failed_checks_idx[j++] = i;
+        }
+    }
+
+    /* calculation of failed codeword bits */
+    size_t cw_dis = 0;
+    for (size_t i = 0; i < ldpc_code->nc(); i++)
+	{
+        #ifdef ENCODE
+        cw_dis += ((ldpc_dec->llr_out[i] <= 0) != c[i]);
+        #else
+        cw_dis += ((ldpc_dec->llr_out[i] <= 0) != 0);
+        #endif
+    }
+
+	size_t* x = new size_t[n];
+	size_t* xhat = new size_t[n];
+	bits_t* chat = new bits_t[ldpc_code->nc()];
+	for (size_t i = 0; i < ldpc_code->nc(); i++) {
+		chat[i] = (bits_t) (ldpc_dec->llr_out[i] <= 0);
+	}
+
+    map_c_to_x(c, x);
+    map_c_to_x(chat, xhat);
+    double cw_dis_euc = 0;
+    for (size_t i = 0; i < n; i++) {
+        #ifdef ENCODE
+        cw_dis_euc += (cstll->X[x[i]] - cstll->X[xhat[i]]) * (cstll->X[x[i]] - cstll->X[xhat[i]]);
+        #else
+        cw_dis_euc += (cstll->X[0] - cstll->X[xhat[i]]) * (cstll->X[0] - cstll->X[xhat[i]]);
+        #endif
+    }
+	vector<size_t> failed_bits_idx(cw_dis);
+    j = 0;
+    for (size_t i = 0; i < ldpc_code->nc(); i++) {
+        #ifdef ENCODE
+        if(chat[i] != c[i]) {
+            failed_bits_idx[j++] = i;
+        }
+        #else
+        if(chat[i] != 0) {
+            failed_bits_idx[j++] = i;
+        }
+        #endif
+    }
+
+    /* print results in file */
+    fprintf(fp, "SNR: %.2f -- frame: %lu -- is codeword: %d -- dE(c,chat): %.3f -- dH(c,chat): %lu | ", snr, frame_num, synd_weight == 0, cw_dis_euc, cw_dis);
+	for (auto failed_bits_idx_i : failed_bits_idx) {
+		fprintf(fp, "%lu ", failed_bits_idx_i);
+	}
+    fprintf(fp, " -- ");
+    fprintf(fp, "synd weight: %lu | ", synd_weight);
+	for (auto failed_checks_idx_i : failed_checks_idx) {
+		fprintf(fp, "%lu ", failed_checks_idx_i);
+	}
+    fprintf(fp, "\n");
+    fclose(fp);
+
+	delete[] x;
+	delete[] xhat;
+	delete[] chat;
+}
+
 
 //tmpl fcts need definition in each file?
 template<typename T> void ldpc::printVector(T *x, const size_t &l)
@@ -486,19 +562,4 @@ template<typename T> void ldpc::printVector(T *x, const size_t &l)
     for (size_t i = 0; i < l-1; ++i)
         cout << x[i] << " ";
     cout << x[l-1] << "]";
-}
-
-
-/*
- *	Cudakernels
- */
-__global__ void cudakernel::sim::sim_test(Ldpc_Decoder_cl* dec_mgd)
-{
-    curandState_t state;
-    curand_init(clock64(), 1, 0, &state);
-    for (size_t i=0; i<dec_mgd->ldpc_code->nc(); ++i)
-    {
-        dec_mgd->llr_in[i] = curand_normal(&state);
-        dec_mgd->llr_out[i] = 0.0;
-    }
 }

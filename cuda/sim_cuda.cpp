@@ -1,11 +1,11 @@
-#include "ldpc/ldpc.cuh"
-#include "simulation.cuh"
+#include "ldpc/ldpc.h"
+#include "simulation.h"
 
 using namespace ldpc;
 using namespace std;
 
 
-// /usr/local/cuda-9.2/bin/nvcc -std=c++11 sim_cuda.cu simulation.cu ldpc/ldpc.cu ldpc/decoder.cu -o sim_cuda -arch sm_35 -rdc=true -O3 -w
+// /usr/local/cuda-9.2/bin/nvcc -x cu -std=c++11 sim_cuda.cpp simulation.cpp ldpc/ldpc.cpp ldpc/decoder.cpp -o sim_cuda -arch sm_35 -rdc=true -O3 -w
 int main()
 {
 	//set up code class on unified memory
@@ -15,7 +15,7 @@ int main()
 	Sim_AWGN_cl sim(code_dev, "../src/sim.txt", "../src/code/test_code/mapping_rand_proto_3x6_400_4.txt");
 	sim.print();
 	sim.start();
-	
+
 /*
 	//set up decoder on unified memory
 	Ldpc_Decoder_cl* dec_dev = new Ldpc_Decoder_cl(code_dev, 1, false, true);

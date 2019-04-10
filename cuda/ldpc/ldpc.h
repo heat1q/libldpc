@@ -165,11 +165,6 @@ namespace cudakernel
         __global__ void decode_lyr_appcalc(Ldpc_Decoder_cl* dec_mgd);
         __global__ void calc_synd(Ldpc_Decoder_cl* dec_mgd);
     }
-
-    namespace sim
-    {
-        __global__ void sim_test(Ldpc_Decoder_cl* dec_mgd);
-    }
 }
 
 }
