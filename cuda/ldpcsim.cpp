@@ -1,4 +1,4 @@
-#include "simulation.h"
+#include "ldpcsim.h"
 
 #include <string.h>
 #include <math.h>
@@ -9,8 +9,8 @@
 using namespace std;
 using namespace ldpc;
 
-Sim_AWGN_cl::Sim_AWGN_cl(Ldpc_Code_cl* code, const char* simFileName, const char* mapFileName)
-: ldpc_code(code)
+ldpc_sim::ldpc_sim(ldpc_code* code, const char* simFileName, const char* mapFileName)
+: mLdpcCode(code)
 {
     //init
     cstll = nullptr;
@@ -19,7 +19,7 @@ Sim_AWGN_cl::Sim_AWGN_cl(Ldpc_Code_cl* code, const char* simFileName, const char
     labels_rev = nullptr;
     bit_mapper = nullptr;
     bits_pos = nullptr;
-    ldpc_dec = nullptr;
+    mLdpcDecoder = nullptr;
 
     try
     {
@@ -162,7 +162,7 @@ Sim_AWGN_cl::Sim_AWGN_cl(Ldpc_Code_cl* code, const char* simFileName, const char
         }
 
         //set up decoder
-        ldpc_dec = new Ldpc_Decoder_cl(code, bp_iter, decoder_terminate_early, true);
+        mLdpcDecoder = new ldpc_decoder(code, bp_iter, decoder_terminate_early);
         fclose(fp);
     }
     catch(exception &e)
@@ -174,16 +174,16 @@ Sim_AWGN_cl::Sim_AWGN_cl(Ldpc_Code_cl* code, const char* simFileName, const char
     }
 }
 
-Sim_AWGN_cl::~Sim_AWGN_cl() { destroy(); }
+ldpc_sim::~ldpc_sim() { destroy(); }
 
 
-void Sim_AWGN_cl::destroy()
+void ldpc_sim::destroy()
 {
     if (snrs != nullptr) { delete[] snrs; }
     if (labels != nullptr) { delete[] labels; }
     if (labels_rev != nullptr) { delete[] labels_rev; }
     if (bits_pos != nullptr) { delete[] bits_pos; }
-    if (ldpc_dec != nullptr) { delete ldpc_dec; }
+    if (mLdpcDecoder != nullptr) { delete mLdpcDecoder; }
 
     if (bit_mapper != nullptr)
     {
@@ -201,7 +201,7 @@ void Sim_AWGN_cl::destroy()
 }
 
 
-void Sim_AWGN_cl::read_bit_mapping_file(const char* filename)
+void ldpc_sim::read_bit_mapping_file(const char* filename)
 {
     FILE *fp;
 
@@ -221,9 +221,9 @@ void Sim_AWGN_cl::read_bit_mapping_file(const char* filename)
     fclose(fp);
 }
 
-void Sim_AWGN_cl::print()
+void ldpc_sim::print()
 {
-    ldpc_code->print_ldpc_code();
+    mLdpcCode->print();
 
     printf("=========== SIM ===========\n");
     printf("logfile: %s\n", logfile);
@@ -257,7 +257,7 @@ void Sim_AWGN_cl::print()
 }
 
 
-void Sim_AWGN_cl::calc_llrs(const double &y, const double &sigma2, double *llrs_out)
+void ldpc_sim::calc_llrs(const double &y, const double &sigma2, double *llrs_out)
 {
     double tmp0, tmp1;
 
@@ -285,7 +285,7 @@ void Sim_AWGN_cl::calc_llrs(const double &y, const double &sigma2, double *llrs_
     }
 }
 
-double Sim_AWGN_cl::simulate_awgn(uint64_t *x, double *y, const double &sigma2)
+double ldpc_sim::simulate_awgn(uint64_t *x, double *y, const double &sigma2)
 {
     double a = 0;
     double Pn = 0;
@@ -302,7 +302,7 @@ double Sim_AWGN_cl::simulate_awgn(uint64_t *x, double *y, const double &sigma2)
     return Px/Pn;
 }
 
-double Sim_AWGN_cl::randn()
+double ldpc_sim::randn()
 {
     static double U, V;
     static int phase = 0;
@@ -322,22 +322,22 @@ double Sim_AWGN_cl::randn()
     return Z;
 }
 
-void Sim_AWGN_cl::encode_all0(uint64_t* x, bits_t* c)
+void ldpc_sim::encode_all0(uint64_t* x, bits_t* c)
 {
-    for(size_t i = 0; i < ldpc_code->nct(); i++)
+    for(size_t i = 0; i < mLdpcCode->nct(); i++)
         c[bits_pos[i]] = rand() & 1;
 
-    for(size_t i = 0; i < ldpc_code->num_puncture(); i++)
-        c[ldpc_code->puncture()[i]] = rand() & 1;
+    for(size_t i = 0; i < mLdpcCode->num_puncture(); i++)
+        c[mLdpcCode->puncture()[i]] = rand() & 1;
 
-    for(size_t i = 0; i < ldpc_code->num_shorten(); i++)
-        c[ldpc_code->shorten()[i]] = 0;
+    for(size_t i = 0; i < mLdpcCode->num_shorten(); i++)
+        c[mLdpcCode->shorten()[i]] = 0;
 
 
     map_c_to_x(c, x);
 }
 
-void Sim_AWGN_cl::map_c_to_x(bits_t* c, size_t* x)
+void ldpc_sim::map_c_to_x(bits_t* c, size_t* x)
 {
     size_t tmp;
 
@@ -352,11 +352,11 @@ void Sim_AWGN_cl::map_c_to_x(bits_t* c, size_t* x)
 }
 
 
-void Sim_AWGN_cl::start()
+void ldpc_sim::start()
 {
     uint64_t* x = new uint64_t[n];
     double* y = new double[n];
-    bits_t* c = new bits_t[ldpc_code->nc()];
+    bits_t* c = new bits_t[mLdpcCode->nc()];
     double* l_tmp = new double[bits];
 
     double sigma2;
@@ -395,16 +395,16 @@ void Sim_AWGN_cl::start()
 			simulate_awgn(x, y, sigma2);
 
 			//puncturing & shortening
-			if(ldpc_code->num_puncture() != 0)
+			if(mLdpcCode->num_puncture() != 0)
 			{
-				for(size_t j = 0; j < ldpc_code->num_puncture(); j++) {
-					ldpc_dec->llr_in[ldpc_code->puncture()[j]] = 0;
+				for(size_t j = 0; j < mLdpcCode->num_puncture(); j++) {
+					mLdpcDecoder->mLLRIn[mLdpcCode->puncture()[j]] = 0;
 				}
 			}
-			if(ldpc_code->num_shorten() != 0)
+			if(mLdpcCode->num_shorten() != 0)
 			{
-				for(size_t j = 0; j < ldpc_code->num_shorten(); j++) {
-					ldpc_dec->llr_in[ldpc_code->shorten()[j]] = 99999.9;
+				for(size_t j = 0; j < mLdpcCode->num_shorten(); j++) {
+					mLdpcDecoder->mLLRIn[mLdpcCode->shorten()[j]] = 99999.9;
 				}
 			}
 
@@ -412,26 +412,26 @@ void Sim_AWGN_cl::start()
 			{
 				calc_llrs(y[j], sigma2, l_tmp);
 				for(size_t k = 0; k < bits; k++) {
-					ldpc_dec->llr_in[bit_mapper[k][j]] = l_tmp[k];
+					mLdpcDecoder->mLLRIn[bit_mapper[k][j]] = l_tmp[k];
 				}
 			}
 
-			for(size_t j = 0; j < ldpc_code->nc(); j++) {
-				ldpc_dec->llr_in[j] *= (1-2*c[j]);
+			for(size_t j = 0; j < mLdpcCode->nc(); j++) {
+				mLdpcDecoder->mLLRIn[j] *= (1-2*c[j]);
 			}
 
 			//decode
-			//iters += ldpc_dec->decode_legacy();
-			//iters += ldpc_dec->decode_layered_legacy();
-			iters += ldpc_dec->decode_layered();
+			//iters += mLdpcDecoder->decode_legacy();
+			//iters += mLdpcDecoder->decode_layered_legacy();
+			iters += mLdpcDecoder->decode_layered();
 
 
 			frames++;
 
 			bec_tmp = 0;
-			for(size_t j = 0; j < ldpc_code->nc(); j++)
+			for(size_t j = 0; j < mLdpcCode->nc(); j++)
 			{
-				bec_tmp += (ldpc_dec->llr_out[j] <= 0);
+				bec_tmp += (mLdpcDecoder->mLLROut[j] <= 0);
 			}
 
 			if (bec_tmp > 0)
@@ -443,7 +443,7 @@ void Sim_AWGN_cl::start()
 				uint64_t t = static_cast<uint64_t>(chrono::duration_cast<chrono::microseconds>(time_dur).count());
 				printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e, TIME/FRAME=%.3f ms, AVGITERS=%.2f\n",
 					fec, min_fec, frames, 10*log10(1/sigma2),
-					(double) bec/(frames*ldpc_code->nc()), (double) fec/frames,
+					(double) bec/(frames*mLdpcCode->nc()), (double) fec/frames,
 					(double) t/frames * 1e-3,
 					(double) iters/frames
 				);
@@ -454,7 +454,7 @@ void Sim_AWGN_cl::start()
 
 		} while (fec < min_fec && frames < max_frames); //end while
 
-		fprintf(fp, "%lf %.3e %.3e %lu %.3e\n", snrs[i], (double) fec/frames, (double) bec/(frames*ldpc_code->nc()), frames, (double) iters/frames);
+		fprintf(fp, "%lf %.3e %.3e %lu %.3e\n", snrs[i], (double) fec/frames, (double) bec/(frames*mLdpcCode->nc()), frames, (double) iters/frames);
 		fflush(fp);
 	}//end for
 
@@ -467,7 +467,7 @@ void Sim_AWGN_cl::start()
 }
 
 
-void Sim_AWGN_cl::log_error(bits_t* c, const uint64_t frame_num, const double snr)
+void ldpc_sim::log_error(bits_t* c, const uint64_t frame_num, const double snr)
 {
 	char errors_file[MAX_FILENAME_LEN];
     snprintf(errors_file, MAX_FILENAME_LEN, "errors_%s", logfile);
@@ -481,14 +481,14 @@ void Sim_AWGN_cl::log_error(bits_t* c, const uint64_t frame_num, const double sn
 
     /* calculation of syndrome and failed syndrome checks */
     size_t synd_weight = 0;
-    for (size_t i = 0; i < ldpc_code->mc(); i++) {
-        synd_weight += (size_t) ldpc_dec->synd[i];
+    for (size_t i = 0; i < mLdpcCode->mc(); i++) {
+        synd_weight += (size_t) mLdpcDecoder->mSynd[i];
     }
 	vector<size_t> failed_checks_idx(synd_weight);
     size_t j = 0;
-    for (size_t i = 0; i < ldpc_code->mc(); i++)
+    for (size_t i = 0; i < mLdpcCode->mc(); i++)
 	{
-        if(ldpc_dec->synd[i] == 1)
+        if(mLdpcDecoder->mSynd[i] == 1)
 		{
             failed_checks_idx[j++] = i;
         }
@@ -496,20 +496,20 @@ void Sim_AWGN_cl::log_error(bits_t* c, const uint64_t frame_num, const double sn
 
     /* calculation of failed codeword bits */
     size_t cw_dis = 0;
-    for (size_t i = 0; i < ldpc_code->nc(); i++)
+    for (size_t i = 0; i < mLdpcCode->nc(); i++)
 	{
         #ifdef ENCODE
-        cw_dis += ((ldpc_dec->llr_out[i] <= 0) != c[i]);
+        cw_dis += ((mLdpcDecoder->mLLROut[i] <= 0) != c[i]);
         #else
-        cw_dis += ((ldpc_dec->llr_out[i] <= 0) != 0);
+        cw_dis += ((mLdpcDecoder->mLLROut[i] <= 0) != 0);
         #endif
     }
 
 	size_t* x = new size_t[n];
 	size_t* xhat = new size_t[n];
-	bits_t* chat = new bits_t[ldpc_code->nc()];
-	for (size_t i = 0; i < ldpc_code->nc(); i++) {
-		chat[i] = (bits_t) (ldpc_dec->llr_out[i] <= 0);
+	bits_t* chat = new bits_t[mLdpcCode->nc()];
+	for (size_t i = 0; i < mLdpcCode->nc(); i++) {
+		chat[i] = (bits_t) (mLdpcDecoder->mLLROut[i] <= 0);
 	}
 
     map_c_to_x(c, x);
@@ -524,7 +524,7 @@ void Sim_AWGN_cl::log_error(bits_t* c, const uint64_t frame_num, const double sn
     }
 	vector<size_t> failed_bits_idx(cw_dis);
     j = 0;
-    for (size_t i = 0; i < ldpc_code->nc(); i++) {
+    for (size_t i = 0; i < mLdpcCode->nc(); i++) {
         #ifdef ENCODE
         if(chat[i] != c[i]) {
             failed_bits_idx[j++] = i;

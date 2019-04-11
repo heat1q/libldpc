@@ -1,168 +1,163 @@
 #pragma once
 
-#define QC_LYR_DEC
+#include "../device/cudamgd.h"
 
-#include <iostream>
-#include <stdint.h>
-#include <cuda.h>
-
-typedef uint8_t bits_t;
-typedef uint16_t labels_t;
-typedef uint32_t symbols_t;
-
-#define NUM_THREADS 128
-
-class Cuda_Mgd_cl
+namespace ldpc
 {
-public:
-	Cuda_Mgd_cl(const bool mgd);
+	typedef uint8_t bits_t;
+	typedef uint16_t labels_t;
+	typedef uint32_t symbols_t;
 
-    void* operator new(size_t len);
-    void operator delete(void* ptr);
+	struct {
+	    double* pX;
+	    double* X;
+	    double* A;
+	    uint16_t M;
+	    uint16_t log2M;
+	} typedef cstll_t;
 
-protected:
-    bool is_mgd = false;
-};
+	class ldpc_code : public cuda_mgd
+	{
+	public:
+		ldpc_code(const char* pFileName, const char* pClFile, const bool pMgd);
+		virtual ~ldpc_code();
 
-namespace ldpc {
+		void setup(const char* pFileName);
+		void setup_layers(const char* pClFile);
 
-class Ldpc_Code_cl : public Cuda_Mgd_cl
-{
-public:
-    Ldpc_Code_cl(const char* filename, const char* clfile, const bool mgd);
-    virtual ~Ldpc_Code_cl();
+		void setup_mgd(const char* pFileName);
+		void setup_layers_mgd(const char* pClFile);
+		void prefetch();
 
-    void setup_code(const char* filename);
-    void setup_layers(const char* clfile);
+		void destroy();
+		void destroy_mgd();
 
-    void setup_code_mgd(const char* filename);
-    void setup_layers_mgd(const char* clfile);
-    void prefetch_code();
+		void print();
 
-    void destroy_code();
-    void destroy_code_mgd();
+		//getter functions
+		__host__ __device__ uint64_t nc() const;
+		__host__ __device__ uint64_t kc() const;
+		__host__ __device__ uint64_t mc() const;
+		__host__ __device__ uint64_t nnz() const;
+		__host__ __device__ size_t *cw() const;
+		__host__ __device__ size_t *vw() const;
+		__host__ __device__ size_t **cn() const;
+		__host__ __device__ size_t **vn() const;
+		__host__ __device__ size_t *r() const;
+		__host__ __device__ size_t *c() const;
+		__host__ __device__ uint64_t nct() const;
+		__host__ __device__ uint64_t kct() const;
+		__host__ __device__ uint64_t mct() const;
+		__host__ __device__ size_t *puncture() const;
+		__host__ __device__ size_t num_puncture() const;
+		__host__ __device__ size_t *shorten() const;
+		__host__ __device__ size_t num_shorten() const;
+		__host__ __device__ size_t max_dc() const;
+		__host__ __device__ uint64_t nl() const;
+		__host__ __device__ uint64_t* lw() const;
+		__host__ __device__ uint64_t** layers() const;
 
-    void print_ldpc_code();
-
-    //getter functions
-    __host__ __device__ uint64_t nc() const;
-    __host__ __device__ uint64_t kc() const;
-    __host__ __device__ uint64_t mc() const;
-    __host__ __device__ uint64_t nnz() const;
-    __host__ __device__ size_t *cw() const;
-    __host__ __device__ size_t *vw() const;
-    __host__ __device__ size_t **cn() const;
-    __host__ __device__ size_t **vn() const;
-    __host__ __device__ size_t *r() const;
-    __host__ __device__ size_t *c() const;
-    __host__ __device__ uint64_t nct() const;
-    __host__ __device__ uint64_t kct() const;
-    __host__ __device__ uint64_t mct() const;
-    __host__ __device__ size_t *puncture() const;
-    __host__ __device__ size_t num_puncture() const;
-    __host__ __device__ size_t *shorten() const;
-    __host__ __device__ size_t num_shorten() const;
-    __host__ __device__ size_t max_dc() const;
-    __host__ __device__ uint64_t nl() const;
-    __host__ __device__ uint64_t* lw() const;
-    __host__ __device__ uint64_t** layers() const;
-
-private:
-    uint64_t n_c;
-    uint64_t k_c;
-    uint64_t m_c;
-    uint64_t nnz_c;
-    size_t* cw_c; /* denotes the check weight of each check node, i.e., # of connected VN; dimensions cw[mc] */
-    size_t* vw_c; /* denotes the variable weight, i.e., # of connected CN; dimensions vw[nc] */
-    size_t** cn_c; /* denotes the check neighbors, i.e. connected VN, for each check node as index in c/r; dimensions cn[mc][cw[i]] */
-    size_t** vn_c; /* denotes the var neighbors, i.e., connected CN, for each variable node as index in c/r; dimensions vn[nc][vw[i]] */
-    size_t* r_c; /* non zero row indices; length nnz */
-    size_t* c_c; /* non zero check indices; length nnz */
-    size_t* puncture_c; /* array pf punctured bit indices */
-    size_t num_puncture_c; /* number of punctured bits */
-    size_t num_puncture_sys_c; /* number of punctured bits in systematic part */
-    size_t num_puncture_par_c; /* number of punctured bits in parity part */
-    size_t* shorten_c; /* array of shortened bit indices */
-    size_t num_shorten_c; /* number of shortened bits */
-    uint64_t nct_c; /* number of transmitted code bits */
-    uint64_t kct_c; /* number of transmitted information bits */
-    uint64_t mct_c; /* number of transmitted parity check bits */
-    size_t max_dc_c;
-    uint64_t nl_c;                                          //number of layers
-    uint64_t* lw_c;                                         //layer weight
-    uint64_t** layers_c;
-};
-
-
-class Ldpc_Decoder_cl : public Cuda_Mgd_cl
-{
-public:
-    Ldpc_Decoder_cl(Ldpc_Code_cl* code, const uint16_t I, const bool early_term, const bool mgd);
-    ~Ldpc_Decoder_cl();
-
-    //void setup_dec();
-    void setup_dec_mgd();
-
-    void prefetch_dec();
-
-    //void destroy_dec();
-    void destroy_dec_mgd();
-
-    __host__ __device__ bool is_codeword();
-    __host__ __device__ bool is_codeword_legacy();
-
-    uint16_t decode_legacy();
-    uint16_t decode_layered_legacy();
-
-    uint16_t decode_layered();
-
-    Ldpc_Code_cl* ldpc_code;
-    double* l_v2c;
-    double* l_c2v;
-    double* f;
-    double* b;
-    double* lsum;
-    double* l_c2v_pre;
-
-    double* llr_in;
-    double* llr_out;
-
-    bits_t* synd;
-    bits_t* c_out;
-
-    uint16_t max_iter;
-    uint16_t iter;
-    bool early_termination;
-
-    bool is_cw;
-    void* fb_ref;
-};
+	private:
+		uint64_t mN;
+		uint64_t mK;
+		uint64_t mM;
+		uint64_t mNNZ;
+		size_t* mCW; /* denotes the check weight of each check node, i.e., # of connected VN; dimensions cw[mc] */
+		size_t* mVW; /* denotes the variable weight, i.e., # of connected CN; dimensions vw[nc] */
+		size_t** mCN; /* denotes the check neighbors, i.e. connected VN, for each check node as index in c/r; dimensions cn[mc][cw[i]] */
+		size_t** mVN; /* denotes the var neighbors, i.e., connected CN, for each variable node as index in c/r; dimensions vn[nc][vw[i]] */
+		size_t* mR; /* non zero row indices; length nnz */
+		size_t* mC; /* non zero check indices; length nnz */
+		size_t* mPuncture; /* array pf punctured bit indices */
+		size_t mNumPuncture; /* number of punctured bits */
+		size_t mNumPunctureSys; /* number of punctured bits in systematic part */
+		size_t mNumPuncturePar; /* number of punctured bits in parity part */
+		size_t* mShorten; /* array of shortened bit indices */
+		size_t mNumShorten; /* number of shortened bits */
+		uint64_t mNCT; /* number of transmitted code bits */
+		uint64_t mKCT; /* number of transmitted information bits */
+		uint64_t mMCT; /* number of transmitted parity check bits */
+		size_t mMaxDC;
+		uint64_t mNL; //number of layers
+		uint64_t* mLW; //layer weight
+		uint64_t** mLayers;
+	};
 
 
-template<typename T>
-extern void printVector(T* x, const size_t& l);
+	class ldpc_decoder : public cuda_mgd
+	{
+	public:
+		ldpc_decoder(ldpc_code* pCode, const uint16_t pI, const bool pEarlyTerm);
+		~ldpc_decoder();
 
-void dec2bin(uint64_t val, uint8_t m);
-__host__ __device__ double jacobian(const double& L1, const double& L2);
-__host__ __device__ double jacobian_lin_approx(const double& L);
-__host__ __device__ int8_t sign(const double& a);
+		void setup();
+		void prefetch();
+		void destroy();
+
+		__host__ __device__ bool is_codeword();
+		__host__ __device__ bool is_codeword_legacy();
+
+		uint16_t decode_legacy();
+		uint16_t decode_layered_legacy();
+		uint16_t decode_layered();
+
+		__host__ __device__ uint16_t max_iter() const;
+		__host__ __device__ bool early_termination() const;
+
+		ldpc_code* mLdpcCode;
+
+		double* mLv2c;
+		double* mLc2v;
+		double* mF;
+		double* mB;
+		double* mLSum;
+		double* mLc2vPre;
+
+		double* mLLRIn;
+		double* mLLROut;
+
+		bits_t* mSynd;
+		bits_t* mCO;
+
+		uint16_t mIter;
+		void* __FBREF__;
+
+		bool mIsCW;
+	private:
+		uint16_t mMaxIter;
+		bool mEarlyTerm;
+	};
 
 
-__host__ __device__ const inline uint64_t get_num_size(const uint64_t length, const uint16_t block_size) { return ceil((length+block_size-1)/block_size); }
-__host__ __device__ const inline dim3 get_gridsize_2d(const dim3& length, const dim3& block_size) { return dim3(ceil((length.x+block_size.x-1)/block_size.x), ceil((length.y+block_size.y-1)/block_size.y)); }
+	template<typename T>
+	extern void printVector(T* x, const size_t& l);
 
-namespace cudakernel
-{
-    namespace decoder
-    {
-        __global__ void clean_decoder(Ldpc_Decoder_cl* dec_mgd);
-        __global__ void decode_layered(Ldpc_Decoder_cl* dec_mgd);
-        __global__ void decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz);
-        __global__ void decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz, uint64_t l);
-        __global__ void decode_lyr_sumllr(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz);
-        __global__ void decode_lyr_appcalc(Ldpc_Decoder_cl* dec_mgd);
-        __global__ void calc_synd(Ldpc_Decoder_cl* dec_mgd);
-    }
-}
+	void dec2bin(uint64_t val, uint8_t m);
+	__host__ __device__ double jacobian(const double& L1, const double& L2);
+	__host__ __device__ double jacobian_lin_approx(const double& L);
+	__host__ __device__ int8_t sign(const double& a);
+
+
+	__host__ __device__ const inline uint64_t get_num_size(const uint64_t length, const uint16_t blockSize) { return ceil((length+blockSize-1)/blockSize); }
+	__host__ __device__ const inline dim3 get_gridsize_2d(const dim3& length, const dim3& blockSize) { return dim3(ceil((length.x+blockSize.x-1)/blockSize.x), ceil((length.y+blockSize.y-1)/blockSize.y)); }
+
+
+	/*
+	* Kernels
+	*/
+
+	namespace cudakernel
+	{
+		namespace decoder
+		{
+			__global__ void clean_decoder(ldpc_decoder* pDecMgd);
+			__global__ void decode_layered(ldpc_decoder* pDecMgd);
+			__global__ void decode_lyr_vnupdate(ldpc_decoder* pDecMgd, size_t pI);
+			__global__ void decode_lyr_cnupdate(ldpc_decoder* pDecMgd, size_t pI, uint64_t pL);
+			__global__ void decode_lyr_sumllr(ldpc_decoder* pDecMgd, size_t pI);
+			__global__ void decode_lyr_appcalc(ldpc_decoder* pDecMgd);
+			__global__ void calc_synd(ldpc_decoder* pDecMgd);
+		}
+	}
 
 }

@@ -6,146 +6,131 @@
 using namespace std;
 using namespace ldpc;
 
-Cuda_Mgd_cl::Cuda_Mgd_cl(const bool mgd) : is_mgd(mgd) {}
 
-void* Cuda_Mgd_cl::operator new(size_t len)
+ldpc_code::ldpc_code(const char* pFileName, const char* pClFile, const bool pMgd)
+	: cuda_mgd(pMgd)
 {
-	void* ptr;
-	cudaMallocManaged(&ptr, len);
-	cudaDeviceSynchronize();
-	return ptr;
-}
-
-void Cuda_Mgd_cl::operator delete(void* ptr)
-{
-	cudaDeviceSynchronize();
-	cudaFree(ptr);
-}
-
-Ldpc_Code_cl::Ldpc_Code_cl(const char* filename, const char* clfile, const bool mgd)
-	: Cuda_Mgd_cl(mgd)
-{
-	if (is_mgd)
+	if (mIsMgd)
 	{
-		setup_code_mgd(filename);
-		setup_layers_mgd(clfile);
-		prefetch_code();
+		setup_mgd(pFileName);
+		setup_layers_mgd(pClFile);
+		prefetch();
 	}
 	else
 	{
-		setup_code(filename);
-		setup_layers(clfile);
+		setup(pFileName);
+		setup_layers(pClFile);
 	}
 }
 
 
-Ldpc_Code_cl::~Ldpc_Code_cl()
+ldpc_code::~ldpc_code()
 {
-	if (is_mgd)
+	if (mIsMgd)
 	{
-		destroy_code_mgd();
+		destroy_mgd();
 	}
 	else
 	{
-		destroy_code();
+		destroy();
 	}
 }
 
 
-void Ldpc_Code_cl::setup_code(const char* filename)
+void ldpc_code::setup(const char* pFileName)
 {
 	//init
-	puncture_c = nullptr;
-	shorten_c = nullptr;
-	cw_c = nullptr;
-	cn_c = nullptr;
-	vw_c = nullptr;
-	vn_c = nullptr;
-	r_c = nullptr;
-	c_c = nullptr;
-	lw_c = nullptr;
-	layers_c = nullptr;
+	mPuncture = nullptr;
+	mShorten = nullptr;
+	mCW = nullptr;
+	mCN = nullptr;
+	mVW = nullptr;
+	mVN = nullptr;
+	mR = nullptr;
+	mC = nullptr;
+	mLW = nullptr;
+	mLayers = nullptr;
 
 	try
 	{
 		FILE *fp;
 
-		fp = fopen(filename, "r");
+		fp = fopen(pFileName, "r");
 		if(!fp)
 			throw runtime_error("can not open codefile for reading.");
 
-		fscanf(fp, "nc: %lu\n", &n_c);
-		fscanf(fp, "mc: %lu\n", &m_c);
-		fscanf(fp, "nct: %lu\n", &nct_c);
-		fscanf(fp, "mct: %lu\n", &mct_c);
-		fscanf(fp,  "nnz: %lu\n", &nnz_c);
-		k_c = n_c-m_c;
-		kct_c = nct_c-mct_c;
+		fscanf(fp, "nc: %lu\n", &mN);
+		fscanf(fp, "mc: %lu\n", &mM);
+		fscanf(fp, "nct: %lu\n", &mNCT);
+		fscanf(fp, "mct: %lu\n", &mMCT);
+		fscanf(fp,  "nnz: %lu\n", &mNNZ);
+		mK = mN-mM;
+		mKCT = mNCT-mMCT;
 
-		fscanf(fp, "puncture [%lu]: ", &(num_puncture_c));
-		num_puncture_sys_c = 0;
-		num_puncture_par_c = 0;
-		if(num_puncture_c != 0)
+		fscanf(fp, "puncture [%lu]: ", &(mNumPuncture));
+		mNumPunctureSys = 0;
+		mNumPuncturePar = 0;
+		if(mNumPuncture != 0)
 		{
-			puncture_c = new size_t[num_puncture_c];
-			for(size_t i = 0; i < num_puncture_c; i++)
+			mPuncture = new size_t[mNumPuncture];
+			for(size_t i = 0; i < mNumPuncture; i++)
 			{
-				fscanf(fp, " %lu ", &(puncture_c[i]));
-				if(puncture_c[i] < k_c)
-					num_puncture_sys_c++;
+				fscanf(fp, " %lu ", &(mPuncture[i]));
+				if(mPuncture[i] < mK)
+					mNumPunctureSys++;
 				else
-					num_puncture_par_c++;
+					mNumPuncturePar++;
 			}
 		}
 
-		fscanf(fp, "shorten [%lu]: ", &num_shorten_c);
-		if(num_shorten_c != 0)
+		fscanf(fp, "shorten [%lu]: ", &mNumShorten);
+		if(mNumShorten != 0)
 		{
-			shorten_c = new size_t[num_shorten_c];
-			for(size_t i = 0; i < num_shorten_c; i++)
-				fscanf(fp, " %lu ", &(shorten_c[i]));
+			mShorten = new size_t[mNumShorten];
+			for(size_t i = 0; i < mNumShorten; i++)
+				fscanf(fp, " %lu ", &(mShorten[i]));
 		}
 
 
-		size_t* cw_tmp;
-		size_t* vw_tmp;
-		cw_c = new uint64_t[m_c] ();
-		cw_tmp = new uint64_t[m_c] ();
-		vw_c = new uint64_t[n_c] ();
-		vw_tmp = new uint64_t[n_c] ();
-		r_c = new uint64_t[nnz_c] ();
-		c_c = new uint64_t[nnz_c] ();
+		size_t* cwTmp;
+		size_t* vwTmp;
+		mCW = new uint64_t[mM] ();
+		cwTmp = new uint64_t[mM] ();
+		mVW = new uint64_t[mN] ();
+		vwTmp = new uint64_t[mN] ();
+		mR = new uint64_t[mNNZ] ();
+		mC = new uint64_t[mNNZ] ();
 
 
-		for(size_t i = 0; i < nnz_c; i++)
+		for(size_t i = 0; i < mNNZ; i++)
 		{
-			fscanf(fp, "%lu %lu\n", &(r_c[i]), &(c_c[i]));
-			cw_c[r_c[i]]++;
-			vw_c[c_c[i]]++;
+			fscanf(fp, "%lu %lu\n", &(mR[i]), &(mC[i]));
+			mCW[mR[i]]++;
+			mVW[mC[i]]++;
 		}
 
-		cn_c = new size_t*[m_c] ();
-		for(size_t i = 0; i < m_c; i++)
-			cn_c[i] = new size_t[cw_c[i]] ();
+		mCN = new size_t*[mM] ();
+		for(size_t i = 0; i < mM; i++)
+			mCN[i] = new size_t[mCW[i]] ();
 
-		vn_c = new size_t*[n_c] ();
-		for(size_t i = 0; i < n_c; i++)
-			vn_c[i] = new size_t[vw_c[i]] ();
+		mVN = new size_t*[mN] ();
+		for(size_t i = 0; i < mN; i++)
+			mVN[i] = new size_t[mVW[i]] ();
 
-		for(size_t i = 0; i < nnz_c; i++)
+		for(size_t i = 0; i < mNNZ; i++)
 		{
-			cn_c[r_c[i]][cw_tmp[r_c[i]]++] = i;
-			vn_c[c_c[i]][vw_tmp[c_c[i]]++] = i;
+			mCN[mR[i]][cwTmp[mR[i]]++] = i;
+			mVN[mC[i]][vwTmp[mC[i]]++] = i;
 		}
 
-		delete[] cw_tmp;
-		delete[] vw_tmp;
+		delete[] cwTmp;
+		delete[] vwTmp;
 
-		max_dc_c = 0;
-		for(size_t i = 0; i < m_c; i++)
+		mMaxDC = 0;
+		for(size_t i = 0; i < mM; i++)
 		{
-			if(cw_c[i] > max_dc_c)
-				max_dc_c = cw_c[i];
+			if(mCW[i] > mMaxDC)
+				mMaxDC = mCW[i];
 		}
 
 		fclose(fp);
@@ -153,140 +138,140 @@ void Ldpc_Code_cl::setup_code(const char* filename)
 	catch(exception &e)
 	{
 		cout << "Error: " << e.what() << endl;
-		destroy_code();
+		destroy();
 
 		exit(EXIT_FAILURE);
 	}
 }
 
 
-void Ldpc_Code_cl::setup_layers(const char* clfile)
+void ldpc_code::setup_layers(const char* pClFile)
 {
-    FILE *fp = fopen(clfile, "r");
+    FILE *fp = fopen(pClFile, "r");
     if(!fp)
         throw runtime_error("Can not open layer file");
 
-    fscanf(fp, "nl: %lu\n", &nl_c);
+    fscanf(fp, "nl: %lu\n", &mNL);
 
-    lw_c = new uint64_t[nl_c];
-    layers_c = new uint64_t*[nl_c];
+    mLW = new uint64_t[mNL];
+    mLayers = new uint64_t*[mNL];
 
-    for (size_t i = 0; i < nl_c; ++i)
+    for (size_t i = 0; i < mNL; ++i)
     {
-        fscanf(fp, "cn[i]: %lu\n", &(lw_c[i]));
-        layers_c[i] = new uint64_t[lw_c[i]];
-        for (size_t j = 0; j < lw_c[i]; ++j)
-            fscanf(fp, "%lu\n", &(layers_c[i][j]));
+        fscanf(fp, "cn[i]: %lu\n", &(mLW[i]));
+        mLayers[i] = new uint64_t[mLW[i]];
+        for (size_t j = 0; j < mLW[i]; ++j)
+            fscanf(fp, "%lu\n", &(mLayers[i][j]));
     }
     fclose(fp);
 }
 
 
-void Ldpc_Code_cl::setup_code_mgd(const char* filename)
+void ldpc_code::setup_mgd(const char* pFileName)
 {
 	//init
-    puncture_c = nullptr;
-    shorten_c = nullptr;
-    cw_c = nullptr;
-    cn_c = nullptr;
-    vw_c = nullptr;
-    vn_c = nullptr;
-    r_c = nullptr;
-    c_c = nullptr;
-    lw_c = nullptr;
-    layers_c = nullptr;
+    mPuncture = nullptr;
+    mShorten = nullptr;
+    mCW = nullptr;
+    mCN = nullptr;
+    mVW = nullptr;
+    mVN = nullptr;
+    mR = nullptr;
+    mC = nullptr;
+    mLW = nullptr;
+    mLayers = nullptr;
 
     try
     {
         FILE *fp;
 
-        fp = fopen(filename, "r");
+        fp = fopen(pFileName, "r");
         if(!fp)
             throw runtime_error("can not open codefile for reading.");
 
-        fscanf(fp, "nc: %lu\n", &n_c);
-        fscanf(fp, "mc: %lu\n", &m_c);
-        fscanf(fp, "nct: %lu\n", &nct_c);
-        fscanf(fp, "mct: %lu\n", &mct_c);
-        fscanf(fp,  "nnz: %lu\n", &nnz_c);
-        k_c = n_c-m_c;
-        kct_c = nct_c-mct_c;
+        fscanf(fp, "nc: %lu\n", &mN);
+        fscanf(fp, "mc: %lu\n", &mM);
+        fscanf(fp, "nct: %lu\n", &mNCT);
+        fscanf(fp, "mct: %lu\n", &mMCT);
+        fscanf(fp,  "nnz: %lu\n", &mNNZ);
+        mK = mN-mM;
+        mKCT = mNCT-mMCT;
 
-        fscanf(fp, "puncture [%lu]: ", &(num_puncture_c));
-        num_puncture_sys_c = 0;
-        num_puncture_par_c = 0;
-        if(num_puncture_c != 0)
+        fscanf(fp, "puncture [%lu]: ", &(mNumPuncture));
+        mNumPunctureSys = 0;
+        mNumPuncturePar = 0;
+        if(mNumPuncture != 0)
         {
-			cudaMallocManaged(&puncture_c, num_puncture_c*sizeof(size_t));
-            for(size_t i = 0; i < num_puncture_c; i++)
+			cudaMallocManaged(&mPuncture, mNumPuncture*sizeof(size_t));
+            for(size_t i = 0; i < mNumPuncture; i++)
             {
-                fscanf(fp, " %lu ", &(puncture_c[i]));
-                if(puncture_c[i] < k_c)
-                    num_puncture_sys_c++;
+                fscanf(fp, " %lu ", &(mPuncture[i]));
+                if(mPuncture[i] < mK)
+                    mNumPunctureSys++;
                 else
-                    num_puncture_par_c++;
+                    mNumPuncturePar++;
             }
         }
 
-        fscanf(fp, "shorten [%lu]: ", &num_shorten_c);
-        if(num_shorten_c != 0)
+        fscanf(fp, "shorten [%lu]: ", &mNumShorten);
+        if(mNumShorten != 0)
         {
-			cudaMallocManaged(&shorten_c, num_shorten_c*sizeof(size_t));
-            for(size_t i = 0; i < num_shorten_c; i++)
-                fscanf(fp, " %lu ", &(shorten_c[i]));
+			cudaMallocManaged(&mShorten, mNumShorten*sizeof(size_t));
+            for(size_t i = 0; i < mNumShorten; i++)
+                fscanf(fp, " %lu ", &(mShorten[i]));
         }
 
-        size_t* cw_tmp;
-        size_t* vw_tmp;
+        size_t* cwTmp;
+        size_t* vwTmp;
 
-		cw_tmp = new size_t[m_c]();
-		vw_tmp = new size_t[n_c]();
+		cwTmp = new size_t[mM]();
+		vwTmp = new size_t[mN]();
 
-		cudaMallocManaged(&cw_c, m_c*sizeof(size_t));
-		cudaMallocManaged(&vw_c, n_c*sizeof(size_t));
-		cudaMallocManaged(&r_c, nnz_c*sizeof(size_t));
-		cudaMallocManaged(&c_c, nnz_c*sizeof(size_t));
+		cudaMallocManaged(&mCW, mM*sizeof(size_t));
+		cudaMallocManaged(&mVW, mN*sizeof(size_t));
+		cudaMallocManaged(&mR, mNNZ*sizeof(size_t));
+		cudaMallocManaged(&mC, mNNZ*sizeof(size_t));
 
-		for(size_t i = 0; i < m_c; i++)
+		for(size_t i = 0; i < mM; i++)
 		{
-	        cw_c[i] = 0;
-	        cw_tmp[i] = 0;
+	        mCW[i] = 0;
+	        cwTmp[i] = 0;
 	    }
-	    for(size_t i = 0; i < n_c; i++)
+	    for(size_t i = 0; i < mN; i++)
 		{
-	        vw_c[i] = 0;
-	        vw_tmp[i] = 0;
+	        mVW[i] = 0;
+	        vwTmp[i] = 0;
 	    }
 
-        for(size_t i = 0; i < nnz_c; i++)
+        for(size_t i = 0; i < mNNZ; i++)
         {
-            fscanf(fp, "%lu %lu\n", &(r_c[i]), &(c_c[i]));
-            cw_c[r_c[i]]++;
-            vw_c[c_c[i]]++;
+            fscanf(fp, "%lu %lu\n", &(mR[i]), &(mC[i]));
+            mCW[mR[i]]++;
+            mVW[mC[i]]++;
         }
 
-		cudaMallocManaged(&cn_c, m_c*sizeof(size_t*));
-        for(size_t i = 0; i < m_c; i++)
-			cudaMallocManaged(&cn_c[i], cw_c[i]*sizeof(size_t));
+		cudaMallocManaged(&mCN, mM*sizeof(size_t*));
+        for(size_t i = 0; i < mM; i++)
+			cudaMallocManaged(&mCN[i], mCW[i]*sizeof(size_t));
 
-		cudaMallocManaged(&vn_c, n_c*sizeof(size_t*));
-        for(size_t i = 0; i < n_c; i++)
-			cudaMallocManaged(&vn_c[i], vw_c[i]*sizeof(size_t));
+		cudaMallocManaged(&mVN, mN*sizeof(size_t*));
+        for(size_t i = 0; i < mN; i++)
+			cudaMallocManaged(&mVN[i], mVW[i]*sizeof(size_t));
 
-        for(size_t i = 0; i < nnz_c; i++)
+        for(size_t i = 0; i < mNNZ; i++)
         {
-            cn_c[r_c[i]][cw_tmp[r_c[i]]++] = i;
-            vn_c[c_c[i]][vw_tmp[c_c[i]]++] = i;
+            mCN[mR[i]][cwTmp[mR[i]]++] = i;
+            mVN[mC[i]][vwTmp[mC[i]]++] = i;
         }
 
-		delete[] cw_tmp;
-		delete[] vw_tmp;
+		delete[] cwTmp;
+		delete[] vwTmp;
 
-        max_dc_c = 0;
-        for(size_t i = 0; i < m_c; i++)
+        mMaxDC = 0;
+        for(size_t i = 0; i < mM; i++)
         {
-            if(cw_c[i] > max_dc_c)
-                max_dc_c = cw_c[i];
+            if(mCW[i] > mMaxDC)
+                mMaxDC = mCW[i];
         }
 
         fclose(fp);
@@ -294,177 +279,177 @@ void Ldpc_Code_cl::setup_code_mgd(const char* filename)
     catch(exception &e)
     {
         cout << "Error: " << e.what() << endl;
-        destroy_code_mgd();
+        destroy_mgd();
 
         exit(EXIT_FAILURE);
     }
 }
 
 
-void Ldpc_Code_cl::setup_layers_mgd(const char* clfile)
+void ldpc_code::setup_layers_mgd(const char* pClFile)
 {
-    FILE *fp = fopen(clfile, "r");
+    FILE *fp = fopen(pClFile, "r");
     if(!fp)
         throw runtime_error("Can not open layer file");
 
-    fscanf(fp, "nl: %lu\n", &nl_c);
+    fscanf(fp, "nl: %lu\n", &mNL);
 
-	cudaMallocManaged(&lw_c, nl_c*sizeof(uint64_t));
-	cudaMallocManaged(&layers_c, nl_c*sizeof(uint64_t*));
+	cudaMallocManaged(&mLW, mNL*sizeof(uint64_t));
+	cudaMallocManaged(&mLayers, mNL*sizeof(uint64_t*));
 
-    for (size_t i = 0; i < nl_c; ++i)
+    for (size_t i = 0; i < mNL; ++i)
     {
-        fscanf(fp, "cn[i]: %lu\n", &(lw_c[i]));
-		cudaMallocManaged(&layers_c[i], lw_c[i]*sizeof(uint64_t));
-        for (size_t j = 0; j < lw_c[i]; ++j)
-            fscanf(fp, "%lu\n", &(layers_c[i][j]));
+        fscanf(fp, "cn[i]: %lu\n", &(mLW[i]));
+		cudaMallocManaged(&mLayers[i], mLW[i]*sizeof(uint64_t));
+        for (size_t j = 0; j < mLW[i]; ++j)
+            fscanf(fp, "%lu\n", &(mLayers[i][j]));
     }
     fclose(fp);
 }
 
 
-void Ldpc_Code_cl::prefetch_code()
+void ldpc_code::prefetch()
 {
 	cudaDeviceSynchronize();
 
 	int dev = -1;
 	cudaGetDevice(&dev);
 
-	if(num_puncture_c != 0)	{ cudaMemPrefetchAsync(puncture_c, sizeof(size_t)*num_puncture_c, dev, NULL); }
-	if(num_shorten_c != 0) { cudaMemPrefetchAsync(shorten_c, sizeof(size_t)*num_shorten_c, dev, NULL); }
+	if(mNumPuncture != 0)	{ cudaMemPrefetchAsync(mPuncture, sizeof(size_t)*mNumPuncture, dev, NULL); }
+	if(mNumShorten != 0) { cudaMemPrefetchAsync(mShorten, sizeof(size_t)*mNumShorten, dev, NULL); }
 
 
-	for(size_t i = 0; i < m_c; i++) {
-		cudaMemPrefetchAsync(cn_c[i], sizeof(size_t)*cw_c[i], dev, NULL);
+	for(size_t i = 0; i < mM; i++) {
+		cudaMemPrefetchAsync(mCN[i], sizeof(size_t)*mCW[i], dev, NULL);
 	}
-	cudaMemPrefetchAsync(cn_c, sizeof(size_t*)*m_c, dev, NULL);
+	cudaMemPrefetchAsync(mCN, sizeof(size_t*)*mM, dev, NULL);
 
 
-	for(size_t i = 0; i < m_c; i++) {
-		cudaMemPrefetchAsync(vn_c[i], sizeof(size_t)*vw_c[i], dev, NULL);
+	for(size_t i = 0; i < mM; i++) {
+		cudaMemPrefetchAsync(mVN[i], sizeof(size_t)*mVW[i], dev, NULL);
 	}
-	cudaMemPrefetchAsync(vn_c, sizeof(size_t*)*n_c, dev, NULL);
+	cudaMemPrefetchAsync(mVN, sizeof(size_t*)*mN, dev, NULL);
 
 
-	for (size_t i = 0; i < nl_c; ++i) {
-		cudaMemPrefetchAsync(layers_c[i], sizeof(uint64_t)*lw_c[i], dev, NULL);
+	for (size_t i = 0; i < mNL; ++i) {
+		cudaMemPrefetchAsync(mLayers[i], sizeof(uint64_t)*mLW[i], dev, NULL);
 	}
-	cudaMemPrefetchAsync(layers_c, sizeof(uint64_t*)*nl_c, dev, NULL);
-	cudaMemPrefetchAsync(lw_c, sizeof(uint64_t)*nl_c, dev, NULL);
+	cudaMemPrefetchAsync(mLayers, sizeof(uint64_t*)*mNL, dev, NULL);
+	cudaMemPrefetchAsync(mLW, sizeof(uint64_t)*mNL, dev, NULL);
 
-	cudaMemPrefetchAsync(cw_c, sizeof(size_t)*m_c, dev, NULL);
-	cudaMemPrefetchAsync(vw_c, sizeof(size_t)*n_c, dev, NULL);
-	cudaMemPrefetchAsync(r_c, sizeof(size_t)*nnz_c, dev, NULL);
-	cudaMemPrefetchAsync(c_c, sizeof(size_t)*nnz_c, dev, NULL);
+	cudaMemPrefetchAsync(mCW, sizeof(size_t)*mM, dev, NULL);
+	cudaMemPrefetchAsync(mVW, sizeof(size_t)*mN, dev, NULL);
+	cudaMemPrefetchAsync(mR, sizeof(size_t)*mNNZ, dev, NULL);
+	cudaMemPrefetchAsync(mC, sizeof(size_t)*mNNZ, dev, NULL);
 
-	cudaMemPrefetchAsync(this, sizeof(Ldpc_Code_cl), dev, NULL);
+	cudaMemPrefetchAsync(this, sizeof(ldpc_code), dev, NULL);
 }
 
 
-void Ldpc_Code_cl::destroy_code()
+void ldpc_code::destroy()
 {
-    if (vn_c != nullptr)
+    if (mVN != nullptr)
     {
-        for(size_t i = 0; i < n_c; i++) { delete[] vn_c[i]; }
-        delete[] vn_c;
+        for(size_t i = 0; i < mN; i++) { delete[] mVN[i]; }
+        delete[] mVN;
     }
 
-    if (vn_c != nullptr)
+    if (mVN != nullptr)
     {
-        for(size_t i = 0; i < m_c; i++) { delete[] cn_c[i]; }
-        delete[] cn_c;
+        for(size_t i = 0; i < mM; i++) { delete[] mCN[i]; }
+        delete[] mCN;
     }
 
-    if (vw_c != nullptr) { delete[] vw_c; }
-    if (cw_c != nullptr) { delete[] cw_c; }
-    if (r_c != nullptr) { delete[] r_c; }
-    if (c_c != nullptr) { delete[] c_c; }
-    if (puncture_c != nullptr) { delete[] puncture_c; }
-    if (shorten_c != nullptr) { delete[] shorten_c; }
-    if (layers_c != nullptr)
+    if (mVW != nullptr) { delete[] mVW; }
+    if (mCW != nullptr) { delete[] mCW; }
+    if (mR != nullptr) { delete[] mR; }
+    if (mC != nullptr) { delete[] mC; }
+    if (mPuncture != nullptr) { delete[] mPuncture; }
+    if (mShorten != nullptr) { delete[] mShorten; }
+    if (mLayers != nullptr)
     {
-        for(size_t i = 0; i < nl_c; i++) { delete[] layers_c[i]; }
-        delete[] layers_c;
+        for(size_t i = 0; i < mNL; i++) { delete[] mLayers[i]; }
+        delete[] mLayers;
     }
-    if (lw_c != nullptr) { delete[] lw_c; }
+    if (mLW != nullptr) { delete[] mLW; }
 }
 
 
-void Ldpc_Code_cl::destroy_code_mgd()
+void ldpc_code::destroy_mgd()
 {
-    if (vn_c != nullptr)
+    if (mVN != nullptr)
     {
-        for(size_t i = 0; i < n_c; i++) { cudaFree(vn_c[i]); }
-        cudaFree(vn_c);
+        for(size_t i = 0; i < mN; i++) { cudaFree(mVN[i]); }
+        cudaFree(mVN);
     }
-    if (vn_c != nullptr)
+    if (mVN != nullptr)
     {
-        for(size_t i = 0; i < m_c; i++) { cudaFree(cn_c[i]); }
-        cudaFree(cn_c);
+        for(size_t i = 0; i < mM; i++) { cudaFree(mCN[i]); }
+        cudaFree(mCN);
     }
-    if (vw_c != nullptr) { cudaFree(vw_c); }
-    if (cw_c != nullptr) { cudaFree(cw_c); }
-    if (r_c != nullptr) { cudaFree(r_c); }
-    if (c_c != nullptr) { cudaFree(c_c); }
-    if (puncture_c != nullptr) { cudaFree(puncture_c); }
-    if (shorten_c != nullptr) { cudaFree(shorten_c); }
-    if (layers_c != nullptr)
+    if (mVW != nullptr) { cudaFree(mVW); }
+    if (mCW != nullptr) { cudaFree(mCW); }
+    if (mR != nullptr) { cudaFree(mR); }
+    if (mC != nullptr) { cudaFree(mC); }
+    if (mPuncture != nullptr) { cudaFree(mPuncture); }
+    if (mShorten != nullptr) { cudaFree(mShorten); }
+    if (mLayers != nullptr)
 	{
-        for(size_t i = 0; i < nl_c; i++) { cudaFree(layers_c[i]); }
-        cudaFree(layers_c);
+        for(size_t i = 0; i < mNL; i++) { cudaFree(mLayers[i]); }
+        cudaFree(mLayers);
     }
-    if (lw_c != nullptr) { cudaFree(lw_c); }
+    if (mLW != nullptr) { cudaFree(mLW); }
 }
 
-void Ldpc_Code_cl::print_ldpc_code()
+void ldpc_code::print()
 {
     cout << "=========== LDPC ===========" << endl;
-    cout << "nc : " << n_c << endl;
-    cout << "mc : " << m_c << endl;
-    cout << "kc : " << k_c << endl;
-    cout << "nnz : " << nnz_c << endl;
-    cout << "nct :" << nct_c << endl;
-    cout << "mct : " << mct_c << endl;
-    cout << "kct : " << kct_c << endl;
-    cout << "max dc : " << max_dc_c << endl;
-    cout << "num puncture: " << num_puncture_c << endl;
-    cout << "num puncture sys: " << num_puncture_sys_c << endl;
-    cout << "num puncture par: " << num_puncture_par_c << endl;
-    cout << "num shorten: " << num_shorten_c << endl;
+    cout << "nc : " << mN << endl;
+    cout << "mc : " << mM << endl;
+    cout << "kc : " << mK << endl;
+    cout << "nnz : " << mNNZ << endl;
+    cout << "nct :" << mNCT << endl;
+    cout << "mct : " << mMCT << endl;
+    cout << "kct : " << mKCT << endl;
+    cout << "max dc : " << mMaxDC << endl;
+    cout << "num puncture: " << mNumPuncture << endl;
+    cout << "num puncture sys: " << mNumPunctureSys << endl;
+    cout << "num puncture par: " << mNumPuncturePar << endl;
+    cout << "num shorten: " << mNumShorten << endl;
     cout << "=========== LDPC: END ===========" << endl;
 
     printf("=========== LDPC LAYERS ===========\n");
-    printf("nl: %lu\n", nl_c);
-    for (size_t i = 0; i < nl_c; ++i)
+    printf("nl: %lu\n", mNL);
+    for (size_t i = 0; i < mNL; ++i)
     {
-        printf("cn[%lu]: %lu\n", i, lw_c[i]);
-        printVector<uint64_t>(layers_c[i], lw_c[i]);
+        printf("cn[%lu]: %lu\n", i, mLW[i]);
+        printVector<uint64_t>(mLayers[i], mLW[i]);
         printf("\n");
     }
     printf("========= LDPC LAYERS: END ========\n");
 }
 
-__host__ __device__ uint64_t Ldpc_Code_cl::nc() const { return n_c; }
-__host__ __device__ uint64_t Ldpc_Code_cl::kc() const { return k_c; }
-__host__ __device__ uint64_t Ldpc_Code_cl::mc() const { return m_c; }
-__host__ __device__ uint64_t Ldpc_Code_cl::nnz() const { return nnz_c; }
-__host__ __device__ size_t *Ldpc_Code_cl::cw() const { return cw_c; }
-__host__ __device__ size_t *Ldpc_Code_cl::vw() const { return vw_c; }
-__host__ __device__ size_t **Ldpc_Code_cl::cn() const { return cn_c; }
-__host__ __device__ size_t **Ldpc_Code_cl::vn() const { return vn_c; }
-__host__ __device__ size_t *Ldpc_Code_cl::r() const { return r_c; }
-__host__ __device__ size_t *Ldpc_Code_cl::c() const { return c_c; }
-__host__ __device__ uint64_t Ldpc_Code_cl::nct() const { return nct_c; }
-__host__ __device__ uint64_t Ldpc_Code_cl::mct() const { return mct_c; }
-__host__ __device__ size_t *Ldpc_Code_cl::puncture() const { return puncture_c; }
-__host__ __device__ size_t Ldpc_Code_cl::num_puncture() const { return num_puncture_c; }
-__host__ __device__ size_t *Ldpc_Code_cl::shorten() const { return shorten_c; }
-__host__ __device__ size_t Ldpc_Code_cl::num_shorten() const { return num_shorten_c; }
-__host__ __device__ uint64_t Ldpc_Code_cl::kct() const { return kct_c; }
-__host__ __device__ size_t Ldpc_Code_cl::max_dc() const { return max_dc_c; }
-__host__ __device__ uint64_t Ldpc_Code_cl::nl() const { return nl_c; }
-__host__ __device__ uint64_t *Ldpc_Code_cl::lw() const { return lw_c; }
-__host__ __device__ uint64_t **Ldpc_Code_cl::layers() const { return layers_c; }
+__host__ __device__ uint64_t ldpc_code::nc() const { return mN; }
+__host__ __device__ uint64_t ldpc_code::kc() const { return mK; }
+__host__ __device__ uint64_t ldpc_code::mc() const { return mM; }
+__host__ __device__ uint64_t ldpc_code::nnz() const { return mNNZ; }
+__host__ __device__ size_t *ldpc_code::cw() const { return mCW; }
+__host__ __device__ size_t *ldpc_code::vw() const { return mVW; }
+__host__ __device__ size_t **ldpc_code::cn() const { return mCN; }
+__host__ __device__ size_t **ldpc_code::vn() const { return mVN; }
+__host__ __device__ size_t *ldpc_code::r() const { return mR; }
+__host__ __device__ size_t *ldpc_code::c() const { return mC; }
+__host__ __device__ uint64_t ldpc_code::nct() const { return mNCT; }
+__host__ __device__ uint64_t ldpc_code::mct() const { return mMCT; }
+__host__ __device__ size_t *ldpc_code::puncture() const { return mPuncture; }
+__host__ __device__ size_t ldpc_code::num_puncture() const { return mNumPuncture; }
+__host__ __device__ size_t *ldpc_code::shorten() const { return mShorten; }
+__host__ __device__ size_t ldpc_code::num_shorten() const { return mNumShorten; }
+__host__ __device__ uint64_t ldpc_code::kct() const { return mKCT; }
+__host__ __device__ size_t ldpc_code::max_dc() const { return mMaxDC; }
+__host__ __device__ uint64_t ldpc_code::nl() const { return mNL; }
+__host__ __device__ uint64_t *ldpc_code::lw() const { return mLW; }
+__host__ __device__ uint64_t **ldpc_code::layers() const { return mLayers; }
 
 
 void ldpc::dec2bin(uint64_t val, uint8_t m)

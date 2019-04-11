@@ -6,154 +6,136 @@ using namespace ldpc;
 using namespace std;
 
 
-Ldpc_Decoder_cl::Ldpc_Decoder_cl(Ldpc_Code_cl* code, const uint16_t I, const bool early_term, const bool mgd)
-: ldpc_code(code), max_iter(I), early_termination(early_term), Cuda_Mgd_cl(mgd)
+ldpc_decoder::ldpc_decoder(ldpc_code* pCode, const uint16_t pI, const bool pEarlyTerm)
+	: mLdpcCode(pCode), mMaxIter(pI), mEarlyTerm(pEarlyTerm), cuda_mgd(true)
 {
-    if (is_mgd)
-    {
-        setup_dec_mgd();
-        prefetch_dec();
-    }
-    else
-    {
-        //setup_dec();
-    }
+	setup();
+	prefetch();
 }
 
+ldpc_decoder::~ldpc_decoder() { destroy(); }
 
-Ldpc_Decoder_cl::~Ldpc_Decoder_cl()
+
+void ldpc_decoder::setup()
 {
-    if (is_mgd)
-    {
-        destroy_dec_mgd();
-    }
-    else
-    {
-        //destroy_dec();
-    }
-}
+    mLc2v = nullptr;
+    mLv2c = nullptr;
+    mF = nullptr;
+    mB = nullptr;
+    __FBREF__ = nullptr;
+    mLSum = nullptr;
+    mLc2vPre = nullptr;
+    mCO = nullptr;
+    mSynd = nullptr;
+    mLLRIn = nullptr;
+    mLLROut = nullptr;
 
-
-void Ldpc_Decoder_cl::setup_dec_mgd()
-{
-    l_c2v = nullptr;
-    l_v2c = nullptr;
-    f = nullptr;
-    b = nullptr;
-    fb_ref = nullptr;
-    lsum = nullptr;
-    l_c2v_pre = nullptr;
-    c_out = nullptr;
-    synd = nullptr;
-    llr_in = nullptr;
-    llr_out = nullptr;
-
-    const uint64_t num_layers = ldpc_code->nl();
+    const uint64_t numLayers = mLdpcCode->nl();
 
     try
     {
         //num layers times num nnz
-        cudaMallocManaged(&l_c2v, sizeof(double)*num_layers*ldpc_code->nnz());
-        if (l_c2v == NULL || l_c2v == nullptr) { throw runtime_error("l_c2v alloc failed."); }
-        cudaMallocManaged(&l_v2c, sizeof(double)*num_layers*ldpc_code->nnz());
-        if (l_v2c == NULL || l_v2c == nullptr) { throw runtime_error("l_v2c alloc failed."); }
-        cudaMallocManaged(&l_c2v_pre, sizeof(double)*num_layers*ldpc_code->nnz());
-        if (l_c2v_pre == NULL || l_c2v_pre == nullptr) { throw runtime_error("l_c2v_pre alloc failed."); }
+        cudaMallocManaged(&mLc2v, sizeof(double)*numLayers*mLdpcCode->nnz());
+        if (mLc2v == NULL || mLc2v == nullptr) { throw runtime_error("mLc2v alloc failed."); }
+        cudaMallocManaged(&mLv2c, sizeof(double)*numLayers*mLdpcCode->nnz());
+        if (mLv2c == NULL || mLv2c == nullptr) { throw runtime_error("mLv2c alloc failed."); }
+        cudaMallocManaged(&mLc2vPre, sizeof(double)*numLayers*mLdpcCode->nnz());
+        if (mLc2vPre == NULL || mLc2vPre == nullptr) { throw runtime_error("mLc2vPre alloc failed."); }
 
-        cudaMallocManaged(&f, sizeof(double)*num_layers*ldpc_code->max_dc());
-        if (f == NULL || f == nullptr) { throw runtime_error("f alloc failed."); }
-        cudaMallocManaged(&b, sizeof(double)*num_layers*ldpc_code->max_dc());
-        if (b == NULL || b == nullptr) { throw runtime_error("b alloc failed."); }
+        cudaMallocManaged(&mF, sizeof(double)*numLayers*mLdpcCode->max_dc());
+        if (mF == NULL || mF == nullptr) { throw runtime_error("mF alloc failed."); }
+        cudaMallocManaged(&mB, sizeof(double)*numLayers*mLdpcCode->max_dc());
+        if (mB == NULL || mB == nullptr) { throw runtime_error("mB alloc failed."); }
 
-        cudaMallocManaged(&fb_ref, ldpc_code->max_dc());
-        if (fb_ref == NULL || fb_ref == nullptr) { throw runtime_error("fb_ref alloc failed."); }
+        cudaMallocManaged(&__FBREF__, mLdpcCode->max_dc());
+        if (__FBREF__ == NULL || __FBREF__ == nullptr) { throw runtime_error("__FBREF__ alloc failed."); }
 
-        cudaMallocManaged(&lsum, sizeof(double)*ldpc_code->nnz());
-        if (lsum == NULL || lsum == nullptr) { throw runtime_error("lsum alloc failed."); }
+        cudaMallocManaged(&mLSum, sizeof(double)*mLdpcCode->nnz());
+        if (mLSum == NULL || mLSum == nullptr) { throw runtime_error("mLSum alloc failed."); }
 
-        cudaMallocManaged(&llr_in, sizeof(double)*ldpc_code->nc());
-        if (llr_in == NULL || llr_in == nullptr) { throw runtime_error("llr_in alloc failed."); }
-        cudaMallocManaged(&llr_out, sizeof(double)*ldpc_code->nc());
-        if (llr_out == NULL || llr_out == nullptr) { throw runtime_error("llr_out alloc failed."); }
-        cudaMallocManaged(&c_out, sizeof(bits_t)*ldpc_code->nc());
-        if (c_out == NULL || c_out == nullptr) { throw runtime_error("c_out alloc failed."); }
+        cudaMallocManaged(&mLLRIn, sizeof(double)*mLdpcCode->nc());
+        if (mLLRIn == NULL || mLLRIn == nullptr) { throw runtime_error("mLLRIn alloc failed."); }
+        cudaMallocManaged(&mLLROut, sizeof(double)*mLdpcCode->nc());
+        if (mLLROut == NULL || mLLROut == nullptr) { throw runtime_error("mLLROut alloc failed."); }
+        cudaMallocManaged(&mCO, sizeof(bits_t)*mLdpcCode->nc());
+        if (mCO == NULL || mCO == nullptr) { throw runtime_error("mCO alloc failed."); }
 
-        cudaMallocManaged(&synd, sizeof(bits_t)*ldpc_code->mc());
-        if (synd == NULL || synd == nullptr) { throw runtime_error("synd alloc failed."); }
+        cudaMallocManaged(&mSynd, sizeof(bits_t)*mLdpcCode->mc());
+        if (mSynd == NULL || mSynd == nullptr) { throw runtime_error("mSynd alloc failed."); }
     }
     catch (exception& e)
     {
         cout << "Error: " << e.what() << endl;
-        destroy_dec_mgd();
+        destroy();
         exit(EXIT_FAILURE);
     }
 }
 
-void Ldpc_Decoder_cl::prefetch_dec()
+void ldpc_decoder::prefetch()
 {
     cudaDeviceSynchronize();
 
     int dev = -1;
     cudaGetDevice(&dev);
 
-    const uint64_t num_layers = ldpc_code->nl();
+    const uint64_t numLayers = mLdpcCode->nl();
 
-    cudaMemPrefetchAsync(l_c2v, sizeof(double)*num_layers*ldpc_code->nnz(), dev, NULL);
-    cudaMemPrefetchAsync(l_v2c, sizeof(double)*num_layers*ldpc_code->nnz(), dev, NULL);
-    cudaMemPrefetchAsync(l_c2v_pre, sizeof(double)*num_layers*ldpc_code->nnz(), dev, NULL);
+    cudaMemPrefetchAsync(mLc2v, sizeof(double)*numLayers*mLdpcCode->nnz(), dev, NULL);
+    cudaMemPrefetchAsync(mLv2c, sizeof(double)*numLayers*mLdpcCode->nnz(), dev, NULL);
+    cudaMemPrefetchAsync(mLc2vPre, sizeof(double)*numLayers*mLdpcCode->nnz(), dev, NULL);
 
-    cudaMemPrefetchAsync(fb_ref, ldpc_code->max_dc(), dev, NULL);
+    cudaMemPrefetchAsync(__FBREF__, mLdpcCode->max_dc(), dev, NULL);
 
-    cudaMemPrefetchAsync(lsum, sizeof(double)*ldpc_code->nnz(), dev, NULL);
+    cudaMemPrefetchAsync(mLSum, sizeof(double)*mLdpcCode->nnz(), dev, NULL);
 
-    cudaMemPrefetchAsync(llr_in, sizeof(double)*ldpc_code->nc(), dev, NULL);
-    cudaMemPrefetchAsync(llr_out, sizeof(double)*ldpc_code->nc(), dev, NULL);
-    cudaMemPrefetchAsync(c_out, sizeof(double)*ldpc_code->nc(), dev, NULL);
+    cudaMemPrefetchAsync(mLLRIn, sizeof(double)*mLdpcCode->nc(), dev, NULL);
+    cudaMemPrefetchAsync(mLLROut, sizeof(double)*mLdpcCode->nc(), dev, NULL);
+    cudaMemPrefetchAsync(mCO, sizeof(double)*mLdpcCode->nc(), dev, NULL);
 
-    cudaMemPrefetchAsync(synd, sizeof(double)*ldpc_code->mc(), dev, NULL);
+    cudaMemPrefetchAsync(mSynd, sizeof(double)*mLdpcCode->mc(), dev, NULL);
 
-    cudaMemPrefetchAsync(this, sizeof(Ldpc_Decoder_cl), dev, NULL);
+    cudaMemPrefetchAsync(this, sizeof(ldpc_decoder), dev, NULL);
 }
 
-void Ldpc_Decoder_cl::destroy_dec_mgd()
+void ldpc_decoder::destroy()
 {
-    if (l_c2v != nullptr) { cudaFree(l_c2v); }
-    if (l_v2c != nullptr) { cudaFree(l_v2c); }
-    if (l_c2v_pre != nullptr) { cudaFree(l_c2v_pre); }
-    if (f != nullptr) { cudaFree(f); }
-    if (b != nullptr) { cudaFree(b); }
-    if (fb_ref != nullptr) { cudaFree(fb_ref); }
-    if (lsum != nullptr) { cudaFree(lsum); }
-    if (c_out != nullptr) { cudaFree(c_out); }
-    if (synd != nullptr) { cudaFree(synd); }
-    if (llr_in != nullptr) { cudaFree(llr_in); }
-    if (llr_out != nullptr) { cudaFree(llr_out); }
+    if (mLc2v != nullptr) { cudaFree(mLc2v); }
+    if (mLv2c != nullptr) { cudaFree(mLv2c); }
+    if (mLc2vPre != nullptr) { cudaFree(mLc2vPre); }
+    if (mF != nullptr) { cudaFree(mF); }
+    if (mB != nullptr) { cudaFree(mB); }
+    if (__FBREF__ != nullptr) { cudaFree(__FBREF__); }
+    if (mLSum != nullptr) { cudaFree(mLSum); }
+    if (mCO != nullptr) { cudaFree(mCO); }
+    if (mSynd != nullptr) { cudaFree(mSynd); }
+    if (mLLRIn != nullptr) { cudaFree(mLLRIn); }
+    if (mLLROut != nullptr) { cudaFree(mLLROut); }
 }
 
 
-__host__ __device__ bool Ldpc_Decoder_cl::is_codeword()
+__host__ __device__ bool ldpc_decoder::is_codeword()
 {
-    is_cw = true;
+    mIsCW = true;
 
     //calc syndrome
-    cudakernel::decoder::calc_synd<<<get_num_size(ldpc_code->mc(), NUM_THREADS), NUM_THREADS>>>(this);
+    cudakernel::decoder::calc_synd<<<get_num_size(mLdpcCode->mc(), NUM_THREADS), NUM_THREADS>>>(this);
     cudaDeviceSynchronize();
 
-    return is_cw;
+    return mIsCW;
 }
 
 
-__host__ __device__ bool Ldpc_Decoder_cl::is_codeword_legacy()
+__host__ __device__ bool ldpc_decoder::is_codeword_legacy()
 {
     bool is_codeword = true;
 
     //calc syndrome
     bits_t s;
-    for (size_t i = 0; i < ldpc_code->mc(); i++)
+    for (size_t i = 0; i < mLdpcCode->mc(); i++)
     {
         s = 0;
-        for (size_t j = 0; j < ldpc_code->cw()[i]; j++)
-            s ^= c_out[ldpc_code->c()[ldpc_code->cn()[i][j]]];
+        for (size_t j = 0; j < mLdpcCode->cw()[i]; j++)
+            s ^= mCO[mLdpcCode->c()[mLdpcCode->cn()[i][j]]];
 
         if (s)
         {
@@ -165,7 +147,7 @@ __host__ __device__ bool Ldpc_Decoder_cl::is_codeword_legacy()
 }
 
 
-uint16_t Ldpc_Decoder_cl::decode_legacy()
+uint16_t ldpc_decoder::decode_legacy()
 {
     uint16_t it;
 
@@ -176,59 +158,59 @@ uint16_t Ldpc_Decoder_cl::decode_legacy()
     size_t cw;
 
     //initialize with llrs
-    for(size_t i = 0; i < ldpc_code->nnz(); i++) {
-        l_v2c[i] = llr_in[ldpc_code->c()[i]];
+    for(size_t i = 0; i < mLdpcCode->nnz(); i++) {
+        mLv2c[i] = mLLRIn[mLdpcCode->c()[i]];
     }
 
     it = 0;
-    while(it < max_iter) {
-        for(size_t i = 0; i < ldpc_code->mc(); i++) {
-            cw = ldpc_code->cw()[i];
-            cn = ldpc_code->cn()[i];
-            f[0] = l_v2c[*cn];
-            b[cw-1] = l_v2c[*(cn+cw-1)];
+    while(it < mMaxIter) {
+        for(size_t i = 0; i < mLdpcCode->mc(); i++) {
+            cw = mLdpcCode->cw()[i];
+            cn = mLdpcCode->cn()[i];
+            mF[0] = mLv2c[*cn];
+            mB[cw-1] = mLv2c[*(cn+cw-1)];
             for(size_t j = 1; j < cw; j++) {
-                f[j] = jacobian(f[j-1], l_v2c[*(cn+j)]);
-                b[cw-1-j] = jacobian(b[cw-j], l_v2c[*(cn + cw-j-1)]);
+                mF[j] = jacobian(mF[j-1], mLv2c[*(cn+j)]);
+                mB[cw-1-j] = jacobian(mB[cw-j], mLv2c[*(cn + cw-j-1)]);
             }
 
-            l_c2v[*cn] = b[1];
-            l_c2v[*(cn+cw-1)] = f[cw-2];
+            mLc2v[*cn] = mB[1];
+            mLc2v[*(cn+cw-1)] = mF[cw-2];
             for(size_t j = 1; j < cw-1; j++) {
-                l_c2v[*(cn+j)] = jacobian(f[j-1], b[j+1]);
+                mLc2v[*(cn+j)] = jacobian(mF[j-1], mB[j+1]);
             }
         }
 
         // VN node processing
-        for(size_t i = 0; i < ldpc_code->nc(); i++) {
-            double tmp = llr_in[i];
-            vw = ldpc_code->vw()[i];
-            vn = ldpc_code->vn()[i];
+        for(size_t i = 0; i < mLdpcCode->nc(); i++) {
+            double tmp = mLLRIn[i];
+            vw = mLdpcCode->vw()[i];
+            vn = mLdpcCode->vn()[i];
             while(vw--) {
-                tmp += l_c2v[*vn++];
+                tmp += mLc2v[*vn++];
             }
-            vn = ldpc_code->vn()[i];
-            vw = ldpc_code->vw()[i];
+            vn = mLdpcCode->vn()[i];
+            vw = mLdpcCode->vw()[i];
             while(vw--) {
-                l_v2c[*vn] = tmp - l_c2v[*vn];
+                mLv2c[*vn] = tmp - mLc2v[*vn];
                 vn++;
             }
         }
 
         // app calculation
-        for(size_t i = 0; i < ldpc_code->nc(); i++) {
-            llr_out[i] = llr_in[i];
-            vn = ldpc_code->vn()[i];
-            vw = ldpc_code->vw()[i];
+        for(size_t i = 0; i < mLdpcCode->nc(); i++) {
+            mLLROut[i] = mLLRIn[i];
+            vn = mLdpcCode->vn()[i];
+            vw = mLdpcCode->vw()[i];
             while(vw--) {
-                llr_out[i] += l_c2v[*vn++];
+                mLLROut[i] += mLc2v[*vn++];
             }
-            c_out[i] = (llr_out[i] <= 0);
+            mCO[i] = (mLLROut[i] <= 0);
         }
 
         it++;
 
-        if (early_termination) {
+        if (mEarlyTerm) {
             if (is_codeword_legacy()) {
                 break;
             }
@@ -239,7 +221,7 @@ uint16_t Ldpc_Decoder_cl::decode_legacy()
 }
 
 
-uint16_t Ldpc_Decoder_cl::decode_layered_legacy()
+uint16_t ldpc_decoder::decode_layered_legacy()
 {
     size_t* vn;
     size_t* cn;
@@ -247,86 +229,86 @@ uint16_t Ldpc_Decoder_cl::decode_layered_legacy()
     size_t vw;
     size_t cw;
 
-    size_t i_nnz;
-    size_t i_dc;
+    size_t iNNZ;
+    size_t iDC;
 
     //initialize
-    for (size_t i = 0; i < ldpc_code->nnz(); ++i)
+    for (size_t i = 0; i < mLdpcCode->nnz(); ++i)
     {
-        lsum[i] = 0.0;
-        for (size_t l = 0; l < ldpc_code->nl(); ++l)
+        mLSum[i] = 0.0;
+        for (size_t l = 0; l < mLdpcCode->nl(); ++l)
         {
-            l_c2v[l*ldpc_code->nnz()+i] = 0.0;
-            l_v2c[l*ldpc_code->nnz()+i] = 0.0;
-            l_c2v_pre[l*ldpc_code->nnz()+i] = 0.0;
+            mLc2v[l*mLdpcCode->nnz()+i] = 0.0;
+            mLv2c[l*mLdpcCode->nnz()+i] = 0.0;
+            mLc2vPre[l*mLdpcCode->nnz()+i] = 0.0;
         }
     }
 
     uint16_t I = 0;
-    while (I < max_iter)
+    while (I < mMaxIter)
     {
-        for (size_t l = 0; l < ldpc_code->nl(); ++l)
+        for (size_t l = 0; l < mLdpcCode->nl(); ++l)
         {
-            i_nnz = l*ldpc_code->nnz();
-            i_dc = l*ldpc_code->max_dc();
+            iNNZ = l*mLdpcCode->nnz();
+            iDC = l*mLdpcCode->max_dc();
 
             // VN node intialization
-            for(size_t i = 0; i < ldpc_code->nc(); i++)
+            for(size_t i = 0; i < mLdpcCode->nc(); i++)
             {
-                double tmp = llr_in[i];
-                vw = ldpc_code->vw()[i];
-                vn = ldpc_code->vn()[i];
+                double tmp = mLLRIn[i];
+                vw = mLdpcCode->vw()[i];
+                vn = mLdpcCode->vn()[i];
                 while(vw--)
-                    tmp += lsum[*vn++];
+                    tmp += mLSum[*vn++];
 
-                vn = ldpc_code->vn()[i];
-                vw = ldpc_code->vw()[i];
+                vn = mLdpcCode->vn()[i];
+                vw = mLdpcCode->vw()[i];
                 while(vw--)
                 {
-                    l_v2c[i_nnz + *vn] = tmp - l_c2v[i_nnz + *vn];
+                    mLv2c[iNNZ + *vn] = tmp - mLc2v[iNNZ + *vn];
                     ++vn;
                 }
             }
 
             //CN processing
-            for(size_t i = 0; i < ldpc_code->lw()[l]; i++)
+            for(size_t i = 0; i < mLdpcCode->lw()[l]; i++)
             {
-                cw = ldpc_code->cw()[ldpc_code->layers()[l][i]];
-                cn = ldpc_code->cn()[ldpc_code->layers()[l][i]];
-                f[i_dc] = l_v2c[i_nnz + *cn];
-                b[i_dc + cw-1] = l_v2c[i_nnz + *(cn+cw-1)];
+                cw = mLdpcCode->cw()[mLdpcCode->layers()[l][i]];
+                cn = mLdpcCode->cn()[mLdpcCode->layers()[l][i]];
+                mF[iDC] = mLv2c[iNNZ + *cn];
+                mB[iDC + cw-1] = mLv2c[iNNZ + *(cn+cw-1)];
                 for(size_t j = 1; j < cw; j++)
                 {
-                    f[i_dc + j] = jacobian(f[i_dc + j-1], l_v2c[i_nnz + *(cn+j)]);
-                    b[i_dc + cw-1-j] = jacobian(b[i_dc + cw-j], l_v2c[i_nnz + *(cn + cw-j-1)]);
+                    mF[iDC + j] = jacobian(mF[iDC + j-1], mLv2c[iNNZ + *(cn+j)]);
+                    mB[iDC + cw-1-j] = jacobian(mB[iDC + cw-j], mLv2c[iNNZ + *(cn + cw-j-1)]);
                 }
 
-                l_c2v[i_nnz + *cn] = b[i_dc + 1];
-                l_c2v[i_nnz + *(cn+cw-1)] = f[i_dc + cw-2];
+                mLc2v[iNNZ + *cn] = mB[iDC + 1];
+                mLc2v[iNNZ + *(cn+cw-1)] = mF[iDC + cw-2];
 
                 for(size_t j = 1; j < cw-1; j++)
-                    l_c2v[i_nnz + *(cn+j)] = jacobian(f[i_dc + j-1], b[i_dc + j+1]);
+                    mLc2v[iNNZ + *(cn+j)] = jacobian(mF[iDC + j-1], mB[iDC + j+1]);
             }
 
             //update the llr sum of layers, by replacing old llr of lyr l with new value
-            for (size_t i = 0; i < ldpc_code->nnz(); ++i)
+            for (size_t i = 0; i < mLdpcCode->nnz(); ++i)
             {
-                lsum[i] += l_c2v[i_nnz + i] - l_c2v_pre[i_nnz + i];
-                l_c2v_pre[i_nnz + i] = l_c2v[i_nnz + i];
+                mLSum[i] += mLc2v[iNNZ + i] - mLc2vPre[iNNZ + i];
+                mLc2vPre[iNNZ + i] = mLc2v[iNNZ + i];
             }
 
             // app calculation
-            for(size_t i = 0; i < ldpc_code->nc(); ++i)
+            for(size_t i = 0; i < mLdpcCode->nc(); ++i)
             {
-                llr_out[i] = llr_in[i];
-                vn = ldpc_code->vn()[i];
-                vw = ldpc_code->vw()[i];
+                mLLROut[i] = mLLRIn[i];
+                vn = mLdpcCode->vn()[i];
+                vw = mLdpcCode->vw()[i];
                 while(vw--)
-                    llr_out[i] += lsum[*vn++];
-                c_out[i] = (llr_out[i] <= 0);
+                    mLLROut[i] += mLSum[*vn++];
+                mCO[i] = (mLLROut[i] <= 0);
             }
 
-            if (early_termination)
+            if (mEarlyTerm)
             {
                 if (is_codeword_legacy())
                 {
@@ -342,13 +324,17 @@ uint16_t Ldpc_Decoder_cl::decode_layered_legacy()
 }
 
 
-uint16_t Ldpc_Decoder_cl::decode_layered()
+uint16_t ldpc_decoder::decode_layered()
 {
-    cudakernel::decoder::decode_layered<<<1, 1>>>(this);
+    cudakernel::decoder::decode_layered<<<2, 1>>>(this);
     cudaDeviceSynchronize();
 
-    return iter;
+    return mIter;
 }
+
+
+__host__ __device__ uint16_t ldpc_decoder::max_iter() const { return mMaxIter; }
+__host__ __device__ bool ldpc_decoder::early_termination() const { return mEarlyTerm; }
 
 
 //tmpl fcts need definition in each file?
@@ -358,187 +344,4 @@ template<typename T> void ldpc::printVector(T *x, const size_t &l)
     for (size_t i = 0; i < l-1; ++i)
         cout << x[i] << " ";
     cout << x[l-1] << "]";
-}
-
-
-/*
- *	Cudakernels
- */
-__global__ void cudakernel::decoder::clean_decoder(Ldpc_Decoder_cl* dec_mgd)
-{
-	const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
-
-    for (size_t i = ix; i < dec_mgd->ldpc_code->nnz(); i += sx)
-    {
-        dec_mgd->lsum[i] = 0.0;
-        for (size_t l = 0; l < dec_mgd->ldpc_code->nl(); ++l)
-        {
-            dec_mgd->l_c2v[l*dec_mgd->ldpc_code->nnz()+i] = 0.0;
-            dec_mgd->l_v2c[l*dec_mgd->ldpc_code->nnz()+i] = 0.0;
-            dec_mgd->l_c2v_pre[l*dec_mgd->ldpc_code->nnz()+i] = 0.0;
-        }
-    }
-}
-
-
-__global__ void cudakernel::decoder::decode_layered(Ldpc_Decoder_cl* dec_mgd)
-{
-    size_t i_nnz;
-
-	const size_t gs_nc = get_num_size(dec_mgd->ldpc_code->nc(), NUM_THREADS);
-	const size_t gs_nnz = get_num_size(dec_mgd->ldpc_code->nnz(), NUM_THREADS);
-
-    //zero everything out
-    cudakernel::decoder::clean_decoder<<<gs_nnz, NUM_THREADS>>>(dec_mgd);
-
-    uint16_t I = 0;
-    while (I < dec_mgd->max_iter)
-    {
-        for (uint64_t l = 0; l < dec_mgd->ldpc_code->nl(); ++l)
-        {
-            i_nnz = dec_mgd->ldpc_code->nnz()*l;
-
-            //launching kernels
-            cudakernel::decoder::decode_lyr_vnupdate<<<gs_nc, NUM_THREADS>>>(dec_mgd, i_nnz);
-            cudakernel::decoder::decode_lyr_cnupdate<<<get_num_size(dec_mgd->ldpc_code->lw()[l], NUM_THREADS/2), NUM_THREADS/2>>>(dec_mgd, i_nnz, l);
-            cudakernel::decoder::decode_lyr_sumllr<<<gs_nnz, NUM_THREADS>>>(dec_mgd, i_nnz);
-            cudakernel::decoder::decode_lyr_appcalc<<<gs_nc, NUM_THREADS>>>(dec_mgd);
-
-            if (dec_mgd->early_termination)
-            {
-                if (dec_mgd->is_codeword()) //break
-                {
-                    //l = dec_mgd->ldpc_code->nl();
-                    //I += dec_mgd->max_iter;
-                    goto break_here;
-                }
-            }
-        }
-
-        ++I;
-    }
-
-    break_here:
-    cudaDeviceSynchronize();
-
-    dec_mgd->iter = I;
-}
-
-
-__global__ void cudakernel::decoder::decode_lyr_vnupdate(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz)
-{
-    size_t* vn;
-    size_t vw;
-
-    const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
-
-    //VN processing
-    for (size_t i = ix; i < dec_mgd->ldpc_code->nc(); i += sx)
-    {
-        double tmp = dec_mgd->llr_in[i];
-        vw =  dec_mgd->ldpc_code->vw()[i];
-        vn = dec_mgd->ldpc_code->vn()[i];
-        while(vw--)
-            tmp += dec_mgd->lsum[*vn++];
-
-        vn = dec_mgd->ldpc_code->vn()[i];
-        vw = dec_mgd->ldpc_code->vw()[i];
-        while(vw--)
-        {
-            dec_mgd->l_v2c[i_nnz + *vn] = tmp - dec_mgd->l_c2v[i_nnz + *vn];
-            ++vn;
-        }
-    }
-}
-
-
-__global__ void cudakernel::decoder::decode_lyr_cnupdate(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz, uint64_t l)
-{
-    size_t* cn;
-    size_t cw;
-
-    const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
-
-    double f_tmp[sizeof(dec_mgd->fb_ref)];
-    double b_tmp[sizeof(dec_mgd->fb_ref)];
-
-    //CN processing
-    for (size_t i = ix; i < dec_mgd->ldpc_code->lw()[l]; i += sx)
-    {
-        cw = dec_mgd->ldpc_code->cw()[dec_mgd->ldpc_code->layers()[l][i]];
-        cn = dec_mgd->ldpc_code->cn()[dec_mgd->ldpc_code->layers()[l][i]];
-        f_tmp[0] = dec_mgd->l_v2c[i_nnz + *cn];
-        b_tmp[cw-1] = dec_mgd->l_v2c[i_nnz + *(cn+cw-1)];
-        for(size_t j = 1; j < cw; j++)
-        {
-            f_tmp[j] = jacobian(f_tmp[j-1], dec_mgd->l_v2c[i_nnz + *(cn+j)]);
-            b_tmp[cw-1-j] = jacobian(b_tmp[cw-j], dec_mgd->l_v2c[i_nnz + *(cn + cw-j-1)]);
-        }
-
-        dec_mgd->l_c2v[i_nnz + *cn] = b_tmp[1];
-        dec_mgd->l_c2v[i_nnz + *(cn+cw-1)] = f_tmp[cw-2];
-
-        for(size_t j = 1; j < cw-1; j++) {
-            dec_mgd->l_c2v[i_nnz + *(cn+j)] = jacobian(f_tmp[j-1], b_tmp[j+1]);
-		}
-    }
-}
-
-
-__global__ void cudakernel::decoder::decode_lyr_sumllr(Ldpc_Decoder_cl* dec_mgd, size_t i_nnz)
-{
-	const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
-
-    //sum llrs
-    for (size_t i = ix; i < dec_mgd->ldpc_code->nnz(); i += sx)
-    {
-        dec_mgd->lsum[i] += dec_mgd->l_c2v[i_nnz + i] - dec_mgd->l_c2v_pre[i_nnz + i];
-        dec_mgd->l_c2v_pre[i_nnz + i] = dec_mgd->l_c2v[i_nnz + i];
-    }
-}
-
-
-__global__ void cudakernel::decoder::decode_lyr_appcalc(Ldpc_Decoder_cl* dec_mgd)
-{
-    size_t* vn;
-    size_t vw;
-
-	const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
-
-    //app calc
-    for (size_t i = ix; i < dec_mgd->ldpc_code->nc(); i += sx)
-    {
-        dec_mgd->llr_out[i] = dec_mgd->llr_in[i];
-        vn = dec_mgd->ldpc_code->vn()[i];
-        vw = dec_mgd->ldpc_code->vw()[i];
-        while(vw--)
-            dec_mgd->llr_out[i] += dec_mgd->lsum[*vn++];
-        dec_mgd->c_out[i] = (dec_mgd->llr_out[i] <= 0);
-    }
-}
-
-
-__global__ void cudakernel::decoder::calc_synd(Ldpc_Decoder_cl* dec_mgd)
-{
-	const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
-
-    for (size_t i = ix; i < dec_mgd->ldpc_code->mc(); i += sx)
-    {
-        dec_mgd->synd[i] = 0;
-        for (size_t j = 0; j < dec_mgd->ldpc_code->cw()[i]; j++)
-        {
-            dec_mgd->synd[i] ^= dec_mgd->c_out[dec_mgd->ldpc_code->c()[dec_mgd->ldpc_code->cn()[i][j]]];
-        }
-
-        if (dec_mgd->synd[i])
-        {
-            dec_mgd->is_cw = false;
-        }
-    }
 }
