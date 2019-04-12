@@ -1,6 +1,5 @@
 #include "ldpc.h"
 
-#include <exception>
 
 using namespace ldpc;
 using namespace std;
@@ -22,7 +21,7 @@ void ldpc_decoder::setup()
     mLv2c = nullptr;
     mF = nullptr;
     mB = nullptr;
-    __FBREF__ = nullptr;
+    FBREF = nullptr;
     mLSum = nullptr;
     mLc2vPre = nullptr;
     mCO = nullptr;
@@ -47,8 +46,8 @@ void ldpc_decoder::setup()
         cudaMallocManaged(&mB, sizeof(double)*numLayers*mLdpcCode->max_dc());
         if (mB == NULL || mB == nullptr) { throw runtime_error("mB alloc failed."); }
 
-        cudaMallocManaged(&__FBREF__, mLdpcCode->max_dc());
-        if (__FBREF__ == NULL || __FBREF__ == nullptr) { throw runtime_error("__FBREF__ alloc failed."); }
+        cudaMallocManaged(&FBREF, mLdpcCode->max_dc());
+        if (FBREF == NULL || FBREF == nullptr) { throw runtime_error("FBREF alloc failed."); }
 
         cudaMallocManaged(&mLSum, sizeof(double)*mLdpcCode->nnz());
         if (mLSum == NULL || mLSum == nullptr) { throw runtime_error("mLSum alloc failed."); }
@@ -63,9 +62,9 @@ void ldpc_decoder::setup()
         cudaMallocManaged(&mSynd, sizeof(bits_t)*mLdpcCode->mc());
         if (mSynd == NULL || mSynd == nullptr) { throw runtime_error("mSynd alloc failed."); }
     }
-    catch (exception& e)
+    catch (std::exception& e)
     {
-        cout << "Error: " << e.what() << endl;
+        std::cout << "Error: " << e.what() << "\n";
         destroy();
         exit(EXIT_FAILURE);
     }
@@ -84,7 +83,7 @@ void ldpc_decoder::prefetch()
     cudaMemPrefetchAsync(mLv2c, sizeof(double)*numLayers*mLdpcCode->nnz(), dev, NULL);
     cudaMemPrefetchAsync(mLc2vPre, sizeof(double)*numLayers*mLdpcCode->nnz(), dev, NULL);
 
-    cudaMemPrefetchAsync(__FBREF__, mLdpcCode->max_dc(), dev, NULL);
+    cudaMemPrefetchAsync(FBREF, mLdpcCode->max_dc(), dev, NULL);
 
     cudaMemPrefetchAsync(mLSum, sizeof(double)*mLdpcCode->nnz(), dev, NULL);
 
@@ -104,7 +103,7 @@ void ldpc_decoder::destroy()
     if (mLc2vPre != nullptr) { cudaFree(mLc2vPre); }
     if (mF != nullptr) { cudaFree(mF); }
     if (mB != nullptr) { cudaFree(mB); }
-    if (__FBREF__ != nullptr) { cudaFree(__FBREF__); }
+    if (FBREF != nullptr) { cudaFree(FBREF); }
     if (mLSum != nullptr) { cudaFree(mLSum); }
     if (mCO != nullptr) { cudaFree(mCO); }
     if (mSynd != nullptr) { cudaFree(mSynd); }
@@ -335,13 +334,3 @@ uint16_t ldpc_decoder::decode_layered()
 
 __host__ __device__ uint16_t ldpc_decoder::max_iter() const { return mMaxIter; }
 __host__ __device__ bool ldpc_decoder::early_termination() const { return mEarlyTerm; }
-
-
-//tmpl fcts need definition in each file?
-template<typename T> void ldpc::printVector(T *x, const size_t &l)
-{
-    cout << "[";
-    for (size_t i = 0; i < l-1; ++i)
-        cout << x[i] << " ";
-    cout << x[l-1] << "]";
-}

@@ -6,11 +6,12 @@
 #include <thrust/device_vector.h>
 #include <chrono>
 #include <vector>
+#include <string.h>
 
 
-#define TIME_PROF(__LOG, __EXEC, __UNIT) \
+#define TIME_PROF(log, exec, unit) \
 		do { \
-			std::string str_unit = std::string(__UNIT);\
+			std::string str_unit = std::string(unit);\
 			float a=1;\
 			if (str_unit == std::string("s")) {\
 				a=1e-9;\
@@ -24,10 +25,10 @@
 				a=1; str_unit=std::string("ns");\
 			}\
 			auto start = std::chrono::high_resolution_clock::now();\
-			__EXEC;\
+			exec;\
 			auto elapsed = std::chrono::high_resolution_clock::now() - start;\
-			printf("[TIMEPROF]: " __LOG ": ");\
-			printf("%.3f %s\n", static_cast<double>(std::chrono::duration_cast<chrono::nanoseconds>(elapsed).count())*a, str_unit.c_str());\
+			printf("[TIMEPROF]: " log ": ");\
+			printf("%.3f %s\n", static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count())*a, str_unit.c_str());\
 		} while(0);
 
 
@@ -42,6 +43,24 @@
 
 namespace ldpc
 {
+	class constellation : public cuda_mgd
+	{
+	public:
+		explicit constellation(const uint16_t pM);
+		~constellation();
+
+		__host__ __device__ inline const thrust::device_vector<double>& pX() const { return mPX; }
+		__host__ __device__ inline const thrust::device_vector<double>& X() const { return mX; }
+		__host__ __device__ inline uint16_t M() const { return mM; }
+		__host__ __device__ inline uint16_t log2M() const { return mLog2M; }
+
+	private:
+		thrust::device_vector<double> mPX;
+		thrust::device_vector<double> mX;
+	    uint16_t mM;
+	    uint16_t mLog2M;
+	};
+
 	class ldpc_sim
 	{
 	public:

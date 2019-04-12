@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <stdint.h>
+#include <exception>
 
 #define NUM_THREADS 128
 #define gpuErrchk(ans) { ldpc::gpuAssert((ans), __FILE__, __LINE__); }

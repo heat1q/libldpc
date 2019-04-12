@@ -1,7 +1,6 @@
 #include "../ldpcsim.h"
 
 using namespace ldpc;
-using namespace std;
 
 
 /*
@@ -105,8 +104,8 @@ __global__ void cudakernel::decoder::decode_lyr_cnupdate(ldpc_decoder* pDecMgd, 
     const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
     const size_t sx = blockDim.x * gridDim.x;
 
-    double f_tmp[sizeof(pDecMgd->__FBREF__)];
-    double b_tmp[sizeof(pDecMgd->__FBREF__)];
+    double f_tmp[sizeof(pDecMgd->FBREF)];
+    double b_tmp[sizeof(pDecMgd->FBREF)];
 
     //CN processing
     for (size_t i = ix; i < pDecMgd->mLdpcCode->lw()[pL]; i += sx)

@@ -1,9 +1,7 @@
 #include "ldpc.h"
 
-#include <exception>
 #include <math.h>
 
-using namespace std;
 using namespace ldpc;
 
 
@@ -57,7 +55,7 @@ void ldpc_code::setup(const char* pFileName)
 
 		fp = fopen(pFileName, "r");
 		if(!fp)
-			throw runtime_error("can not open codefile for reading.");
+			throw std::runtime_error("can not open codefile for reading.");
 
 		fscanf(fp, "nc: %lu\n", &mN);
 		fscanf(fp, "mc: %lu\n", &mM);
@@ -135,9 +133,9 @@ void ldpc_code::setup(const char* pFileName)
 
 		fclose(fp);
 	}
-	catch(exception &e)
+	catch(std::exception &e)
 	{
-		cout << "Error: " << e.what() << endl;
+		std::cout << "Error: " << e.what() << "\n";
 		destroy();
 
 		exit(EXIT_FAILURE);
@@ -149,7 +147,7 @@ void ldpc_code::setup_layers(const char* pClFile)
 {
     FILE *fp = fopen(pClFile, "r");
     if(!fp)
-        throw runtime_error("Can not open layer file");
+        throw std::runtime_error("Can not open layer file");
 
     fscanf(fp, "nl: %lu\n", &mNL);
 
@@ -187,7 +185,7 @@ void ldpc_code::setup_mgd(const char* pFileName)
 
         fp = fopen(pFileName, "r");
         if(!fp)
-            throw runtime_error("can not open codefile for reading.");
+            throw std::runtime_error("can not open codefile for reading.");
 
         fscanf(fp, "nc: %lu\n", &mN);
         fscanf(fp, "mc: %lu\n", &mM);
@@ -276,9 +274,9 @@ void ldpc_code::setup_mgd(const char* pFileName)
 
         fclose(fp);
     }
-    catch(exception &e)
+    catch(std::exception &e)
     {
-        cout << "Error: " << e.what() << endl;
+        std::cout << "Error: " << e.what() << "\n";
         destroy_mgd();
 
         exit(EXIT_FAILURE);
@@ -290,7 +288,7 @@ void ldpc_code::setup_layers_mgd(const char* pClFile)
 {
     FILE *fp = fopen(pClFile, "r");
     if(!fp)
-        throw runtime_error("Can not open layer file");
+        throw std::runtime_error("Can not open layer file");
 
     fscanf(fp, "nl: %lu\n", &mNL);
 
@@ -403,27 +401,27 @@ void ldpc_code::destroy_mgd()
 
 void ldpc_code::print()
 {
-    cout << "=========== LDPC ===========" << endl;
-    cout << "nc : " << mN << endl;
-    cout << "mc : " << mM << endl;
-    cout << "kc : " << mK << endl;
-    cout << "nnz : " << mNNZ << endl;
-    cout << "nct :" << mNCT << endl;
-    cout << "mct : " << mMCT << endl;
-    cout << "kct : " << mKCT << endl;
-    cout << "max dc : " << mMaxDC << endl;
-    cout << "num puncture: " << mNumPuncture << endl;
-    cout << "num puncture sys: " << mNumPunctureSys << endl;
-    cout << "num puncture par: " << mNumPuncturePar << endl;
-    cout << "num shorten: " << mNumShorten << endl;
-    cout << "=========== LDPC: END ===========" << endl;
+    std::cout << "=========== LDPC ===========" << "\n";
+    std::cout << "nc : " << mN << "\n";
+    std::cout << "mc : " << mM << "\n";
+    std::cout << "kc : " << mK << "\n";
+    std::cout << "nnz : " << mNNZ << "\n";
+    std::cout << "nct :" << mNCT << "\n";
+    std::cout << "mct : " << mMCT << "\n";
+    std::cout << "kct : " << mKCT << "\n";
+    std::cout << "max dc : " << mMaxDC << "\n";
+    std::cout << "num puncture: " << mNumPuncture << "\n";
+    std::cout << "num puncture sys: " << mNumPunctureSys << "\n";
+    std::cout << "num puncture par: " << mNumPuncturePar << "\n";
+    std::cout << "num shorten: " << mNumShorten << "\n";
+    std::cout << "=========== LDPC: END ===========" << "\n";
 
     printf("=========== LDPC LAYERS ===========\n");
     printf("nl: %lu\n", mNL);
     for (size_t i = 0; i < mNL; ++i)
     {
         printf("cn[%lu]: %lu\n", i, mLW[i]);
-        printVector<uint64_t>(mLayers[i], mLW[i]);
+        //printVector<uint64_t>(mLayers[i], mLW[i]);
         printf("\n");
     }
     printf("========= LDPC LAYERS: END ========\n");
@@ -456,14 +454,6 @@ void ldpc::dec2bin(uint64_t val, uint8_t m)
 {
     for(size_t i = 0; i < m; i++)
         printf("%lu", (val>>(m-i-1) & 0x01));
-}
-
-template<typename T> void ldpc::printVector(T *x, const size_t &l)
-{
-    cout << "[";
-    for (size_t i = 0; i < l-1; ++i)
-        cout << x[i] << " ";
-    cout << x[l-1] << "]";
 }
 
 __host__ __device__ double ldpc::jacobian(const double& L1, const double& L2)

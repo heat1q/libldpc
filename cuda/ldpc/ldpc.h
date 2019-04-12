@@ -120,7 +120,7 @@ namespace ldpc
 		bits_t* mCO;
 
 		uint16_t mIter;
-		void* __FBREF__;
+		void* FBREF;
 
 		bool mIsCW;
 	private:
@@ -129,8 +129,8 @@ namespace ldpc
 	};
 
 
-	template<typename T>
-	extern void printVector(T* x, const size_t& l);
+	//template<typename T>
+	//extern void printVector(T* x, const size_t& l);
 
 	void dec2bin(uint64_t val, uint8_t m);
 	__host__ __device__ double jacobian(const double& L1, const double& L2);
@@ -138,8 +138,8 @@ namespace ldpc
 	__host__ __device__ int8_t sign(const double& a);
 
 
-	__host__ __device__ const inline uint64_t get_num_size(const uint64_t length, const uint16_t blockSize) { return ceil((length+blockSize-1)/blockSize); }
-	__host__ __device__ const inline dim3 get_gridsize_2d(const dim3& length, const dim3& blockSize) { return dim3(ceil((length.x+blockSize.x-1)/blockSize.x), ceil((length.y+blockSize.y-1)/blockSize.y)); }
+	__host__ __device__ inline const uint64_t get_num_size(const uint64_t length, const uint16_t blockSize) { return ceil((length+blockSize-1)/blockSize); }
+	__host__ __device__ inline const dim3& get_gridsize_2d(const dim3& length, const dim3& blockSize) { return dim3(ceil((length.x+blockSize.x-1)/blockSize.x), ceil((length.y+blockSize.y-1)/blockSize.y)); }
 
 
 	/*
@@ -161,3 +161,12 @@ namespace ldpc
 	}
 
 }
+/*
+template<typename T> void ldpc::printVector(T *x, const size_t &l)
+{
+    std::cout << "[";
+    for (size_t i = 0; i < l-1; ++i)
+        std::cout << x[i] << " ";
+    std::cout << x[l-1] << "]";
+}
+*/

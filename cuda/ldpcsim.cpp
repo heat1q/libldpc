@@ -1,12 +1,9 @@
 #include "ldpcsim.h"
 
-#include <string.h>
 #include <math.h>
-#include <exception>
 #include <curand.h>
 #include <curand_kernel.h>
 
-using namespace std;
 using namespace ldpc;
 
 ldpc_sim::ldpc_sim(ldpc_code* code, const char* simFileName, const char* mapFileName)
@@ -41,7 +38,7 @@ ldpc_sim::ldpc_sim(ldpc_code* code, const char* simFileName, const char* mapFile
         fp = fopen(simFileName, "r");
         if(!fp)
         {
-            throw runtime_error("can not open sim file");
+            throw std::runtime_error("can not open sim file");
         }
 
         fscanf(fp, "name: %256s\n", logfile);
@@ -63,7 +60,7 @@ ldpc_sim::ldpc_sim(ldpc_code* code, const char* simFileName, const char* mapFile
         }
         if(i != M)
         {
-            throw runtime_error("error parsing simfile: number of constellation points does not match label size");
+            throw std::runtime_error("error parsing simfile: number of constellation points does not match label size");
         }
 
         labels = new uint16_t[M] ();
@@ -98,7 +95,7 @@ ldpc_sim::ldpc_sim(ldpc_code* code, const char* simFileName, const char* mapFile
 
         if(code->nct() % bits != 0)
         {
-            throw runtime_error("Chosen setting m with n_c does not work. Please correct.");
+            throw std::runtime_error("Chosen setting m with n_c does not work. Please correct.");
         }
         n = code->nct()/bits;
 
@@ -165,9 +162,9 @@ ldpc_sim::ldpc_sim(ldpc_code* code, const char* simFileName, const char* mapFile
         mLdpcDecoder = new ldpc_decoder(code, bp_iter, decoder_terminate_early);
         fclose(fp);
     }
-    catch(exception &e)
+    catch(std::exception &e)
     {
-        cout << "Error: " << e.what() << endl;
+        std::cout << "Error: " << e.what() << "\n";
         destroy();
 
         exit(EXIT_FAILURE);
@@ -209,7 +206,7 @@ void ldpc_sim::read_bit_mapping_file(const char* filename)
 
     if(!fp)
     {
-        throw runtime_error("can not open mapping file");
+        throw std::runtime_error("can not open mapping file");
     }
 
     for(size_t i = 0; i < bits; i++)
@@ -369,7 +366,7 @@ void ldpc_sim::start()
     FILE* fp = fopen(logfile, "w");
     if(!fp)
     {
-        cout << "can not open logfile " << logfile << " for writing" << endl;
+        std::cout << "can not open logfile " << logfile << " for writing" << "\n";
         exit(EXIT_FAILURE);
     }
 
@@ -386,7 +383,7 @@ void ldpc_sim::start()
 		frames = 0;
 		iters = 0;
 		sigma2 = pow(10, -snrs[i]/10);
-		auto time_start = chrono::high_resolution_clock::now();
+		auto time_start = std::chrono::high_resolution_clock::now();
 
 		do
 		{
@@ -439,8 +436,8 @@ void ldpc_sim::start()
 				bec += bec_tmp;
 				fec++;
 
-				auto time_dur = chrono::high_resolution_clock::now() - time_start;
-				uint64_t t = static_cast<uint64_t>(chrono::duration_cast<chrono::microseconds>(time_dur).count());
+				auto time_dur = std::chrono::high_resolution_clock::now() - time_start;
+				uint64_t t = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(time_dur).count());
 				printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e, TIME/FRAME=%.3f ms, AVGITERS=%.2f\n",
 					fec, min_fec, frames, 10*log10(1/sigma2),
 					(double) bec/(frames*mLdpcCode->nc()), (double) fec/frames,
@@ -484,7 +481,7 @@ void ldpc_sim::log_error(bits_t* c, const uint64_t frame_num, const double snr)
     for (size_t i = 0; i < mLdpcCode->mc(); i++) {
         synd_weight += (size_t) mLdpcDecoder->mSynd[i];
     }
-	vector<size_t> failed_checks_idx(synd_weight);
+	std::vector<size_t> failed_checks_idx(synd_weight);
     size_t j = 0;
     for (size_t i = 0; i < mLdpcCode->mc(); i++)
 	{
@@ -522,7 +519,7 @@ void ldpc_sim::log_error(bits_t* c, const uint64_t frame_num, const double snr)
         cw_dis_euc += (cstll->X[0] - cstll->X[xhat[i]]) * (cstll->X[0] - cstll->X[xhat[i]]);
         #endif
     }
-	vector<size_t> failed_bits_idx(cw_dis);
+	std::vector<size_t> failed_bits_idx(cw_dis);
     j = 0;
     for (size_t i = 0; i < mLdpcCode->nc(); i++) {
         #ifdef ENCODE
@@ -552,14 +549,4 @@ void ldpc_sim::log_error(bits_t* c, const uint64_t frame_num, const double snr)
 	delete[] x;
 	delete[] xhat;
 	delete[] chat;
-}
-
-
-//tmpl fcts need definition in each file?
-template<typename T> void ldpc::printVector(T *x, const size_t &l)
-{
-    cout << "[";
-    for (size_t i = 0; i < l-1; ++i)
-        cout << x[i] << " ";
-    cout << x[l-1] << "]";
 }
