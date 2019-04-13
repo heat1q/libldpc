@@ -325,7 +325,7 @@ uint16_t ldpc_decoder::decode_layered_legacy()
 
 uint16_t ldpc_decoder::decode_layered()
 {
-    cudakernel::decoder::decode_layered<<<2, 1>>>(this);
+    cudakernel::decoder::decode_layered<<<1, 1>>>(this);
     cudaDeviceSynchronize();
 
     return mIter;
