@@ -2,29 +2,118 @@
 
 namespace ldpc
 {
+	template <typename T>
+	class cudamgd_ptr
+	{
+	public:
+		__host__ cudamgd_ptr(const T& pVal)
+			:  cudamgd_ptr(pVal, 1) {}
+
+		__host__ cudamgd_ptr(const T& pVal, size_t pSize) //init constructor
+			: mContainer(nullptr), mRef(nullptr)
+		{
+			size_t index = 0;
+			try
+			{
+				cudaError_t result = cudaMallocManaged(&mRef, sizeof(size_t));
+				if (result != cudaSuccess)
+				{
+					throw std::runtime_error(cudaGetErrorString(result));
+				}
+				*mRef = 1;
+
+				result = cudaMallocManaged(&mContainer, sizeof(T)*pSize);
+				if (result != cudaSuccess)
+				{
+					throw std::runtime_error(cudaGetErrorString(result));
+				}
+				while (index < pSize) {
+					new(mContainer + index) T(pVal);
+					++index;
+				}
+			}
+			catch(...)
+			{
+				for(size_t i = 0; i < index; ++i) //destroy already constructed elements
+				{
+					mContainer[index-1-i].~T();
+				}
+
+				throw;
+			}
+		}
+
+		__host__ __device__ cudamgd_ptr(const cudamgd_ptr& pCopy) //copy constructor
+			: mContainer(pCopy.mContainer), mRef(pCopy.mRef)
+		{
+			(*mRef)++;
+		}
+
+		__host__ __device__ ~cudamgd_ptr()
+		{
+			#ifndef __CUDA_ARCH__
+				cudaDeviceSynchronize();
+				if (mRef != nullptr)
+				{
+					if (--(*mRef) == 0) //decrement ref count & delete if zero reference count
+					{
+						cudaFree(mRef);
+						if (mContainer != nullptr) { cudaFree(mContainer); }
+					}
+				}
+			#endif
+		}
+
+		__host__ __device__ cudamgd_ptr& operator=(const cudamgd_ptr& pCopy) //assignment operator
+		{
+			if (this != &pCopy) // Avoid self assignment
+			{
+				// Decrement the old reference count
+				// if reference become zero delete the old data
+				if(--(*mRef) == 0)
+				{
+					cudaFree(mRef);
+					cudaFree(mContainer);
+				}
+
+				//copy data & ref count
+				mContainer = pCopy.mContainer;
+				mRef = pCopy.mRef;
+				(*mRef)++;
+			}
+			return *this;
+		}
+
+		__host__ __device__ T& operator*() { return *mContainer; }
+		__host__ __device__ T* operator->() { return mContainer; }
+
+	private:
+		T* mContainer;
+		size_t* mRef;
+	};
 
 
 	template <typename T>
-	class const_iterator_mgd
+	class cuda_const_iterator
 	{
 	public:
-		const_iterator_mgd(T *pContainer): mContainer(pContainer){}
-		const_iterator_mgd operator++() { ++mContainer; return *this; }
-		bool operator!=(const const_iterator_mgd& pOther) const { return mContainer != pOther.mContainer; }
-		const T& operator*() const { return *mContainer; }
-	private: 
+		__host__ __device__ cuda_const_iterator(T *pContainer): mContainer(pContainer){}
+		__host__ __device__ cuda_const_iterator operator++() { ++mContainer; return *this; }
+		__host__ __device__ bool operator!=(const cuda_const_iterator& pOther) const { return mContainer != pOther.mContainer; }
+		__host__ __device__ const T& operator*() const { return *mContainer; }
+	private:
 		T* mContainer;
 	};
 
 	template <typename T>
-	class iterator_mgd
+	class cuda_iterator
 	{
 	public:
-		iterator_mgd(T *pContainer): mContainer(pContainer){}
-		iterator_mgd operator++() { ++mContainer; return *this; }
-		bool operator!=(const iterator_mgd& pOther) const { return mContainer != pOther.mContainer; }
-		T& operator*() const { return *mContainer; }
-	private: 
+		__host__ __device__ cuda_iterator(T *pContainer): mContainer(pContainer){}
+		__host__ __device__ cuda_iterator operator++() { ++mContainer; return *this; }
+		__host__ __device__ bool operator!=(const cuda_iterator& pOther) const { return mContainer != pOther.mContainer; }
+		__host__ __device__ T& operator*() const { return *mContainer; }
+	private:
 		T* mContainer;
 	};
 
@@ -33,40 +122,30 @@ namespace ldpc
 	class vector_mgd
 	{
 	public:
-		using iterator = iterator_mgd<T>;
-		using const_iterator = const_iterator_mgd<T>;
+		using iterator = cuda_iterator<T>;
+		using const_iterator = cuda_const_iterator<T>;
 
-		const_iterator begin() const { return const_iterator(mBuffer); }
-		const_iterator end() const { return const_iterator(mBuffer + mLength); }
-		iterator begin() { return iterator(mBuffer); }
-		iterator end() { return iterator(mBuffer + mLength); }
-
-
-		explicit vector_mgd(int pCap) : mCapacity(pCap), mLength(0)
+		__host__ vector_mgd(int pCap)
+			: mCapacity(pCap), mLength(0)
 		{
-			if (cudaMallocManaged(&mBuffer, sizeof(T)*mCapacity) != cudaSuccess)
+			cudaError_t result = cudaMallocManaged(&mBuffer, sizeof(T)*mCapacity);
+			if (result != cudaSuccess)
 			{
-				throw; //TODO: throw exception
+				throw std::runtime_error(cudaGetErrorString(result));
 			}
-			
-		}
-		~vector_mgd()
-		{
-			//manually call destructor on elements in reverse order
-			for(size_t i = 0; i < mLength; ++i)
-			{
-				mBuffer[mLength-1-i].~T();
-			}
-			cudaFree(mBuffer);
+
 		}
 
-		explicit vector_mgd(int pCap, const T& pVal) //init constructor
-		: mCapacity(pCap)
-		, mLength(0)
+		__host__ vector_mgd(int pCap, const T& pVal) //init constructor
+			: mCapacity(pCap), mLength(0)
 		{
 			try
 			{
-				if (cudaMallocManaged(&mBuffer, sizeof(T)*mCapacity) != cudaSuccess) { throw; }
+				cudaError_t result = cudaMallocManaged(&mBuffer, sizeof(T)*mCapacity);
+				if (result != cudaSuccess)
+				{
+					throw std::runtime_error(cudaGetErrorString(result));
+				}
 				for(size_t i = 0; i < mCapacity; ++i)
 				{
 					push_back(pVal);
@@ -78,63 +157,102 @@ namespace ldpc
 				{
 					mBuffer[mLength-1-i].~T();
 				}
-				
+
+				//set length to zero to avoid cleaning elements in destructor
+				mLength = 0;
+
 				//continue exception
 				throw;
 			}
 		}
 
-		explicit vector_mgd(const vector_mgd& pCopy) //Copy constructor
-		: mCapacity(pCopy.size())
-		, mLength(0)
+		__host__ __device__ vector_mgd(const vector_mgd& pCopy) //copy constructor for device & host
+			: mCapacity(pCopy.mCapacity), mLength(0)
 		{
-			try
-			{
-				if (cudaMallocManaged(&mBuffer, sizeof(T)*mCapacity) != cudaSuccess) { throw; }
-				for(size_t i = 0; i < pCopy.size(); ++i)
+			#ifdef __CUDA_ARCH__
+				//in device code, copy allocates memory for gpu
+				cudaError_t result = cudaMalloc(&mBuffer, sizeof(T)*mCapacity);
+				if (result != cudaSuccess)
+				{
+					printf("Error: vector_mgd: %s\n", cudaGetErrorString(result));
+					exit(EXIT_FAILURE);
+				}
+				for(size_t i = 0; i < pCopy.mLength; ++i)
 				{
 					push_back(pCopy[i]);
 				}
-			}
-			catch(...)
-			{
-				for(size_t i = 0; i < mLength; ++i) //destroy already constructed elements
+			#else
+				try
 				{
-					mBuffer[mLength-1-i].~T();
+					cudaError_t result = cudaMallocManaged(&mBuffer, sizeof(T)*mCapacity);
+					if (result != cudaSuccess)
+					{
+						throw std::runtime_error(cudaGetErrorString(result));
+					}
+					for(size_t i = 0; i < pCopy.mLength; ++i)
+					{
+						push_back(pCopy[i]);
+					}
 				}
-				
-				//continue exception
-				throw;
-			}
+				catch(...)
+				{
+					for(size_t i = 0; i < mLength; ++i) //destroy already constructed elements
+					{
+						mBuffer[mLength-1-i].~T();
+					}
+
+					//set length to zero to avoid cleaning elements in destructor
+					mLength = 0;
+
+					//continue exception
+					throw;
+				}
+			#endif
 		}
 
-		inline vector_mgd& operator=(const vector_mgd& pCopy) { return *this; }
-		inline const T& operator[](int pIndex) const {	return mBuffer[pIndex];	}
-		inline T& operator[](int pIndex) { return mBuffer[pIndex]; }
+		__host__ __device__ ~vector_mgd()
+		{
+			//manually call destructor on elements in reverse order
+			for(size_t i = 0; i < mLength; ++i)
+			{
+				mBuffer[mLength-1-i].~T();
+			}
+			cudaFree(mBuffer);
+		}
 
-		void push_back(const T& pVal) //no resize!!
+		//Operators
+		__host__ __device__ vector_mgd& operator=(const vector_mgd& pCopy) { return *this; }
+		__host__ __device__ const T& operator[](int pIndex) const {	return mBuffer[pIndex];	}
+		__host__ __device__ T& operator[](int pIndex) { return mBuffer[pIndex]; }
+
+		__host__ __device__ void push_back(const T& pVal)
 		{
 			resize_if_req();
 			new(mBuffer + mLength) T(pVal); //copy buffer into new buffer
 			++mLength;
 		}
-		void pop_back()
+
+		__host__ void pop_back()
 		{
 			--mLength;
 			mBuffer[mLength].~T(); //call destructor
 		}
 
-		T& at(int pIndex)
+		__host__ T& at(int pIndex)
 		{
 			if (pIndex >= mLength) //check out of bound index
-			{ throw; } else { return mBuffer[pIndex]; }
+			{ throw std::runtime_error("bad index"); } else { return mBuffer[pIndex]; }
 		}
 
-		void resize(int pNewCap) 
+		__host__ void resize(int pNewCap)
 		{
 			//alloc new buffer with new size
 			T* newBuff;
-			if (cudaMallocManaged(&newBuff, sizeof(T)*pNewCap) != cudaSuccess) { throw; }
+			cudaError_t result = cudaMallocManaged(&newBuff, sizeof(T)*pNewCap);
+			if (result != cudaSuccess)
+			{
+				throw std::runtime_error(cudaGetErrorString(result));
+			}
 			size_t newLen = 0;
 			while (newLen < mLength && newLen < pNewCap) //check if new size is bigger or smaller than old
 			{
@@ -155,16 +273,29 @@ namespace ldpc
 			mCapacity = pNewCap;
 		}
 
-		__host__ __device__ inline size_t size() const { return mLength; }
+		__host__ __device__ const_iterator begin() const { return const_iterator(mBuffer); }
+		__host__ __device__ const_iterator end() const { return const_iterator(mBuffer + mLength); }
+		__host__ __device__ iterator begin() { return iterator(mBuffer); }
+		__host__ __device__ iterator end() { return iterator(mBuffer + mLength); }
+
+		__host__ __device__ size_t size() const { return mLength; }
+
 	private:
-		void resize_if_req() 
+		__host__ __device__ void resize_if_req()
 		{
-			if (mLength == mCapacity) { resize(mCapacity+1); }
+			#ifdef __CUDA_ARCH__
+				if (mLength == mCapacity)
+				{
+					printf("Error: vector_mgd: exceeds maximum capacity");
+					exit(EXIT_FAILURE);
+				}
+			#else
+				if (mLength == mCapacity) { resize(mCapacity+1); }
+			#endif
 		}
 
 		size_t mCapacity;
 		size_t mLength;
 		T* mBuffer;
 	};
-
 }
