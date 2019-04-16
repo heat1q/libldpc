@@ -1,12 +1,21 @@
 #pragma once
 
 #include "../device/cudamgd.h"
+#include "../device/vectormgd.h"
 
 namespace ldpc
 {
-	typedef uint8_t bits_t;
-	typedef uint16_t labels_t;
-	typedef uint32_t symbols_t;
+	using bits_t = unsigned char;
+	using labels_t = unsigned short;
+	using symbols_t = unsigned;
+
+	using vec_bits_t = vector_mgd<bits_t>;
+	using vec_labels_t = vector_mgd<unsigned short>;
+	using vec_symbols_t = vector_mgd<unsigned>;
+	using vec_size_t = vector_mgd<size_t>;
+	using vec_double_t = vector_mgd<double>;
+
+	using mat_size_t = vector_mgd< vector_mgd<size_t> >;
 
 	struct {
 	    double* pX;
@@ -84,6 +93,65 @@ namespace ldpc
 	};
 
 
+	class ldpc_code_device
+	{
+	public:
+		ldpc_code_device(const char* pFileName, const char* pClFile);
+
+		void prefetch();
+
+		void print();
+
+		//getter functions
+		__host__ __device__ size_t nc() const { return mN; };
+		__host__ __device__ size_t kc() const { return mK; };
+		__host__ __device__ size_t mc() const { return mM; };
+		__host__ __device__ size_t nnz() const { return mNNZ; };
+		__host__ __device__ const vec_size_t& cw() const { return mCW; };
+		__host__ __device__ const vec_size_t& vw() const { return mVW; };
+		__host__ __device__ const mat_size_t& cn() const { return mCN; };
+		__host__ __device__ const mat_size_t& vn() const { return mVN; };
+		__host__ __device__ const vec_size_t& r() const { return mR; };
+		__host__ __device__ const vec_size_t& c() const { return mC; };
+		__host__ __device__ size_t nct() const { return mNCT; };
+		__host__ __device__ size_t kct() const { return mKCT; };
+		__host__ __device__ size_t mct() const { return mMCT; };
+		__host__ __device__ const vec_size_t& puncture() const { return mPuncture; };
+		__host__ __device__ size_t num_puncture() const { return mNumPuncture; };
+		__host__ __device__ const vec_size_t& shorten() const { return mShorten; };
+		__host__ __device__ size_t num_shorten() const { return mNumShorten; };
+		__host__ __device__ size_t max_dc() const { return mMaxDC; };
+		__host__ __device__ size_t nl() const { return mNL; };
+		__host__ __device__ const vec_size_t& lw() const { return mLW; };
+		__host__ __device__ const mat_size_t& layers() const { return mLayers; };
+
+	private:
+		size_t mN;
+		size_t mK;
+		size_t mM;
+		size_t mNNZ;
+		vec_size_t mCW; /* denotes the check weight of each check node, i.e., # of connected VN; dimensions cw[mc] */
+		vec_size_t mVW; /* denotes the variable weight, i.e., # of connected CN; dimensions vw[nc] */
+		mat_size_t mCN; /* denotes the check neighbors, i.e. connected VN, for each check node as index in c/r; dimensions cn[mc][cw[i]] */
+		mat_size_t mVN; /* denotes the var neighbors, i.e., connected CN, for each variable node as index in c/r; dimensions vn[nc][vw[i]] */
+		vec_size_t mR; /* non zero row indices; length nnz */
+		vec_size_t mC; /* non zero check indices; length nnz */
+		vec_size_t mPuncture; /* array pf punctured bit indices */
+		size_t mNumPuncture; /* number of punctured bits */
+		size_t mNumPunctureSys; /* number of punctured bits in systematic part */
+		size_t mNumPuncturePar; /* number of punctured bits in parity part */
+		vec_size_t mShorten; /* array of shortened bit indices */
+		size_t mNumShorten; /* number of shortened bits */
+		size_t mNCT; /* number of transmitted code bits */
+		size_t mKCT; /* number of transmitted information bits */
+		size_t mMCT; /* number of transmitted parity check bits */
+		size_t mMaxDC;
+		size_t mNL; //number of layers
+		vec_size_t mLW; //layer weight
+		mat_size_t mLayers;
+	};
+
+
 	class ldpc_decoder : public cuda_mgd
 	{
 	public:
@@ -101,8 +169,8 @@ namespace ldpc
 		uint16_t decode_layered_legacy();
 		uint16_t decode_layered();
 
-		__host__ __device__ uint16_t max_iter() const;
-		__host__ __device__ bool early_termination() const;
+		__host__ __device__ uint16_t max_iter() const { return mMaxIter; }
+		__host__ __device__ bool early_termination() const { return mEarlyTerm; }
 
 		ldpc_code* mLdpcCode;
 
@@ -128,6 +196,39 @@ namespace ldpc
 		bool mEarlyTerm;
 	};
 
+	class ldpc_decoder_device
+	{
+	public:
+		ldpc_decoder_device(const ldpc_code_device& pCode, const size_t pI, const bool pEarlyTerm);
+
+		__host__ __device__ bool is_codeword();
+
+		uint16_t decode_layered();
+
+		__host__ __device__ uint16_t max_iter() const { return mMaxIter; }
+		__host__ __device__ bool early_termination() const { return mEarlyTerm; }
+
+		cudamgd_ptr<ldpc_code_device> mLdpcCode;
+
+		vec_double_t mLv2c;
+		vec_double_t mLc2v;
+		vec_double_t mLSum;
+		vec_double_t mLc2vPre;
+
+		vec_double_t mLLRIn;
+		vec_double_t mLLROut;
+
+		vec_bits_t mSynd;
+		vec_bits_t mCO;
+
+		size_t mIter;
+		void* FBREF;
+
+		bool mIsCW;
+	private:
+		uint16_t mMaxIter;
+		bool mEarlyTerm;
+	};
 
 	//template<typename T>
 	//extern void printVector(T* x, const size_t& l);

@@ -1,6 +1,5 @@
 #include "ldpc.h"
 
-
 using namespace ldpc;
 
 
@@ -331,5 +330,17 @@ uint16_t ldpc_decoder::decode_layered()
 }
 
 
-__host__ __device__ uint16_t ldpc_decoder::max_iter() const { return mMaxIter; }
-__host__ __device__ bool ldpc_decoder::early_termination() const { return mEarlyTerm; }
+
+/*
+*	Decoder device
+*/
+//Init constructor
+ldpc_decoder_device::ldpc_decoder_device(const ldpc_code_device& pCode, const size_t pI, const bool pEarlyTerm)
+: mLdpcCode(pCode), mMaxIter(pI), mEarlyTerm(pEarlyTerm)
+, mLv2c(pCode.nnz()), mLc2v(pCode.nnz()), mLSum(pCode.nnz()), mLc2vPre(pCode.nnz())
+, mLLRIn(pCode.nc()), mLLROut(pCode.nc())
+, mSynd(pCode.mc()), mCO(pCode.nc())
+, mIter(0), mIsCW(false)
+{
+	//TODO prefetch
+}

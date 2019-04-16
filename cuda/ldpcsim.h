@@ -4,7 +4,6 @@
 #include <vector>
 #include <string.h>
 
-#include "device/vectormgd.h"
 #include "ldpc/ldpc.h"
 
 #define TIME_PROF(log, exec, unit) \
@@ -45,20 +44,20 @@ namespace ldpc
 	{
 	public:
 		__host__ __device__ constellation() {}
-		__host__ constellation(const uint16_t pM);
+		__host__ constellation(const labels_t pM);
 		__host__ __device__ constellation(const constellation& pCopy);
 		__host__ __device__ ~constellation() {};
 
-		__host__ __device__ const vector_mgd<double>& pX() const { return mPX; }
-		__host__ __device__ const vector_mgd<double>& X() const { return mX; }
-		__host__ __device__ uint16_t M() const { return mM; }
-		__host__ __device__ uint16_t log2M() const { return mLog2M; }
+		__host__ __device__ const vec_double_t& pX() const { return mPX; }
+		__host__ __device__ const vec_double_t& X() const { return mX; }
+		__host__ __device__ labels_t M() const { return mM; }
+		__host__ __device__ labels_t log2M() const { return mLog2M; }
 
 	private:
-		vector_mgd<double> mPX;
-		vector_mgd<double> mX;
-	    uint16_t mM;
-	    uint16_t mLog2M;
+		vec_double_t mPX;
+		vec_double_t mX;
+	    labels_t mM;
+	    labels_t mLog2M;
 	};
 
 	class ldpc_sim
@@ -111,8 +110,6 @@ namespace ldpc
 	{
 	public:
 		ldpc_sim_device(cudamgd_ptr<ldpc_code> pCode, const char* pSimFileName, const char* pMapFileName);
-		ldpc_sim_device(const ldpc_sim_device& pCopy);
-		~ldpc_sim_device() {}
 
 		void print();
 
@@ -135,10 +132,10 @@ namespace ldpc
 		char mLogfile[MAX_FILENAME_LEN];
 		double mSE;
 
-		vector_mgd<double> mSnrs;
-		vector_mgd<uint16_t> mLabels;
-		vector_mgd<uint16_t> mLabelsRev;
-		vector_mgd< vector_mgd<size_t> > mBitMapper;
-		vector_mgd<size_t> mBitPos;
+		vec_double_t mSnrs;
+		vec_labels_t mLabels;
+		vec_labels_t mLabelsRev;
+		vec_size_t mBitPos;
+		mat_size_t mBitMapper;
 	};
 }
