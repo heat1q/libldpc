@@ -2,7 +2,6 @@
 
 
 using namespace ldpc;
-using namespace std;
 
 
 ldpc_decoder::ldpc_decoder(ldpc_code* pCode, const uint16_t pI, const bool pEarlyTerm)
@@ -35,32 +34,32 @@ void ldpc_decoder::setup()
     {
         //num layers times num nnz
         cudaMallocManaged(&mLc2v, sizeof(double)*numLayers*mLdpcCode->nnz());
-        if (mLc2v == NULL || mLc2v == nullptr) { throw runtime_error("mLc2v alloc failed."); }
+        if (mLc2v == NULL || mLc2v == nullptr) { throw std::runtime_error("mLc2v alloc failed."); }
         cudaMallocManaged(&mLv2c, sizeof(double)*numLayers*mLdpcCode->nnz());
-        if (mLv2c == NULL || mLv2c == nullptr) { throw runtime_error("mLv2c alloc failed."); }
+        if (mLv2c == NULL || mLv2c == nullptr) { throw std::runtime_error("mLv2c alloc failed."); }
         cudaMallocManaged(&mLc2vPre, sizeof(double)*numLayers*mLdpcCode->nnz());
-        if (mLc2vPre == NULL || mLc2vPre == nullptr) { throw runtime_error("mLc2vPre alloc failed."); }
+        if (mLc2vPre == NULL || mLc2vPre == nullptr) { throw std::runtime_error("mLc2vPre alloc failed."); }
 
         cudaMallocManaged(&mF, sizeof(double)*numLayers*mLdpcCode->max_dc());
-        if (mF == NULL || mF == nullptr) { throw runtime_error("mF alloc failed."); }
+        if (mF == NULL || mF == nullptr) { throw std::runtime_error("mF alloc failed."); }
         cudaMallocManaged(&mB, sizeof(double)*numLayers*mLdpcCode->max_dc());
-        if (mB == NULL || mB == nullptr) { throw runtime_error("mB alloc failed."); }
+        if (mB == NULL || mB == nullptr) { throw std::runtime_error("mB alloc failed."); }
 
         cudaMallocManaged(&FBREF, mLdpcCode->max_dc());
-        if (FBREF == NULL || FBREF == nullptr) { throw runtime_error("FBREF alloc failed."); }
+        if (FBREF == NULL || FBREF == nullptr) { throw std::runtime_error("FBREF alloc failed."); }
 
         cudaMallocManaged(&mLSum, sizeof(double)*mLdpcCode->nnz());
-        if (mLSum == NULL || mLSum == nullptr) { throw runtime_error("mLSum alloc failed."); }
+        if (mLSum == NULL || mLSum == nullptr) { throw std::runtime_error("mLSum alloc failed."); }
 
         cudaMallocManaged(&mLLRIn, sizeof(double)*mLdpcCode->nc());
-        if (mLLRIn == NULL || mLLRIn == nullptr) { throw runtime_error("mLLRIn alloc failed."); }
+        if (mLLRIn == NULL || mLLRIn == nullptr) { throw std::runtime_error("mLLRIn alloc failed."); }
         cudaMallocManaged(&mLLROut, sizeof(double)*mLdpcCode->nc());
-        if (mLLROut == NULL || mLLROut == nullptr) { throw runtime_error("mLLROut alloc failed."); }
+        if (mLLROut == NULL || mLLROut == nullptr) { throw std::runtime_error("mLLROut alloc failed."); }
         cudaMallocManaged(&mCO, sizeof(bits_t)*mLdpcCode->nc());
-        if (mCO == NULL || mCO == nullptr) { throw runtime_error("mCO alloc failed."); }
+        if (mCO == NULL || mCO == nullptr) { throw std::runtime_error("mCO alloc failed."); }
 
         cudaMallocManaged(&mSynd, sizeof(bits_t)*mLdpcCode->mc());
-        if (mSynd == NULL || mSynd == nullptr) { throw runtime_error("mSynd alloc failed."); }
+        if (mSynd == NULL || mSynd == nullptr) { throw std::runtime_error("mSynd alloc failed."); }
     }
     catch (std::exception& e)
     {

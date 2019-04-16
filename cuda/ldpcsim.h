@@ -1,13 +1,11 @@
 #pragma once
 
-#include "ldpc/ldpc.h"
-
-#include <thrust/host_vector.h>
-#include <thrust/device_vector.h>
 #include <chrono>
 #include <vector>
 #include <string.h>
 
+#include "device/vectormgd.h"
+#include "ldpc/ldpc.h"
 
 #define TIME_PROF(log, exec, unit) \
 		do { \
@@ -43,20 +41,22 @@
 
 namespace ldpc
 {
-	class constellation : public cuda_mgd
+	class constellation
 	{
 	public:
-		explicit constellation(const uint16_t pM);
-		~constellation();
+		__host__ __device__ constellation() {}
+		__host__ constellation(const uint16_t pM);
+		__host__ __device__ constellation(const constellation& pCopy);
+		__host__ __device__ ~constellation() {};
 
-		__host__ __device__ inline const thrust::device_vector<double>& pX() const { return mPX; }
-		__host__ __device__ inline const thrust::device_vector<double>& X() const { return mX; }
-		__host__ __device__ inline uint16_t M() const { return mM; }
-		__host__ __device__ inline uint16_t log2M() const { return mLog2M; }
+		__host__ __device__ const vector_mgd<double>& pX() const { return mPX; }
+		__host__ __device__ const vector_mgd<double>& X() const { return mX; }
+		__host__ __device__ uint16_t M() const { return mM; }
+		__host__ __device__ uint16_t log2M() const { return mLog2M; }
 
 	private:
-		thrust::device_vector<double> mPX;
-		thrust::device_vector<double> mX;
+		vector_mgd<double> mPX;
+		vector_mgd<double> mX;
 	    uint16_t mM;
 	    uint16_t mLog2M;
 	};
@@ -110,19 +110,35 @@ namespace ldpc
 	class ldpc_sim_device
 	{
 	public:
-		ldpc_sim_device(ldpc::ldpc_code* code, const char* simFileName, const char* mapFileName);
-		~ldpc_sim_device();
+		ldpc_sim_device(cudamgd_ptr<ldpc_code> pCode, const char* pSimFileName, const char* pMapFileName);
+		ldpc_sim_device(const ldpc_sim_device& pCopy);
+		~ldpc_sim_device() {}
 
 		void print();
-		void destroy();
 
 		void start();
 
 		double curandn();
 
 	private:
-		thrust::device_vector<double> mSNR;
-		thrust::device_vector<uint16_t> mLabels;
-		thrust::device_vector<uint16_t> mLabelsRev;
+		cudamgd_ptr<ldpc_code> mLdpcCode;
+		cudamgd_ptr<ldpc_decoder> mLdpcDecoder;
+
+		constellation mConstellation;
+
+		uint64_t mN;
+		uint16_t mBits;
+		uint64_t mMaxFrames;
+		uint64_t mMinFec;
+		uint64_t mBPIter;
+
+		char mLogfile[MAX_FILENAME_LEN];
+		double mSE;
+
+		vector_mgd<double> mSnrs;
+		vector_mgd<uint16_t> mLabels;
+		vector_mgd<uint16_t> mLabelsRev;
+		vector_mgd< vector_mgd<size_t> > mBitMapper;
+		vector_mgd<size_t> mBitPos;
 	};
 }
