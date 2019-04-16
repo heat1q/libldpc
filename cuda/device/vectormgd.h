@@ -6,30 +6,22 @@ namespace ldpc
 	class cudamgd_ptr
 	{
 	public:
-		__host__ cudamgd_ptr(const T& pVal)
-			:  cudamgd_ptr(pVal, 1) {}
+		__host__ cudamgd_ptr(const T& pVal) //init constructor, only on host
+			: cudamgd_ptr(pVal, 1) {}
 
-		__host__ cudamgd_ptr(const T& pVal, size_t pSize) //init constructor
-			: mContainer(nullptr), mRef(nullptr)
+		__host__ cudamgd_ptr(const T& pVal, size_t pSize) //init constructor, only on host
+			: mContainer(nullptr),  mIsRef(false)
 		{
 			size_t index = 0;
 			try
 			{
-				cudaError_t result = cudaMallocManaged(&mRef, sizeof(size_t));
+				cudaError_t result = cudaMallocManaged(&mContainer, sizeof(T)*pSize);
 				if (result != cudaSuccess)
 				{
 					throw std::runtime_error(cudaGetErrorString(result));
 				}
-				*mRef = 1;
-
-				result = cudaMallocManaged(&mContainer, sizeof(T)*pSize);
-				if (result != cudaSuccess)
-				{
-					throw std::runtime_error(cudaGetErrorString(result));
-				}
-				while (index < pSize) {
+				for (; index < pSize; ++index) {
 					new(mContainer + index) T(pVal);
-					++index;
 				}
 			}
 			catch(...)
@@ -44,22 +36,16 @@ namespace ldpc
 		}
 
 		__host__ __device__ cudamgd_ptr(const cudamgd_ptr& pCopy) //copy constructor
-			: mContainer(pCopy.mContainer), mRef(pCopy.mRef)
-		{
-			(*mRef)++;
-		}
+			: mContainer(pCopy.mContainer), mIsRef(true) {
+			printf("Copy Pointer\n");}
 
 		__host__ __device__ ~cudamgd_ptr()
 		{
-			#ifndef __CUDA_ARCH__
-				cudaDeviceSynchronize();
-				if (mRef != nullptr)
+			#ifndef __CUDA_ARCH__ //only delete on host
+				if (!mIsRef && mContainer != nullptr) //only delete original pointer
 				{
-					if (--(*mRef) == 0) //decrement ref count & delete if zero reference count
-					{
-						cudaFree(mRef);
-						if (mContainer != nullptr) { cudaFree(mContainer); }
-					}
+					cudaFree(mContainer);
+					printf("Delete Pointer\n");
 				}
 			#endif
 		}
@@ -68,18 +54,15 @@ namespace ldpc
 		{
 			if (this != &pCopy) // Avoid self assignment
 			{
-				// Decrement the old reference count
-				// if reference become zero delete the old data
-				if(--(*mRef) == 0)
+				//if non referenced pointer, then delete current buffer
+				if(!mIsRef)
 				{
-					cudaFree(mRef);
 					cudaFree(mContainer);
 				}
 
 				//copy data & ref count
 				mContainer = pCopy.mContainer;
-				mRef = pCopy.mRef;
-				(*mRef)++;
+				mIsRef = true;
 			}
 			return *this;
 		}
@@ -89,7 +72,7 @@ namespace ldpc
 
 	private:
 		T* mContainer;
-		size_t* mRef;
+		bool mIsRef;
 	};
 
 
@@ -221,7 +204,11 @@ namespace ldpc
 		}
 
 		//Operators
-		__host__ __device__ vector_mgd& operator=(const vector_mgd& pCopy) { return *this; }
+		__host__ __device__ vector_mgd& operator=(const vector_mgd& pCopy)
+		{
+			//TODO
+			return *this;
+		}
 		__host__ __device__ const T& operator[](int pIndex) const {	return mBuffer[pIndex];	}
 		__host__ __device__ T& operator[](int pIndex) { return mBuffer[pIndex]; }
 
