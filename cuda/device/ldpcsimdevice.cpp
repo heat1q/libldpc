@@ -23,19 +23,12 @@ __host__ constellation::constellation(const uint16_t pM)
 }
 
 
-//copy constructor
-__host__ __device__ constellation::constellation(const constellation& pCopy)
-	: mM(pCopy.mM), mLog2M(pCopy.mLog2M)
-	, mPX(pCopy.mPX), mX(pCopy.mX) {}
-
-
-
 /*
  * ldpc_sim_device
 */
 //init constructor
-ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code> pCode, const char* pSimFileName, const char* pMapFileName)
-	: mLdpcCode(pCode), mLdpcDecoder(nullptr)
+ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> pCode, const char* pSimFileName, const char* pMapFileName)
+: mLdpcCode(pCode), mLdpcDecoder(nullptr)
 {
 	try
 	{
@@ -148,8 +141,14 @@ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code> pCode, const char* pSimF
 			}
 		}
 
+		//changed with each frame
 		//set up decoder
-		//mLdpcDecoder = ldpc_decoder(mLdpcCode, mBPIter, true);
+		mLdpcDecoder = cudamgd_ptr<ldpc_decoder_device>(ldpc_decoder_device(mLdpcCode, mBPIter, true));
+
+		//channel i/o
+		mX = vec_size_t(mN);
+		mY = vec_double_t(mN);
+		mC = vec_bits_t(mLdpcCode->nc());
 
 		fclose(fpSim);
 		fclose(fpMap);
@@ -161,6 +160,242 @@ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code> pCode, const char* pSimF
 	}
 }
 
+
+void ldpc_sim_device::start()
+{
+    double sigma2;
+    uint64_t frames;
+    uint64_t bec = 0;
+    uint64_t fec = 0;
+    uint64_t iters;
+    size_t bec_tmp;
+
+	std::vector<std::string> printResStr(mSnrs.size()+1, std::string());
+	std::ofstream fp;
+	char resStr[128];
+
+	#ifdef LOG_FRAME_TIME
+	printResStr[0].assign("snr fer ber frames avg_iter time_frame[ms]");
+	#else
+	printResStr[0].assign("snr fer ber frames avg_iter");
+	#endif
+
+	/*
+	* START: SIMULATION PART
+	*/
+
+	for (size_t i = 0; i < mSnrs.size(); ++i)
+	{
+		bec = 0;
+		fec = 0;
+		frames = 0;
+		iters = 0;
+		sigma2 = pow(10, -mSnrs[i]/10);
+		auto time_start = std::chrono::high_resolution_clock::now();
+
+		do
+		{
+			encode_all0(); //40ms
+			simulate_awgn(sigma2); //100ms
+
+			//puncturing & shortening
+			if(mLdpcCode->num_puncture() != 0)
+			{
+				for(size_t j = 0; j < mLdpcCode->num_puncture(); j++) {
+					mLdpcDecoder->mLLRIn[mLdpcCode->puncture()[j]] = 0;
+				}
+			}
+			if(mLdpcCode->num_shorten() != 0)
+			{
+				for(size_t j = 0; j < mLdpcCode->num_shorten(); j++) {
+					mLdpcDecoder->mLLRIn[mLdpcCode->shorten()[j]] = 99999.9;
+				}
+			}
+
+			calc_llrs(sigma2); //150ms
+
+			//decode
+			iters += mLdpcDecoder->decode_layered();
+
+			frames++;
+
+			bec_tmp = 0;
+			for(size_t j = 0; j < mLdpcCode->nc(); j++)
+			{
+				bec_tmp += (mLdpcDecoder->mLLROut[j] <= 0);
+			}
+
+			if (bec_tmp > 0)
+			{
+				bec += bec_tmp;
+				fec++;
+
+				auto time_dur = std::chrono::high_resolution_clock::now() - time_start;
+				size_t t = static_cast<size_t>(std::chrono::duration_cast<std::chrono::microseconds>(time_dur).count());
+				printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e, TIME/FRAME=%.3fms, AVGITERS=%.2f\n",
+					fec, mMinFec, frames, mSnrs[i],
+					(double) bec/(frames*mLdpcCode->nc()), (double) fec/frames,
+					(double) t/frames * 1e-3,
+					(double) iters/frames
+				);
+
+				#ifdef LOG_FRAME_TIME
+				sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.3f"
+					, mSnrs[i]
+					, (double) fec/frames
+					, (double) bec/(frames*mLdpcCode->nc())
+					, frames, (double) iters/frames
+					, (double) t/frames * 1e-3
+				);
+				#else
+				sprintf(resStr, "%lf %.3e %.3e %lu %.3e"
+					, mSnrs[i]
+					, (double) fec/frames
+					, (double) bec/(frames*mLdpcCode->nc())
+					, frames, (double) iters/frames
+				);
+				#endif
+
+				printResStr[i+1].assign(resStr);
+
+				try
+				{
+					fp.open(mLogfile);
+					for (const auto& x : printResStr)
+					{
+						fp << x << "\n";
+					}
+					fp.close();
+				}
+				catch(...)
+				{
+					std::cout << "Warning: can not open logfile " << mLogfile << " for writing" << "\n";
+				}
+
+				//log_error(c, frames, snrs[i]);
+			}
+		} while (fec < mMinFec && frames < mMaxFrames); //end while
+	}//end for
+}
+
+
+double ldpc_sim_device::randn()
+{
+    static double U, V;
+    static int phase = 0;
+    double Z;
+
+    if (phase == 0)
+    {
+        U = (rand() + 1.) / (RAND_MAX + 2.);
+        V = rand() / (RAND_MAX + 1.);
+        Z = sqrt(-2 * log(U)) * sin(2 * M_PI * V);
+    }
+    else
+        Z = sqrt(-2 * log(U)) * cos(2 * M_PI * V);
+
+    phase = 1 - phase;
+
+    return Z;
+}
+
+
+double ldpc_sim_device::simulate_awgn(double sigma2)
+{
+    double a = 0;
+    double Pn = 0;
+    double Px = 0;
+
+    for (size_t i = 0; i < mN; i++)
+    {
+        a = randn() * sqrt(sigma2);
+        Pn += a * a;
+        Px += mConstellation.X()[mX[i]] * mConstellation.X()[mX[i]];
+        mY[i] = mConstellation.X()[mX[i]] + a;
+    }
+
+    return Px/Pn;
+}
+
+
+void ldpc_sim_device::encode_all0()
+{
+    for(size_t i = 0; i < mLdpcCode->nct(); i++) {
+        mC[mBitPos[i]] = rand() & 1;
+	}
+
+    for(size_t i = 0; i < mLdpcCode->num_puncture(); i++) {
+        mC[mLdpcCode->puncture()[i]] = rand() & 1;
+	}
+
+    for(size_t i = 0; i < mLdpcCode->num_shorten(); i++) {
+        mC[mLdpcCode->shorten()[i]] = 0;
+	}
+
+    map_c_to_x();
+}
+
+
+void ldpc_sim_device::map_c_to_x()
+{
+    size_t tmp;
+
+    for(size_t i = 0; i < mN; i++)
+    {
+        tmp = 0;
+        for(size_t j = 0; j < mBits; j++) {
+            tmp += mC[mBitMapper[j][i]] << (mBits-1-j);
+		}
+
+        mX[i] = mLabelsRev[tmp];
+    }
+}
+
+
+void ldpc_sim_device::calc_llrs(double sigma2)
+{
+	double l_tmp[mBits];
+
+	for(size_t j = 0; j < mN; j++)
+	{
+		double tmp0, tmp1;
+		for(size_t i = 0; i < mConstellation.log2M(); i++)
+		{
+			tmp0 = 0.0;
+			tmp1 = 0.0;
+			for(size_t j = 0; j < mConstellation.M(); j++)
+			{
+				if(mLabels[j] & (1 << (mConstellation.log2M()-1-i)))
+				{
+					tmp1 += exp(-(mY[j]-mConstellation.X()[j])*(mY[j]-mConstellation.X()[j])/(2*sigma2)) * mConstellation.pX()[j];
+				} else
+				{
+					tmp0 += exp(-(mY[j]-mConstellation.X()[j])*(mY[j]-mConstellation.X()[j])/(2*sigma2)) * mConstellation.pX()[j];
+				}
+			}
+			double val = log(tmp0/tmp1);
+			// check usually required when PAS is used with large constellations
+			// and severely shaped distributions
+			if(std::isinf(val) == +1) {
+				l_tmp[i] = MAX_LLR;
+			} else if(std::isinf(val) == -1) {
+				l_tmp[i] = MIN_LLR;
+			} else {
+				l_tmp[i] = val;
+			}
+		}
+
+		for(size_t k = 0; k < mBits; k++)
+		{
+			mLdpcDecoder->mLLRIn[mBitMapper[k][j]] = l_tmp[k];
+		}
+	}
+
+	for(size_t j = 0; j < mLdpcCode->nc(); j++)
+	{
+		mLdpcDecoder->mLLRIn[j] *= (1-2*mC[j]);
+	}
+}
 
 void ldpc_sim_device::print()
 {

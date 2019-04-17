@@ -3,6 +3,7 @@
 #include <chrono>
 #include <vector>
 #include <string.h>
+#include <fstream>
 
 #include "ldpc/ldpc.h"
 
@@ -29,6 +30,7 @@
 		} while(0);
 
 
+#define LOG_FRAME_TIME
 
 #define MAX_FILENAME_LEN 256
 #define MAX_LLR 9999.9
@@ -45,8 +47,6 @@ namespace ldpc
 	public:
 		__host__ __device__ constellation() {}
 		__host__ constellation(const labels_t pM);
-		__host__ __device__ constellation(const constellation& pCopy);
-		__host__ __device__ ~constellation() {};
 
 		__host__ __device__ const vec_double_t& pX() const { return mPX; }
 		__host__ __device__ const vec_double_t& X() const { return mX; }
@@ -109,17 +109,22 @@ namespace ldpc
 	class ldpc_sim_device
 	{
 	public:
-		ldpc_sim_device(cudamgd_ptr<ldpc_code> pCode, const char* pSimFileName, const char* pMapFileName);
-
-		void print();
+		ldpc_sim_device(cudamgd_ptr<ldpc_code_device> pCode, const char* pSimFileName, const char* pMapFileName);
 
 		void start();
 
-		double curandn();
+		double randn();
 
+		double simulate_awgn(double pSigma2);
+		void encode() {}
+		void encode_all0();
+		void map_c_to_x();
+		void calc_llrs(double sigma2);
+
+		void print();
+		void log_error(size_t pFrameNum, double pSNR);
 	private:
-		cudamgd_ptr<ldpc_code> mLdpcCode;
-		cudamgd_ptr<ldpc_decoder> mLdpcDecoder;
+		cudamgd_ptr<ldpc_code_device> mLdpcCode;
 
 		constellation mConstellation;
 
@@ -137,5 +142,11 @@ namespace ldpc
 		vec_labels_t mLabelsRev;
 		vec_size_t mBitPos;
 		mat_size_t mBitMapper;
+
+		//changed with each frame
+		cudamgd_ptr<ldpc_decoder_device> mLdpcDecoder;
+		vec_size_t mX;
+		vec_double_t mY;
+		vec_bits_t mC;
 	};
 }

@@ -335,12 +335,83 @@ uint16_t ldpc_decoder::decode_layered()
 *	Decoder device
 */
 //Init constructor
-ldpc_decoder_device::ldpc_decoder_device(const ldpc_code_device& pCode, const size_t pI, const bool pEarlyTerm)
+__host__ ldpc_decoder_device::ldpc_decoder_device(cudamgd_ptr<ldpc_code_device>& pCode, size_t pI, bool pEarlyTerm)
 : mLdpcCode(pCode), mMaxIter(pI), mEarlyTerm(pEarlyTerm)
-, mLv2c(pCode.nnz()), mLc2v(pCode.nnz()), mLSum(pCode.nnz()), mLc2vPre(pCode.nnz())
-, mLLRIn(pCode.nc()), mLLROut(pCode.nc())
-, mSynd(pCode.mc()), mCO(pCode.nc())
-, mIter(0), mIsCW(false)
+, mLv2c(pCode->nnz()), mLc2v(pCode->nnz()), mLSum(pCode->nnz()), mLc2vPre(pCode->nnz())
+, mLLRIn(pCode->nc()), mLLROut(pCode->nc())
+, mSynd(pCode->mc()), mCO(pCode->nc())
+, mIter(0), mIsCW(false), FBREF(nullptr)
 {
-	//TODO prefetch
+	cudaMallocManaged(&FBREF, mLdpcCode->max_dc());
+
+	cudaDeviceSynchronize();
+	int dev = -1;
+	cudaGetDevice(&dev);
+	cudaMemPrefetchAsync(FBREF, mLdpcCode->max_dc(), dev, NULL);
+}
+
+//copy constructor
+__host__ ldpc_decoder_device::ldpc_decoder_device(const ldpc_decoder_device& pCopy)
+: mLdpcCode(pCopy.mLdpcCode), mMaxIter(pCopy.mMaxIter), mEarlyTerm(pCopy.mEarlyTerm)
+, mLv2c(pCopy.mLv2c), mLc2v(pCopy.mLc2v), mLSum(pCopy.mLSum), mLc2vPre(pCopy.mLc2vPre)
+, mLLRIn(pCopy.mLLRIn), mLLROut(pCopy.mLLROut)
+, mSynd(pCopy.mSynd), mCO(pCopy.mCO)
+, mIter(0), mIsCW(false), FBREF(nullptr)
+{
+	cudaMallocManaged(&FBREF, mLdpcCode->max_dc());
+
+	cudaDeviceSynchronize();
+	int dev = -1;
+	cudaGetDevice(&dev);
+	cudaMemPrefetchAsync(FBREF, mLdpcCode->max_dc(), dev, NULL);
+}
+
+//destructor
+__host__ ldpc_decoder_device::~ldpc_decoder_device()
+{
+	if (FBREF != nullptr) { cudaFree(FBREF); }
+}
+
+//copy/move assignment operator
+__host__ ldpc_decoder_device& ldpc_decoder_device::operator=(ldpc_decoder_device pCopy) noexcept
+{
+	swap(mLdpcCode, pCopy.mLdpcCode);
+	swap(mLv2c, pCopy.mLv2c);
+	swap(mLc2v, pCopy.mLc2v);
+	swap(mLSum, pCopy.mLSum);
+	swap(mLc2vPre, pCopy.mLc2vPre);
+	swap(mLLRIn, pCopy.mLLRIn);
+	swap(mLLROut, pCopy.mLLROut);
+	swap(mSynd, pCopy.mSynd);
+	swap(mCO, pCopy.mCO);
+	swap(mIter, pCopy.mIter);
+	swap(FBREF, pCopy.FBREF);
+	swap(mIsCW, pCopy.mIsCW);
+	swap(mMaxIter, pCopy.mMaxIter);
+	swap(mEarlyTerm, pCopy.mEarlyTerm);
+
+	return *this;
+}
+
+//calc syndrome & check if codeword
+//calls global function
+__host__ __device__ bool ldpc_decoder_device::is_codeword()
+{
+    mIsCW = true;
+
+    //calc syndrome
+    //cudakernel::decoder::calc_synd<<<get_num_size(mLdpcCode->mc(), NUM_THREADS), NUM_THREADS>>>(this);
+    cudaDeviceSynchronize();
+
+    return mIsCW;
+}
+
+//start decoding
+//calls global function
+__host__ __device__ size_t ldpc_decoder_device::decode_layered()
+{
+	//cudakernel::decoder::decode_layered<<<1, 1>>>(this);
+    cudaDeviceSynchronize();
+
+    return mIter;
 }

@@ -490,7 +490,7 @@ __host__ __device__ int8_t ldpc::sign(const double& a)
 * Code device
 */
 //init constructor
-ldpc_code_device::ldpc_code_device(const char* pFileName, const char* pClFile)
+__host__ ldpc_code_device::ldpc_code_device(const char* pFileName, const char* pClFile)
 : mMaxDC(0)
 {
 	try
@@ -531,7 +531,6 @@ ldpc_code_device::ldpc_code_device(const char* pFileName, const char* pClFile)
 				fscanf(fpCode, " %lu ", &(mShorten[i]));
 			}
 		}
-
 
 		vec_size_t cwTmp(mM);
 		vec_size_t vwTmp(mN);
@@ -588,16 +587,18 @@ ldpc_code_device::ldpc_code_device(const char* pFileName, const char* pClFile)
 
 		fclose(fpLayer);
 		fclose(fpCode);
+
+		mem_prefetch();
 	}
 	catch(std::exception &e)
 	{
-		std::cout << "Error: " << e.what() << "\n";
+		std::cout << "Error: ldpc_code_device::ldpc_code_device(): " << e.what() << std::endl;
 		exit(EXIT_FAILURE);
 	}
 }
 
 
-void ldpc_code_device::print()
+__host__ void ldpc_code_device::print()
 {
     std::cout << "=========== LDPC ===========" << "\n";
     std::cout << "nc : " << mN << "\n";
@@ -628,7 +629,34 @@ void ldpc_code_device::print()
 }
 
 
-void ldpc_code_device::prefetch()
+/*
+*	Prefetch, i.e. move the data to the gpu, to reduce latency
+*/
+__host__ void ldpc_code_device::mem_prefetch()
 {
-	//TODO
+	try
+	{
+		if(mNumPuncture != 0)	{ mPuncture.mem_prefetch(); }
+		if(mNumShorten != 0) { mShorten.mem_prefetch(); }
+
+		for (auto& cni : mCN) { cni.mem_prefetch(); }
+		mCN.mem_prefetch();
+
+		for (auto& vni : mVN) { vni.mem_prefetch(); }
+		mVN.mem_prefetch();
+
+		for (auto& li : mLayers) { li.mem_prefetch(); }
+		mLayers.mem_prefetch();
+		mLW.mem_prefetch();
+
+		mCW.mem_prefetch();
+		mVW.mem_prefetch();
+		mR.mem_prefetch();
+		mC.mem_prefetch();
+	}
+	catch(...)
+	{
+		std::cout << "Error: ldpc_code_device::prefetch(): " << std::endl;
+		throw;
+	}
 }

@@ -96,11 +96,9 @@ namespace ldpc
 	class ldpc_code_device
 	{
 	public:
-		ldpc_code_device(const char* pFileName, const char* pClFile);
-
-		void prefetch();
-
-		void print();
+		__host__ ldpc_code_device(const char* pFileName, const char* pClFile);
+		__host__ void mem_prefetch();
+		__host__ void print();
 
 		//getter functions
 		__host__ __device__ size_t nc() const { return mN; };
@@ -199,11 +197,14 @@ namespace ldpc
 	class ldpc_decoder_device
 	{
 	public:
-		ldpc_decoder_device(const ldpc_code_device& pCode, const size_t pI, const bool pEarlyTerm);
+		__host__ ldpc_decoder_device(cudamgd_ptr<ldpc_code_device>& pCode, size_t pI, bool pEarlyTerm);
+		__host__ ldpc_decoder_device(const ldpc_decoder_device& pCopy);
+		//__host__ ldpc_decoder_device(ldpc_decoder_device&& pMove) noexcept;
+		__host__ ~ldpc_decoder_device();
+		__host__ ldpc_decoder_device& operator=(ldpc_decoder_device pCopy) noexcept;
 
 		__host__ __device__ bool is_codeword();
-
-		uint16_t decode_layered();
+		__host__ __device__ size_t decode_layered();
 
 		__host__ __device__ uint16_t max_iter() const { return mMaxIter; }
 		__host__ __device__ bool early_termination() const { return mEarlyTerm; }
