@@ -20,7 +20,7 @@ namespace ldpc
 		__host__ __device__ explicit cudamgd_ptr(T* pVal) //init constructor with pointer to obj, only on host
 		: mContainer(pVal),  mIsRef(false) {}
 
-		__host__ explicit cudamgd_ptr(const T& pVal) //init constructor, only on host
+		__host__ cudamgd_ptr(const T& pVal) //init constructor, only on host
 		: mContainer(nullptr), mIsRef(false)
 		{
 			try
