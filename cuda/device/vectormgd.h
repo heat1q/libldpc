@@ -5,7 +5,7 @@
 
 namespace ldpc
 {
-	template< typename T >
+	template<typename T>
 	void swap(T& one, T& two)
 	{
 		T tmp(one);
@@ -21,29 +21,32 @@ namespace ldpc
 		: mContainer(pVal),  mIsRef(false) {}
 
 		__host__ explicit cudamgd_ptr(const T& pVal) //init constructor, only on host
-		: cudamgd_ptr(pVal, 1) {}
-
-		__host__ explicit cudamgd_ptr(const T& pVal, size_t pSize) //init constructor, only on host
-		: mContainer(nullptr),  mIsRef(false)
+		: mContainer(nullptr), mIsRef(false)
 		{
-			size_t index = 0;
 			try
 			{
-				cudaError_t result = cudaMallocManaged(&mContainer, sizeof(T)*pSize);
+				cudaError_t result = cudaMallocManaged(&mContainer, sizeof(T));
 				if (result != cudaSuccess)
 				{
 					throw std::runtime_error(cudaGetErrorString(result));
 				}
-				for (; index < pSize; ++index) {
-					new(mContainer + index) T(pVal);
+
+				new(mContainer) T(pVal);
+
+				//Prefetch, i.e. move the data to the gpu, to reduce latency
+				cudaDeviceSynchronize();
+				int dev = -1;
+				cudaGetDevice(&dev);
+				result = cudaMemPrefetchAsync(mContainer, sizeof(T), dev, NULL);
+				if (result != cudaSuccess)
+				{
+					throw std::runtime_error(cudaGetErrorString(result));
 				}
 			}
 			catch(...)
 			{
-				for(size_t i = 0; i < index; ++i) //destroy already constructed elements
-				{
-					mContainer[index-1-i].~T();
-				}
+				//destroy already constructed elements
+				mContainer->~T();
 
 				throw;
 			}
@@ -56,24 +59,17 @@ namespace ldpc
 		{
 			if (!mIsRef && mContainer != nullptr) //only delete original pointer
 			{
+				mContainer->~T();
 				cudaFree(mContainer);
 			}
 		}
 
-		__host__ __device__ cudamgd_ptr& operator=(const cudamgd_ptr& pCopy) //assignment operator
+		//copy/move assignment operator
+		__host__ __device__ cudamgd_ptr& operator=(cudamgd_ptr pCopy) noexcept
 		{
-			if (this != &pCopy) // Avoid self assignment
-			{
-				//if non referenced pointer, then delete current buffer
-				if(!mIsRef && mContainer != nullptr)
-				{
-					cudaFree(mContainer);
-				}
+			swap(mContainer, pCopy.mContainer);
+			swap(mIsRef, pCopy.mIsRef);
 
-				//copy data & ref count
-				mContainer = pCopy.mContainer;
-				mIsRef = true;
-			}
 			return *this;
 		}
 
@@ -146,6 +142,7 @@ namespace ldpc
 				{
 					push_back(pVal);
 				}
+				mem_prefetch();
 			}
 			catch(...)
 			{
@@ -189,6 +186,8 @@ namespace ldpc
 				{
 					push_back(pCopy[i]);
 				}
+				//prefetch when copy
+				mem_prefetch();
 			}
 			catch(...)
 			{
@@ -216,17 +215,17 @@ namespace ldpc
 			if (mBuffer != nullptr) { cudaFree(mBuffer); }
 		}
 
-		//copy assignment operator
-		__host__ vector_mgd& operator=(const vector_mgd& pCopy)
+		//copy/move assignment operator
+		//replaces both assignment operators
+		__host__ vector_mgd& operator=(vector_mgd pCopy) noexcept //make a copy to eliminate const
 		{
-			vector_mgd tmp(pCopy); //make a copy to eliminate const
-
-			swap(mCapacity, tmp.mCapacity);
-			swap(mLength, tmp.mLength);
-			swap(mBuffer, tmp.mBuffer);
+			swap(mCapacity, pCopy.mCapacity);
+			swap(mLength, pCopy.mLength);
+			swap(mBuffer, pCopy.mBuffer);
 
 			return *this;
 		}
+
 		__host__ __device__ const T& operator[](int pIndex) const {	return mBuffer[pIndex];	}
 		__host__ __device__ T& operator[](int pIndex) { return mBuffer[pIndex]; }
 
@@ -276,6 +275,22 @@ namespace ldpc
 			mBuffer = newBuff;
 			mLength = newLen;
 			mCapacity = pNewCap;
+
+			mem_prefetch();
+		}
+
+		//Prefetch, i.e. move the data to the gpu, to reduce latency
+		__host__ void mem_prefetch()
+		{
+			cudaDeviceSynchronize();
+			int dev = -1;
+			cudaGetDevice(&dev);
+
+			cudaError_t result = cudaMemPrefetchAsync(mBuffer, sizeof(T)*mCapacity, dev, NULL);
+			if (result != cudaSuccess)
+			{
+				throw std::runtime_error(cudaGetErrorString(result));
+			}
 		}
 
 		__host__ __device__ const_iterator begin() const { return const_iterator(mBuffer); }
@@ -288,7 +303,7 @@ namespace ldpc
 	private:
 		__host__ __device__ void resize_if_req()
 		{
-			#ifdef __CUDA_ARCH__
+			#ifdef __CUDA_ARCH__ //no resize on device
 			if (mLength == mCapacity)
 			{
 				printf("Error: vector_mgd: exceeds maximum capacity");
