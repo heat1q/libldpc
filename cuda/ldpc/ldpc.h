@@ -197,11 +197,12 @@ namespace ldpc
 	class ldpc_decoder_device
 	{
 	public:
-		__host__ ldpc_decoder_device(cudamgd_ptr<ldpc_code_device>& pCode, size_t pI, bool pEarlyTerm);
+		__host__ ldpc_decoder_device(cudamgd_ptr<ldpc_code_device> pCode, size_t pI, bool pEarlyTerm);
 		__host__ ldpc_decoder_device(const ldpc_decoder_device& pCopy);
 		//__host__ ldpc_decoder_device(ldpc_decoder_device&& pMove) noexcept;
 		__host__ ~ldpc_decoder_device();
 		__host__ ldpc_decoder_device& operator=(ldpc_decoder_device pCopy) noexcept;
+		__host__ void mem_prefetch();
 
 		__host__ __device__ bool is_codeword();
 		__host__ __device__ size_t decode_layered();
@@ -252,13 +253,13 @@ namespace ldpc
 	{
 		namespace decoder
 		{
-			__global__ void clean_decoder(ldpc_decoder* pDecMgd);
-			__global__ void decode_layered(ldpc_decoder* pDecMgd);
-			__global__ void decode_lyr_vnupdate(ldpc_decoder* pDecMgd, size_t pI);
-			__global__ void decode_lyr_cnupdate(ldpc_decoder* pDecMgd, size_t pI, uint64_t pL);
-			__global__ void decode_lyr_sumllr(ldpc_decoder* pDecMgd, size_t pI);
-			__global__ void decode_lyr_appcalc(ldpc_decoder* pDecMgd);
-			__global__ void calc_synd(ldpc_decoder* pDecMgd);
+			__global__ void clean_decoder(ldpc_decoder_device* pDecMgd);
+			__global__ void decode_layered(ldpc_decoder_device* pDecMgd);
+			__global__ void decode_lyr_vnupdate(ldpc_decoder_device* pDecMgd, size_t pI);
+			__global__ void decode_lyr_cnupdate(ldpc_decoder_device* pDecMgd, size_t pI, uint64_t pL);
+			__global__ void decode_lyr_sumllr(ldpc_decoder_device* pDecMgd, size_t pI);
+			__global__ void decode_lyr_appcalc(ldpc_decoder_device* pDecMgd);
+			__global__ void calc_synd(ldpc_decoder_device* pDecMgd);
 		}
 	}
 

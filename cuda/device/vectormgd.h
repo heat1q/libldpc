@@ -142,7 +142,7 @@ namespace ldpc
 				{
 					push_back(pVal);
 				}
-				mem_prefetch();
+				//mem_prefetch();
 			}
 			catch(...)
 			{
@@ -187,7 +187,7 @@ namespace ldpc
 					push_back(pCopy[i]);
 				}
 				//prefetch when copy
-				mem_prefetch();
+				//mem_prefetch();
 			}
 			catch(...)
 			{
@@ -276,7 +276,7 @@ namespace ldpc
 			mLength = newLen;
 			mCapacity = pNewCap;
 
-			mem_prefetch();
+			//mem_prefetch();
 		}
 
 		//Prefetch, i.e. move the data to the gpu, to reduce latency
@@ -299,6 +299,7 @@ namespace ldpc
 		__host__ __device__ iterator end() { return iterator(mBuffer + mLength); }
 
 		__host__ __device__ size_t size() const { return mLength; }
+		__host__ __device__ T* data() const { return mBuffer; }
 
 	private:
 		__host__ __device__ void resize_if_req()

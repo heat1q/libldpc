@@ -148,5 +148,6 @@ namespace ldpc
 		vec_size_t mX;
 		vec_double_t mY;
 		vec_bits_t mC;
+		vec_double_t mLTmp;
 	};
 }

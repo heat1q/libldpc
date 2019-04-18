@@ -6,7 +6,7 @@ using namespace ldpc;
 /*
  *	Decoder kernels
  */
-__global__ void cudakernel::decoder::clean_decoder(ldpc_decoder* pDecMgd)
+__global__ void cudakernel::decoder::clean_decoder(ldpc_decoder_device* pDecMgd)
 {
 	const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
     const size_t sx = blockDim.x * gridDim.x;
@@ -24,7 +24,7 @@ __global__ void cudakernel::decoder::clean_decoder(ldpc_decoder* pDecMgd)
 }
 
 
-__global__ void cudakernel::decoder::decode_layered(ldpc_decoder* pDecMgd)
+__global__ void cudakernel::decoder::decode_layered(ldpc_decoder_device* pDecMgd)
 {
     size_t pI;
 
@@ -51,8 +51,6 @@ __global__ void cudakernel::decoder::decode_layered(ldpc_decoder* pDecMgd)
             {
                 if (pDecMgd->is_codeword()) //break
                 {
-                    //l = pDecMgd->mLdpcCode->nl();
-                    //I += pDecMgd->max_iter();
                     goto break_here;
                 }
             }
@@ -68,7 +66,7 @@ __global__ void cudakernel::decoder::decode_layered(ldpc_decoder* pDecMgd)
 }
 
 
-__global__ void cudakernel::decoder::decode_lyr_vnupdate(ldpc_decoder* pDecMgd, size_t pI)
+__global__ void cudakernel::decoder::decode_lyr_vnupdate(ldpc_decoder_device* pDecMgd, size_t pI)
 {
     size_t* vn;
     size_t vw;
@@ -80,13 +78,13 @@ __global__ void cudakernel::decoder::decode_lyr_vnupdate(ldpc_decoder* pDecMgd, 
     for (size_t i = ix; i < pDecMgd->mLdpcCode->nc(); i += sx)
     {
         double tmp = pDecMgd->mLLRIn[i];
-        vw =  pDecMgd->mLdpcCode->vw()[i];
-        vn = pDecMgd->mLdpcCode->vn()[i];
+        vw = pDecMgd->mLdpcCode->vn()[i].size();
+        vn = pDecMgd->mLdpcCode->vn()[i].data();
         while(vw--)
             tmp += pDecMgd->mLSum[*vn++];
 
-        vn = pDecMgd->mLdpcCode->vn()[i];
-        vw = pDecMgd->mLdpcCode->vw()[i];
+        vn = pDecMgd->mLdpcCode->vn()[i].data();
+        vw = pDecMgd->mLdpcCode->vn()[i].size();
         while(vw--)
         {
             pDecMgd->mLv2c[pI + *vn] = tmp - pDecMgd->mLc2v[pI + *vn];
@@ -96,7 +94,7 @@ __global__ void cudakernel::decoder::decode_lyr_vnupdate(ldpc_decoder* pDecMgd, 
 }
 
 
-__global__ void cudakernel::decoder::decode_lyr_cnupdate(ldpc_decoder* pDecMgd, size_t pI, uint64_t pL)
+__global__ void cudakernel::decoder::decode_lyr_cnupdate(ldpc_decoder_device* pDecMgd, size_t pI, uint64_t pL)
 {
     size_t* cn;
     size_t cw;
@@ -108,10 +106,10 @@ __global__ void cudakernel::decoder::decode_lyr_cnupdate(ldpc_decoder* pDecMgd, 
     double b_tmp[sizeof(pDecMgd->FBREF)];
 
     //CN processing
-    for (size_t i = ix; i < pDecMgd->mLdpcCode->lw()[pL]; i += sx)
+    for (size_t i = ix; i < pDecMgd->mLdpcCode->layers()[pL].size(); i += sx)
     {
-        cw = pDecMgd->mLdpcCode->cw()[pDecMgd->mLdpcCode->layers()[pL][i]];
-        cn = pDecMgd->mLdpcCode->cn()[pDecMgd->mLdpcCode->layers()[pL][i]];
+        cw = pDecMgd->mLdpcCode->cn()[pDecMgd->mLdpcCode->layers()[pL][i]].size();
+        cn = pDecMgd->mLdpcCode->cn()[pDecMgd->mLdpcCode->layers()[pL][i]].data();
         f_tmp[0] = pDecMgd->mLv2c[pI + *cn];
         b_tmp[cw-1] = pDecMgd->mLv2c[pI + *(cn+cw-1)];
         for(size_t j = 1; j < cw; j++)
@@ -130,7 +128,7 @@ __global__ void cudakernel::decoder::decode_lyr_cnupdate(ldpc_decoder* pDecMgd, 
 }
 
 
-__global__ void cudakernel::decoder::decode_lyr_sumllr(ldpc_decoder* pDecMgd, size_t pI)
+__global__ void cudakernel::decoder::decode_lyr_sumllr(ldpc_decoder_device* pDecMgd, size_t pI)
 {
 	const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
     const size_t sx = blockDim.x * gridDim.x;
@@ -144,7 +142,7 @@ __global__ void cudakernel::decoder::decode_lyr_sumllr(ldpc_decoder* pDecMgd, si
 }
 
 
-__global__ void cudakernel::decoder::decode_lyr_appcalc(ldpc_decoder* pDecMgd)
+__global__ void cudakernel::decoder::decode_lyr_appcalc(ldpc_decoder_device* pDecMgd)
 {
     size_t* vn;
     size_t vw;
@@ -156,8 +154,8 @@ __global__ void cudakernel::decoder::decode_lyr_appcalc(ldpc_decoder* pDecMgd)
     for (size_t i = ix; i < pDecMgd->mLdpcCode->nc(); i += sx)
     {
         pDecMgd->mLLROut[i] = pDecMgd->mLLRIn[i];
-        vn = pDecMgd->mLdpcCode->vn()[i];
-        vw = pDecMgd->mLdpcCode->vw()[i];
+        vn = pDecMgd->mLdpcCode->vn()[i].data();
+        vw = pDecMgd->mLdpcCode->vn()[i].size();
         while(vw--)
             pDecMgd->mLLROut[i] += pDecMgd->mLSum[*vn++];
         pDecMgd->mCO[i] = (pDecMgd->mLLROut[i] <= 0);
@@ -165,7 +163,7 @@ __global__ void cudakernel::decoder::decode_lyr_appcalc(ldpc_decoder* pDecMgd)
 }
 
 
-__global__ void cudakernel::decoder::calc_synd(ldpc_decoder* pDecMgd)
+__global__ void cudakernel::decoder::calc_synd(ldpc_decoder_device* pDecMgd)
 {
 	const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
     const size_t sx = blockDim.x * gridDim.x;
@@ -173,9 +171,9 @@ __global__ void cudakernel::decoder::calc_synd(ldpc_decoder* pDecMgd)
     for (size_t i = ix; i < pDecMgd->mLdpcCode->mc(); i += sx)
     {
         pDecMgd->mSynd[i] = 0;
-        for (size_t j = 0; j < pDecMgd->mLdpcCode->cw()[i]; j++)
+        for (auto cni : pDecMgd->mLdpcCode->cn()[i])
         {
-            pDecMgd->mSynd[i] ^= pDecMgd->mCO[pDecMgd->mLdpcCode->c()[pDecMgd->mLdpcCode->cn()[i][j]]];
+			pDecMgd->mSynd[i] ^= pDecMgd->mCO[pDecMgd->mLdpcCode->c()[cni]];
         }
 
         if (pDecMgd->mSynd[i])

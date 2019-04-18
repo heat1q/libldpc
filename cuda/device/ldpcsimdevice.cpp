@@ -143,12 +143,15 @@ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> pCode, const char
 
 		//changed with each frame
 		//set up decoder
-		mLdpcDecoder = cudamgd_ptr<ldpc_decoder_device>(ldpc_decoder_device(mLdpcCode, mBPIter, true));
+		mLdpcDecoder = cudamgd_ptr<ldpc_decoder_device>(
+			ldpc_decoder_device(mLdpcCode, mBPIter, true)
+		);
 
 		//channel i/o
 		mX = vec_size_t(mN);
 		mY = vec_double_t(mN);
 		mC = vec_bits_t(mLdpcCode->nc());
+		mLTmp = vec_double_t(mBits);
 
 		fclose(fpSim);
 		fclose(fpMap);
@@ -354,48 +357,44 @@ void ldpc_sim_device::map_c_to_x()
 
 void ldpc_sim_device::calc_llrs(double sigma2)
 {
-	double l_tmp[mBits];
-
-	for(size_t j = 0; j < mN; j++)
+	for(size_t l = 0; l < mN; l++)
 	{
 		double tmp0, tmp1;
+
 		for(size_t i = 0; i < mConstellation.log2M(); i++)
 		{
 			tmp0 = 0.0;
 			tmp1 = 0.0;
-			for(size_t j = 0; j < mConstellation.M(); j++)
-			{
-				if(mLabels[j] & (1 << (mConstellation.log2M()-1-i)))
-				{
-					tmp1 += exp(-(mY[j]-mConstellation.X()[j])*(mY[j]-mConstellation.X()[j])/(2*sigma2)) * mConstellation.pX()[j];
-				} else
-				{
-					tmp0 += exp(-(mY[j]-mConstellation.X()[j])*(mY[j]-mConstellation.X()[j])/(2*sigma2)) * mConstellation.pX()[j];
+			for(size_t j = 0; j < mConstellation.M(); j++) {
+				if(mLabels[j] & (1 << (mConstellation.log2M()-1-i))) {
+					tmp1 += exp(-(mY[l]-mConstellation.X()[j])*(mY[l]-mConstellation.X()[j])/(2*sigma2)) * mConstellation.pX()[j];
+				} else {
+					tmp0 += exp(-(mY[l]-mConstellation.X()[j])*(mY[l]-mConstellation.X()[j])/(2*sigma2)) * mConstellation.pX()[j];
 				}
 			}
 			double val = log(tmp0/tmp1);
 			// check usually required when PAS is used with large constellations
 			// and severely shaped distributions
 			if(std::isinf(val) == +1) {
-				l_tmp[i] = MAX_LLR;
+				mLTmp[i] = MAX_LLR;
 			} else if(std::isinf(val) == -1) {
-				l_tmp[i] = MIN_LLR;
+				mLTmp[i] = MIN_LLR;
 			} else {
-				l_tmp[i] = val;
+				mLTmp[i] = val;
 			}
 		}
 
-		for(size_t k = 0; k < mBits; k++)
-		{
-			mLdpcDecoder->mLLRIn[mBitMapper[k][j]] = l_tmp[k];
+
+		for(size_t k = 0; k < mBits; k++) {
+			mLdpcDecoder->mLLRIn[mBitMapper[k][l]] = mLTmp[k];
 		}
 	}
 
-	for(size_t j = 0; j < mLdpcCode->nc(); j++)
-	{
+	for(size_t j = 0; j < mLdpcCode->nc(); j++) {
 		mLdpcDecoder->mLLRIn[j] *= (1-2*mC[j]);
 	}
 }
+
 
 void ldpc_sim_device::print()
 {

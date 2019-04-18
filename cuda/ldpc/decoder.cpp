@@ -115,7 +115,7 @@ __host__ __device__ bool ldpc_decoder::is_codeword()
     mIsCW = true;
 
     //calc syndrome
-    cudakernel::decoder::calc_synd<<<get_num_size(mLdpcCode->mc(), NUM_THREADS), NUM_THREADS>>>(this);
+    //cudakernel::decoder::calc_synd<<<get_num_size(mLdpcCode->mc(), NUM_THREADS), NUM_THREADS>>>(this);
     cudaDeviceSynchronize();
 
     return mIsCW;
@@ -323,7 +323,7 @@ uint16_t ldpc_decoder::decode_layered_legacy()
 
 uint16_t ldpc_decoder::decode_layered()
 {
-    cudakernel::decoder::decode_layered<<<1, 1>>>(this);
+    //cudakernel::decoder::decode_layered<<<1, 1>>>(this);
     cudaDeviceSynchronize();
 
     return mIter;
@@ -335,9 +335,12 @@ uint16_t ldpc_decoder::decode_layered()
 *	Decoder device
 */
 //Init constructor
-__host__ ldpc_decoder_device::ldpc_decoder_device(cudamgd_ptr<ldpc_code_device>& pCode, size_t pI, bool pEarlyTerm)
+__host__ ldpc_decoder_device::ldpc_decoder_device(cudamgd_ptr<ldpc_code_device> pCode, size_t pI, bool pEarlyTerm)
 : mLdpcCode(pCode), mMaxIter(pI), mEarlyTerm(pEarlyTerm)
-, mLv2c(pCode->nnz()), mLc2v(pCode->nnz()), mLSum(pCode->nnz()), mLc2vPre(pCode->nnz())
+, mLv2c(pCode->layers().size()*pCode->nnz())
+, mLc2v(pCode->layers().size()*pCode->nnz())
+, mLc2vPre(pCode->layers().size()*pCode->nnz())
+, mLSum(pCode->nnz())
 , mLLRIn(pCode->nc()), mLLROut(pCode->nc())
 , mSynd(pCode->mc()), mCO(pCode->nc())
 , mIter(0), mIsCW(false), FBREF(nullptr)
@@ -348,6 +351,8 @@ __host__ ldpc_decoder_device::ldpc_decoder_device(cudamgd_ptr<ldpc_code_device>&
 	int dev = -1;
 	cudaGetDevice(&dev);
 	cudaMemPrefetchAsync(FBREF, mLdpcCode->max_dc(), dev, NULL);
+
+	mem_prefetch();
 }
 
 //copy constructor
@@ -364,6 +369,8 @@ __host__ ldpc_decoder_device::ldpc_decoder_device(const ldpc_decoder_device& pCo
 	int dev = -1;
 	cudaGetDevice(&dev);
 	cudaMemPrefetchAsync(FBREF, mLdpcCode->max_dc(), dev, NULL);
+
+	mem_prefetch();
 }
 
 //destructor
@@ -393,6 +400,23 @@ __host__ ldpc_decoder_device& ldpc_decoder_device::operator=(ldpc_decoder_device
 	return *this;
 }
 
+//prefetch memory
+__host__ void ldpc_decoder_device::mem_prefetch()
+{
+	mLc2v.mem_prefetch();
+	mLv2c.mem_prefetch();
+	mLc2vPre.mem_prefetch();
+
+	mLSum.mem_prefetch();
+
+	mLLRIn.mem_prefetch();
+	mLLROut.mem_prefetch();
+	mCO.mem_prefetch();
+
+	mSynd.mem_prefetch();
+}
+
+
 //calc syndrome & check if codeword
 //calls global function
 __host__ __device__ bool ldpc_decoder_device::is_codeword()
@@ -400,7 +424,7 @@ __host__ __device__ bool ldpc_decoder_device::is_codeword()
     mIsCW = true;
 
     //calc syndrome
-    //cudakernel::decoder::calc_synd<<<get_num_size(mLdpcCode->mc(), NUM_THREADS), NUM_THREADS>>>(this);
+    cudakernel::decoder::calc_synd<<<get_num_size(mLdpcCode->mc(), NUM_THREADS), NUM_THREADS>>>(this);
     cudaDeviceSynchronize();
 
     return mIsCW;
@@ -410,7 +434,7 @@ __host__ __device__ bool ldpc_decoder_device::is_codeword()
 //calls global function
 __host__ __device__ size_t ldpc_decoder_device::decode_layered()
 {
-	//cudakernel::decoder::decode_layered<<<1, 1>>>(this);
+	cudakernel::decoder::decode_layered<<<1, 1>>>(this);
     cudaDeviceSynchronize();
 
     return mIter;
