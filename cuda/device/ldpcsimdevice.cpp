@@ -27,7 +27,7 @@ __host__ constellation::constellation(const uint16_t pM)
  * ldpc_sim_device
 */
 //init constructor
-ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> pCode, const char* pSimFileName, const char* pMapFileName)
+__host__ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> pCode, const char* pSimFileName, const char* pMapFileName)
 : mLdpcCode(pCode), mLdpcDecoder(nullptr)
 {
 	try
@@ -155,6 +155,8 @@ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> pCode, const char
 
 		fclose(fpSim);
 		fclose(fpMap);
+
+		mem_prefetch();
 	}
 	catch(std::exception &e)
 	{
@@ -163,8 +165,26 @@ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> pCode, const char
 	}
 }
 
+__host__ void ldpc_sim_device::mem_prefetch()
+{
+	mConstellation.mem_prefetch();
 
-void ldpc_sim_device::start()
+	for (auto& bmi : mBitMapper) { bmi.mem_prefetch(); }
+	mBitMapper.mem_prefetch();
+
+	mBitPos.mem_prefetch();
+	mLabelsRev.mem_prefetch();
+	mLabels.mem_prefetch();
+	mSnrs.mem_prefetch();
+
+	mX.mem_prefetch();
+	mY.mem_prefetch();
+	mC.mem_prefetch();
+	mLTmp.mem_prefetch();
+}
+
+
+__host__ void ldpc_sim_device::start()
 {
     double sigma2;
     uint64_t frames;
@@ -195,7 +215,6 @@ void ldpc_sim_device::start()
 		iters = 0;
 		sigma2 = pow(10, -mSnrs[i]/10);
 		auto time_start = std::chrono::high_resolution_clock::now();
-
 		do
 		{
 			encode_all0(); //40ms
@@ -282,7 +301,7 @@ void ldpc_sim_device::start()
 }
 
 
-double ldpc_sim_device::randn()
+__host__ double ldpc_sim_device::randn()
 {
     static double U, V;
     static int phase = 0;
@@ -303,7 +322,13 @@ double ldpc_sim_device::randn()
 }
 
 
-double ldpc_sim_device::simulate_awgn(double sigma2)
+__device__ double ldpc_sim_device::randn_device()
+{
+
+}
+
+
+__host__ __device__ double ldpc_sim_device::simulate_awgn(double sigma2)
 {
     double a = 0;
     double Pn = 0;
@@ -321,7 +346,7 @@ double ldpc_sim_device::simulate_awgn(double sigma2)
 }
 
 
-void ldpc_sim_device::encode_all0()
+__host__ __device__ void ldpc_sim_device::encode_all0()
 {
     for(size_t i = 0; i < mLdpcCode->nct(); i++) {
         mC[mBitPos[i]] = rand() & 1;
@@ -339,7 +364,7 @@ void ldpc_sim_device::encode_all0()
 }
 
 
-void ldpc_sim_device::map_c_to_x()
+__host__ __device__ void ldpc_sim_device::map_c_to_x()
 {
     size_t tmp;
 
@@ -355,8 +380,9 @@ void ldpc_sim_device::map_c_to_x()
 }
 
 
-void ldpc_sim_device::calc_llrs(double sigma2)
+__host__ __device__ void ldpc_sim_device::calc_llrs(double sigma2)
 {
+
 	for(size_t l = 0; l < mN; l++)
 	{
 		double tmp0, tmp1;
@@ -384,7 +410,6 @@ void ldpc_sim_device::calc_llrs(double sigma2)
 			}
 		}
 
-
 		for(size_t k = 0; k < mBits; k++) {
 			mLdpcDecoder->mLLRIn[mBitMapper[k][l]] = mLTmp[k];
 		}
@@ -396,7 +421,7 @@ void ldpc_sim_device::calc_llrs(double sigma2)
 }
 
 
-void ldpc_sim_device::print()
+__host__ void ldpc_sim_device::print()
 {
     mLdpcCode->print();
 

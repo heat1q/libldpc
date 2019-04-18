@@ -47,6 +47,7 @@ namespace ldpc
 	public:
 		__host__ __device__ constellation() {}
 		__host__ constellation(const labels_t pM);
+		__host__ void mem_prefetch() { mPX.mem_prefetch(); mX.mem_prefetch(); }
 
 		__host__ __device__ const vec_double_t& pX() const { return mPX; }
 		__host__ __device__ const vec_double_t& X() const { return mX; }
@@ -109,30 +110,48 @@ namespace ldpc
 	class ldpc_sim_device
 	{
 	public:
-		ldpc_sim_device(cudamgd_ptr<ldpc_code_device> pCode, const char* pSimFileName, const char* pMapFileName);
+		__host__ ldpc_sim_device(cudamgd_ptr<ldpc_code_device> pCode, const char* pSimFileName, const char* pMapFileName);
+		__host__ void mem_prefetch();
 
-		void start();
+		__host__ void start();
 
-		double randn();
+		__host__ double randn();
+		__device__ double randn_device();
 
-		double simulate_awgn(double pSigma2);
-		void encode() {}
-		void encode_all0();
-		void map_c_to_x();
-		void calc_llrs(double sigma2);
+		__host__ __device__ double simulate_awgn(double pSigma2);
+		__host__ __device__ void encode() {}
+		__host__ __device__ void encode_all0();
+		__host__ __device__ void map_c_to_x();
+		__host__ __device__ void calc_llrs(double sigma2);
 
-		void print();
-		void log_error(size_t pFrameNum, double pSNR);
+		__host__ void print();
+		__host__ void log_error(size_t pFrameNum, double pSNR);
+
+		//changed with each frame
+		cudamgd_ptr<ldpc_decoder_device> mLdpcDecoder;
+		vec_size_t mX;
+		vec_double_t mY;
+		vec_bits_t mC;
+		vec_double_t mLTmp;
+
+		__host__ __device__ cudamgd_ptr<ldpc_code_device> ldpc_code() const { return mLdpcCode; }
+		__host__ __device__ const constellation& cstll() const { return mConstellation; }
+		__host__ __device__ size_t n() const { return mN; }
+		__host__ __device__ size_t bits() const { return mBits; }
+		__host__ __device__ const vec_labels_t& labels() const { return mLabels; }
+		__host__ __device__ const vec_labels_t& labels_rev() const { return mLabelsRev; }
+		__host__ __device__ const vec_size_t& bits_pos() const { return mBitPos; }
+		__host__ __device__ const mat_size_t& bit_mapper() const { return mBitMapper; }
 	private:
 		cudamgd_ptr<ldpc_code_device> mLdpcCode;
 
 		constellation mConstellation;
 
-		uint64_t mN;
-		uint16_t mBits;
-		uint64_t mMaxFrames;
-		uint64_t mMinFec;
-		uint64_t mBPIter;
+		size_t mN;
+		size_t mBits;
+		size_t mMaxFrames;
+		size_t mMinFec;
+		size_t mBPIter;
 
 		char mLogfile[MAX_FILENAME_LEN];
 		double mSE;
@@ -142,12 +161,5 @@ namespace ldpc
 		vec_labels_t mLabelsRev;
 		vec_size_t mBitPos;
 		mat_size_t mBitMapper;
-
-		//changed with each frame
-		cudamgd_ptr<ldpc_decoder_device> mLdpcDecoder;
-		vec_size_t mX;
-		vec_double_t mY;
-		vec_bits_t mC;
-		vec_double_t mLTmp;
 	};
 }

@@ -150,7 +150,6 @@ namespace ldpc
 				{
 					mBuffer[mLength-1-i].~T();
 				}
-
 				//set length to zero to avoid cleaning elements in destructor
 				mLength = 0;
 
@@ -195,7 +194,6 @@ namespace ldpc
 				{
 					mBuffer[mLength-1-i].~T();
 				}
-
 				//set length to zero to avoid cleaning elements in destructor
 				mLength = 0;
 

@@ -490,15 +490,20 @@ __host__ __device__ int8_t ldpc::sign(const double& a)
 * Code device
 */
 //init constructor
-__host__ ldpc_code_device::ldpc_code_device(const char* pFileName, const char* pClFile)
+__host__ ldpc_code_device::ldpc_code_device(const char* pFileName, const char* pClFile, bool pUseLayer)
 : mMaxDC(0)
 {
 	try
 	{
 		FILE *fpCode = fopen(pFileName, "r");
 		if(!fpCode) { throw std::runtime_error("can not open codefile for reading."); }
-		FILE *fpLayer = fopen(pClFile, "r");
-		if(!fpLayer) { throw std::runtime_error("Can not open layer file"); }
+
+		FILE *fpLayer;
+		if (pUseLayer)
+		{
+			fpLayer = fopen(pClFile, "r");
+			if(!fpLayer) { throw std::runtime_error("Can not open layer file"); }
+		}
 
 		fscanf(fpCode, "nc: %lu\n", &mN);
 		fscanf(fpCode, "mc: %lu\n", &mM);
@@ -571,21 +576,36 @@ __host__ ldpc_code_device::ldpc_code_device(const char* pFileName, const char* p
 			if(mCW[i] > mMaxDC) { mMaxDC = mCW[i]; }
 		}
 
-		//setup layers
-		fscanf(fpLayer, "nl: %lu\n", &mNL);
-
-		mLW = vec_size_t(mNL);
-		mLayers = mat_size_t(mNL, vec_size_t());
-
-		for (size_t i = 0; i < mNL; ++i)
+		if (pUseLayer)
 		{
-			fscanf(fpLayer, "cn[i]: %lu\n", &(mLW[i]));
-			mLayers[i] = vec_size_t(mLW[i]);
-			for (size_t j = 0; j < mLW[i]; ++j)
+			//setup layers
+			fscanf(fpLayer, "nl: %lu\n", &mNL);
+
+			mLW = vec_size_t(mNL);
+			mLayers = mat_size_t(mNL, vec_size_t());
+
+			for (size_t i = 0; i < mNL; ++i)
+			{
+				fscanf(fpLayer, "cn[i]: %lu\n", &(mLW[i]));
+				mLayers[i] = vec_size_t(mLW[i]);
+				for (size_t j = 0; j < mLW[i]; ++j)
 				fscanf(fpLayer, "%lu\n", &(mLayers[i][j]));
+			}
+
+			fclose(fpLayer);
+		}
+		else
+		{
+			mNL = 1;
+			mLW = vec_size_t(mNL, mM);
+			mLayers = mat_size_t(mNL, vec_size_t(mM));
+			for (size_t i = 0; i < mM; ++i)
+			{
+				mLayers[0][i] = i;
+			}
 		}
 
-		fclose(fpLayer);
+
 		fclose(fpCode);
 
 		mem_prefetch();

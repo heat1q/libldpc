@@ -96,7 +96,7 @@ namespace ldpc
 	class ldpc_code_device
 	{
 	public:
-		__host__ ldpc_code_device(const char* pFileName, const char* pClFile);
+		__host__ ldpc_code_device(const char* pFileName, const char* pClFile, bool pUseLayer);
 		__host__ void mem_prefetch();
 		__host__ void print();
 
@@ -248,6 +248,7 @@ namespace ldpc
 	/*
 	* Kernels
 	*/
+	class ldpc_sim_device;
 
 	namespace cudakernel
 	{
@@ -260,6 +261,21 @@ namespace ldpc
 			__global__ void decode_lyr_sumllr(ldpc_decoder_device* pDecMgd, size_t pI);
 			__global__ void decode_lyr_appcalc(ldpc_decoder_device* pDecMgd);
 			__global__ void calc_synd(ldpc_decoder_device* pDecMgd);
+			/*
+			__global__ void clean_decoder(ldpc_decoder* pDecMgd);
+			__global__ void decode_layered(ldpc_decoder* pDecMgd);
+			__global__ void decode_lyr_vnupdate(ldpc_decoder* pDecMgd, size_t pI);
+			__global__ void decode_lyr_cnupdate(ldpc_decoder* pDecMgd, size_t pI, uint64_t pL);
+			__global__ void decode_lyr_sumllr(ldpc_decoder* pDecMgd, size_t pI);
+			__global__ void decode_lyr_appcalc(ldpc_decoder* pDecMgd);
+			__global__ void calc_synd(ldpc_decoder* pDecMgd);
+			*/
+		}
+
+		namespace sim
+		{
+			__global__ void sim_frame_proc(ldpc_sim_device* pSim, double pSigma2);
+			__global__ void sim_calc_llrs(ldpc_sim_device* pSim, double pSigma2);
 		}
 	}
 

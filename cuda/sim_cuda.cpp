@@ -18,21 +18,22 @@ int main()
     sim.start();
 */
 
-
-	ldpc_code_device code_dev(
-		"../src/code/test_code/code_rand_proto_3x6_400_4.txt"
-		, "../src/code/test_code/layer_rand_proto_3x6_400_4.txt"
-	);
-
-	cudamgd_ptr<ldpc_sim_device> sim(
-		ldpc_sim_device(
-			code_dev
-			, "../src/sim.txt"
-			, "../src/code/test_code/mapping_rand_proto_3x6_400_4.txt"
+	cudamgd_ptr<ldpc_code_device> code_dev(
+		ldpc_code_device(
+			"../src/code/test_code/code_rand_proto_3x6_400_4.txt"
+			, "../src/code/test_code/layer_rand_proto_3x6_400_4.txt"
+			, true
 		)
 	);
-	//sim->print();
-	sim->start();
+
+	//TODO Seg fault when cudamgd_ptr<ldpc_sim_device>
+	ldpc_sim_device sim(
+		code_dev
+		, "../src/sim.txt"
+		, "../src/code/test_code/mapping_rand_proto_3x6_400_4.txt"
+	);
+	sim.print();
+	sim.start();
 
 /*
     //set up decoder on unified memory
@@ -47,12 +48,7 @@ int main()
 		}
 
 		dec_dev->decode_layered();
-		for (size_t i = 0; i < code_dev.nc(); ++i) {
-			double a = dec_dev->mLLRIn[i];
-		}
-		dec_dev->decode_layered();
-
-		//TIME_PROF("GPU Layered", dec_dev->decode_layered(), "ms");
+		TIME_PROF("GPU Layered", dec_dev->decode_layered(), "ms");
 		//TIME_PROF("CPU Layered", dec_dev->decode_layered_legacy(), "ms");
 		//TIME_PROF("CPU Legacy", dec_dev->decode_legacy(), "ms");
 	}
