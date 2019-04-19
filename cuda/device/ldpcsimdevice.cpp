@@ -294,7 +294,7 @@ __host__ void ldpc_sim_device::start()
                     std::cout << "Warning: can not open logfile " << mLogfile << " for writing" << "\n";
                 }
                 
-                log_error(frames, snrs[i]);
+                log_error(frames, mSnrs[i]);
             }
         } while (fec < mMinFec && frames < mMaxFrames); //end while
     }//end for
@@ -496,13 +496,13 @@ __host__ void ldpc_sim_device::log_error(size_t pFrameNum, double pSNR)
         #endif
     }
     
-    std::vector<size_t> x(n);
-    std::vector<size_t> xhat(n);
+    std::vector<size_t> x(mN);
+    std::vector<size_t> xhat(mN);
     std::vector<size_t> chat(mLdpcCode->nc());
     
-    for (auto& ci : chat)
+    for (size_t i = 0; i < mLdpcCode->nc(); ++i)
     {
-        ci = (mLdpcDecoder->mLLROut[i] <= 0);
+        chat[i] = (mLdpcDecoder->mLLROut[i] <= 0);
     }
         
     size_t tmp;
@@ -529,11 +529,11 @@ __host__ void ldpc_sim_device::log_error(size_t pFrameNum, double pSNR)
     }
     
     double cw_dis_euc = 0;
-    for (size_t i = 0; i < n; i++) {
+    for (size_t i = 0; i < mN; i++) {
         #ifdef ENCODE
         cw_dis_euc += (mConstellation.X()[x[i]] - mConstellation.X()[xhat[i]]) * (mConstellation.X()[x[i]] - mConstellation.X()[xhat[i]]);
         #else
-        cw_dis_euc += (mConstellation.X()[0] - mConstellation.X()[xhat[i]]) * mConstellation.X()[0] - mConstellation.X()[xhat[i]]);
+        cw_dis_euc += (mConstellation.X()[0] - mConstellation.X()[xhat[i]]) * (mConstellation.X()[0] - mConstellation.X()[xhat[i]]);
         #endif
     }
     std::vector<size_t> failed_bits_idx(cw_dis);
@@ -551,7 +551,7 @@ __host__ void ldpc_sim_device::log_error(size_t pFrameNum, double pSNR)
     }
     
     /* print results in file */
-    fprintf(fp, "SNR: %.2f -- frame: %lu -- is codeword: %d -- dE(c,chat): %.3f -- dH(c,chat): %lu | ", snr, frame_num, synd_weight == 0, cw_dis_euc, cw_dis);
+    fprintf(fp, "SNR: %.2f -- frame: %lu -- is codeword: %d -- dE(c,chat): %.3f -- dH(c,chat): %lu | ", pSNR, pFrameNum, synd_weight == 0, cw_dis_euc, cw_dis);
     for (auto failed_bits_idx_i : failed_bits_idx) {
         fprintf(fp, "%lu ", failed_bits_idx_i);
     }
