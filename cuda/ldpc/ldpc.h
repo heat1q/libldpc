@@ -197,7 +197,7 @@ namespace ldpc
 	class ldpc_decoder_device
 	{
 	public:
-		__host__ ldpc_decoder_device(cudamgd_ptr<ldpc_code_device> pCode, size_t pI, bool pEarlyTerm);
+		__host__ ldpc_decoder_device(cudamgd_ptr<ldpc_code_device>& pCode, size_t pI, bool pEarlyTerm);
 		__host__ ldpc_decoder_device(const ldpc_decoder_device& pCopy);
 		//__host__ ldpc_decoder_device(ldpc_decoder_device&& pMove) noexcept;
 		__host__ ~ldpc_decoder_device();

@@ -335,7 +335,7 @@ uint16_t ldpc_decoder::decode_layered()
 *	Decoder device
 */
 //Init constructor
-__host__ ldpc_decoder_device::ldpc_decoder_device(cudamgd_ptr<ldpc_code_device> pCode, size_t pI, bool pEarlyTerm)
+__host__ ldpc_decoder_device::ldpc_decoder_device(cudamgd_ptr<ldpc_code_device>& pCode, size_t pI, bool pEarlyTerm)
 : mLdpcCode(pCode), mMaxIter(pI), mEarlyTerm(pEarlyTerm)
 , mLv2c(pCode->layers().size()*pCode->nnz())
 , mLc2v(pCode->layers().size()*pCode->nnz())

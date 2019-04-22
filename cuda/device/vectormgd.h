@@ -17,11 +17,31 @@ namespace ldpc
 	class cudamgd_ptr
 	{
 	public:
-		__host__ __device__ explicit cudamgd_ptr(T* pVal) //init constructor with pointer to obj, only on host
-		: mContainer(pVal),  mIsRef(false) {}
+		__host__ __device__ cudamgd_ptr()
+		: mContainer(nullptr),  mRefCount(nullptr) {}
+
+		__host__ explicit cudamgd_ptr(T* pVal) //init constructor with pointer to obj, only on host
+		: mContainer(pVal),  mRefCount(nullptr)
+		{
+			try
+			{
+				cudaError_t result = cudaMallocManaged(&mRefCount, sizeof(size_t));
+				if (result != cudaSuccess)
+				{
+					throw std::runtime_error(cudaGetErrorString(result));
+				}
+				*mRefCount = 1;
+
+				mem_prefetch();
+			}
+			catch(...)
+			{
+				throw;
+			}
+		}
 
 		__host__ cudamgd_ptr(const T& pVal) //init constructor, only on host
-		: mContainer(nullptr), mIsRef(false)
+		: mContainer(nullptr), mRefCount(nullptr)
 		{
 			try
 			{
@@ -33,34 +53,42 @@ namespace ldpc
 
 				new(mContainer) T(pVal);
 
-				//Prefetch, i.e. move the data to the gpu, to reduce latency
-				cudaDeviceSynchronize();
-				int dev = -1;
-				cudaGetDevice(&dev);
-				result = cudaMemPrefetchAsync(mContainer, sizeof(T), dev, NULL);
+				result = cudaMallocManaged(&mRefCount, sizeof(size_t));
 				if (result != cudaSuccess)
 				{
 					throw std::runtime_error(cudaGetErrorString(result));
 				}
+				*mRefCount = 1;
+
+				mem_prefetch();
 			}
 			catch(...)
 			{
-				//destroy already constructed elements
-				mContainer->~T();
-
 				throw;
 			}
 		}
 
 		__host__ __device__ cudamgd_ptr(const cudamgd_ptr& pCopy) //copy constructor
-		: mContainer(pCopy.mContainer), mIsRef(true) {}
+		: mContainer(pCopy.mContainer), mRefCount(pCopy.mRefCount) { (*mRefCount)++; }
 
 		__host__ __device__ ~cudamgd_ptr()
 		{
-			if (!mIsRef && mContainer != nullptr) //only delete original pointer
+			if (mRefCount != nullptr)
 			{
-				mContainer->~T();
-				cudaFree(mContainer);
+				if (--(*mRefCount) == 0) //only delete original pointer
+				{
+					mContainer->~T();
+					cudaFree(mContainer);
+					cudaFree(mRefCount);
+				}
+			}
+			else if (mRefCount == nullptr)
+			{
+				if (mContainer != nullptr)
+				{
+					mContainer->~T();
+					cudaFree(mContainer);
+				}
 			}
 		}
 
@@ -68,9 +96,19 @@ namespace ldpc
 		__host__ __device__ cudamgd_ptr& operator=(cudamgd_ptr pCopy) noexcept
 		{
 			swap(mContainer, pCopy.mContainer);
-			swap(mIsRef, pCopy.mIsRef);
+			swap(mRefCount, pCopy.mRefCount);
 
 			return *this;
+		}
+
+		__host__ void mem_prefetch() //Prefetch, i.e. move the data to the gpu, to reduce latency
+		{
+			cudaDeviceSynchronize();
+
+			int dev = -1;
+			cudaGetDevice(&dev);
+			cudaMemPrefetchAsync(mContainer, sizeof(T), dev, NULL);
+			cudaMemPrefetchAsync(mRefCount, sizeof(size_t), dev, NULL);
 		}
 
 		__host__ __device__ T& operator*() { return *mContainer; }
@@ -78,7 +116,7 @@ namespace ldpc
 
 	private:
 		T* mContainer;
-		bool mIsRef;
+		size_t* mRefCount;
 	};
 
 

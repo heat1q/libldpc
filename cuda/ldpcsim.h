@@ -110,7 +110,7 @@ namespace ldpc
 	class ldpc_sim_device
 	{
 	public:
-		__host__ ldpc_sim_device(cudamgd_ptr<ldpc_code_device> pCode, const char* pSimFileName, const char* pMapFileName);
+		__host__ ldpc_sim_device(cudamgd_ptr<ldpc_code_device>& pCode, const char* pSimFileName, const char* pMapFileName);
 		__host__ void mem_prefetch();
 
 		__host__ void start();
