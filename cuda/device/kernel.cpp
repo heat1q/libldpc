@@ -2,6 +2,53 @@
 
 using namespace ldpc;
 
+/*
+__global__ void cudakernel::sim::awgn()
+{
+	printf("curand\n");
+
+	curandState_t state[10];
+	for (size_t i = 0; i < 10; i++) {
+		curand_init(clock64(), 1, 0, &state[i]);
+	}
+
+	double a[10];
+	for (size_t i = 0; i < 10; i++) {
+		a[i] = curand_normal(&state[i]);
+		printf("%.3f\n", a[i]);
+	}
+}
+*/
+__global__ void cudakernel::sim::frame_proc(cudamgd_ptr<ldpc_sim_device> pSim)
+{
+	
+}
+
+__global__ void cudakernel::sim::awgn(cudamgd_ptr<ldpc_sim_device> pSim, double sigma2)
+{
+	const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t sx = blockDim.x * gridDim.x;
+
+	double a = 0;
+
+	for (size_t i = ix; i < pSim->n(); i += sx)
+	{
+		a = curand_normal(&(pSim->mCurandState[i])) * sqrt(sigma2);
+		pSim->mY[i] = pSim->cstll().X()[pSim->mX[i]] + a;
+	}
+}
+
+__global__ void cudakernel::sim::setup_randn(cudamgd_ptr<ldpc_sim_device> pSim)
+{
+	// initialize curand
+	const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t sx = blockDim.x * gridDim.x;
+
+	for (size_t i = ix; i < pSim->n(); i += sx)
+	{
+		curand_init(clock64(), i, 0, &(pSim->mCurandState[i]));
+	}
+}
 
 /*
  *	Decoder kernels
@@ -370,10 +417,7 @@ __global__ void cudakernel::sim::sim_calc_llrs(ldpc_sim_device* pSim, double pSi
 
 }
 
-__global__ void cudakernel::sim::sim_frame_proc(ldpc_sim_device* pSim, double pSigma2)
-{
 
-}
 */
 
 /*

@@ -143,16 +143,17 @@ __host__ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device>& pCode, 
 
         //changed with each frame
         //set up decoder
-		printf("HERE\n");
         mLdpcDecoder = cudamgd_ptr<ldpc_decoder_device>(
             ldpc_decoder_device(mLdpcCode, mBPIter, true)
         );
-		printf("HERE\n");
+
         //channel i/o
         mX = vec_size_t(mN);
         mY = vec_double_t(mN);
         mC = vec_bits_t(mLdpcCode->nc());
         mLTmp = vec_double_t(mBits);
+
+		mCurandState = vector_mgd<curandState_t>(mN);
 
         fclose(fpSim);
         fclose(fpMap);

@@ -274,7 +274,9 @@ namespace ldpc
 
 		namespace sim
 		{
-			__global__ void sim_frame_proc(ldpc_sim_device* pSim, double pSigma2);
+			__global__ void setup_randn(cudamgd_ptr<ldpc_sim_device> pSim);
+			__global__ void awgn(cudamgd_ptr<ldpc_sim_device> pSim, double sigma2);
+			__global__ void frame_proc(cudamgd_ptr<ldpc_sim_device> pSim);
 			__global__ void sim_calc_llrs(ldpc_sim_device* pSim, double pSigma2);
 		}
 	}

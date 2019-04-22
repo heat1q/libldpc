@@ -5,6 +5,8 @@
 #include <string.h>
 #include <fstream>
 
+#include "curand_kernel.h"
+
 #include "ldpc/ldpc.h"
 
 #define TIME_PROF(log, exec, unit) \
@@ -129,6 +131,7 @@ namespace ldpc
 
 		//changed with each frame
 		cudamgd_ptr<ldpc_decoder_device> mLdpcDecoder;
+		vector_mgd<curandState_t> mCurandState;
 		vec_size_t mX;
 		vec_double_t mY;
 		vec_bits_t mC;
