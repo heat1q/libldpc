@@ -519,7 +519,7 @@ __host__ __device__ size_t ldpc_decoder_device::decode_legacy()
 }
 
 
-__host__ __device__ bool ldpc_decoder::is_codeword_legacy()
+__host__ __device__ bool ldpc_decoder_device::is_codeword_legacy()
 {
     //calc syndrome
     bits_t s;
