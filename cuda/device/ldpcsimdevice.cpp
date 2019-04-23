@@ -240,6 +240,7 @@ __host__ void ldpc_sim_device::start()
 
             //decode
             iters += mLdpcDecoder->decode_layered();
+            //iter += mLdpcDecoder->decode_legacy();
 
             frames++;
 

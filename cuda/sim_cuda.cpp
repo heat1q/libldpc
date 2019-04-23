@@ -34,12 +34,11 @@ int main()
 		)
 	);
 	sim_dev->print();
-	//sim_dev->start();
+	sim_dev->start();
 
 	//cudakernel::sim::setup_randn<<<get_num_size(sim_dev->n(), NUM_THREADS), NUM_THREADS>>>(sim_dev);
 	//cudakernel::sim::awgn<<<get_num_size(sim_dev->n(), NUM_THREADS), NUM_THREADS>>>(sim_dev, 1);
-
-	cudaDeviceSynchronize();
+	//cudaDeviceSynchronize();
 
 
 /*

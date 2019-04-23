@@ -207,7 +207,10 @@ namespace ldpc
 		__host__ __device__ bool is_codeword();
 		__host__ __device__ size_t decode_layered();
 
-		__host__ __device__ uint16_t max_iter() const { return mMaxIter; }
+		__host__ __device__ size_t decode_legacy();
+		__host__ __device__ bool is_codeword_legacy();
+
+		__host__ __device__ size_t max_iter() const { return mMaxIter; }
 		__host__ __device__ bool early_termination() const { return mEarlyTerm; }
 
 		cudamgd_ptr<ldpc_code_device> mLdpcCode;
@@ -216,6 +219,8 @@ namespace ldpc
 		vec_double_t mLc2v;
 		vec_double_t mLSum;
 		vec_double_t mLc2vPre;
+		vec_double_t mF;
+		vec_double_t mB;
 
 		vec_double_t mLLRIn;
 		vec_double_t mLLROut;
@@ -228,7 +233,7 @@ namespace ldpc
 
 		bool mIsCW;
 	private:
-		uint16_t mMaxIter;
+		size_t mMaxIter;
 		bool mEarlyTerm;
 	};
 
@@ -275,9 +280,10 @@ namespace ldpc
 		namespace sim
 		{
 			__global__ void setup_randn(cudamgd_ptr<ldpc_sim_device> pSim);
+			__global__ void encode_all0()
 			__global__ void awgn(cudamgd_ptr<ldpc_sim_device> pSim, double sigma2);
+			__global__ void calc_llrs(ldpc_sim_device* pSim, double pSigma2);
 			__global__ void frame_proc(cudamgd_ptr<ldpc_sim_device> pSim);
-			__global__ void sim_calc_llrs(ldpc_sim_device* pSim, double pSigma2);
 		}
 	}
 
