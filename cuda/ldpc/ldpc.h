@@ -279,11 +279,13 @@ namespace ldpc
 
 		namespace sim
 		{
-			__global__ void setup_randn(ldpc_sim_device* pSim);
+			__global__ void setup_rng(ldpc_sim_device* pSim);
 			__global__ void frame_proc(ldpc_sim_device* pSim, double pSigma2);
 			__global__ void encode_all0(ldpc_sim_device* pSim);
 			__global__ void awgn(ldpc_sim_device* pSim, double pSigma2);
 			__global__ void calc_llrs(ldpc_sim_device* pSim, double pSigma2);
+			__global__ void calc_llrin(ldpc_sim_device* pSim);
+			__global__ void map_c_to_x(ldpc_sim_device* pSim);
 		}
 	}
 

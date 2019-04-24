@@ -42,6 +42,14 @@
 #define M_PI 3.14159265358979323846264338327
 #endif
 
+//These are used for variable sized temporary arrays inside kernel functions
+#ifndef SIM_NUM_BITS
+#define SIM_NUM_BITS 32
+#endif
+#ifndef DEC_MAX_DC
+#define DEC_MAX_DC 64
+#endif
+
 namespace ldpc
 {
 	class constellation
@@ -130,11 +138,13 @@ namespace ldpc
 
 		//changed with each frame
 		cudamgd_ptr<ldpc_decoder_device> mLdpcDecoder;
-		vector_mgd<curandState_t> mCurandState;
 		vec_size_t mX;
 		vec_double_t mY;
 		vec_bits_t mC;
 		vec_double_t mLTmp;
+
+		vector_mgd<curandState_t> mCurandState;
+		vector_mgd<curandState_t> mCurandStateEncoding;
 
 		__host__ __device__ cudamgd_ptr<ldpc_code_device> ldpc_code() const { return mLdpcCode; }
 		__host__ __device__ const constellation& cstll() const { return mConstellation; }

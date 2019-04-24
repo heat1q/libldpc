@@ -153,6 +153,8 @@ __host__ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device>& pCode, 
         mC = vec_bits_t(mLdpcCode->nc());
         mLTmp = vec_double_t(mBits);
 
+        //rng states
+		mCurandStateEncoding = vector_mgd<curandState_t>(mLdpcCode->nct());
 		mCurandState = vector_mgd<curandState_t>(mN);
 
         fclose(fpSim);
@@ -183,6 +185,9 @@ __host__ void ldpc_sim_device::mem_prefetch()
     mY.mem_prefetch();
     mC.mem_prefetch();
     mLTmp.mem_prefetch();
+
+    mCurandStateEncoding.mem_prefetch();
+    mCurandState.mem_prefetch();
 }
 
 
@@ -190,6 +195,10 @@ __host__ void ldpc_sim_device::mem_prefetch()
 //specified with mThreads
 __host__ void ldpc_sim_device::start_device()
 {
+    //setup random number generators on device
+    cudakernel::sim::setup_rng<<<get_num_size(mN, NUM_THREADS), NUM_THREADS>>>(this);
+    cudaDeviceSynchronize();
+
     double sigma2;
     uint64_t frames;
     uint64_t bec = 0;
@@ -219,8 +228,9 @@ __host__ void ldpc_sim_device::start_device()
         {
             //launch the frame processing kernel
             cudakernel::sim::frame_proc<<<mThreads, 1>>>(this, sigma2);
-            cudeDeviceSynchronize();
-
+            cudaDeviceSynchronize();
+            iters += mLdpcDecoder->mIter;
+            
             //now check the processed frames
             for (uint16_t k = 0; k < mThreads; ++k) //TODO adjust for parallel threads
             {

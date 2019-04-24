@@ -22,7 +22,7 @@ int main()
 		ldpc_code_device(
 			"../src/code/test_code/code_rand_proto_3x6_400_4.txt"
 			, "../src/code/test_code/layer_rand_proto_3x6_400_4.txt"
-			, false
+			, true
 		)
 	);
 
@@ -33,14 +33,10 @@ int main()
 			, "../src/code/test_code/mapping_rand_proto_3x6_400_4.txt"
 		)
 	);
-	sim_dev->print();
-	sim_dev->start();
-
-	//cudakernel::sim::setup_randn<<<get_num_size(sim_dev->n(), NUM_THREADS), NUM_THREADS>>>(sim_dev);
-	//cudakernel::sim::awgn<<<get_num_size(sim_dev->n(), NUM_THREADS), NUM_THREADS>>>(sim_dev, 1);
-	//cudaDeviceSynchronize();
-
-
+	//sim_dev->print();
+	//sim_dev->start();
+	sim_dev->start_device();
+	
 /*
     //set up decoder on unified memory
 	try
@@ -49,11 +45,11 @@ int main()
 			ldpc_decoder_device(code_dev, 50, false)
 		);
 
-		for (size_t i = 0; i < code_dev.nc(); ++i) {
+		for (size_t i = 0; i < code_dev->nc(); ++i) {
 			dec_dev->mLLRIn[i] = ldpc_sim::randn();
 		}
 
-		dec_dev->decode_layered();
+		//dec_dev->decode_layered();
 		TIME_PROF("GPU Layered", dec_dev->decode_layered(), "ms");
 		//TIME_PROF("CPU Layered", dec_dev->decode_layered_legacy(), "ms");
 		//TIME_PROF("CPU Legacy", dec_dev->decode_legacy(), "ms");
@@ -62,6 +58,6 @@ int main()
 	{
 		std::cout << "Error ldpc_decoder_device" << '\n';
 	}
-    return 0;
 */
+    return 0;
 }

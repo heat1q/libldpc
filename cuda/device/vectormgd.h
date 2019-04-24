@@ -114,6 +114,7 @@ namespace ldpc
 		__host__ __device__ T& operator*() { return *mContainer; }
 		__host__ __device__ T* operator->() { return mContainer; }
 
+		__host__ __device__ T* get() { return mContainer; }
 	private:
 		T* mContainer;
 		size_t* mRefCount;
