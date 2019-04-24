@@ -28,7 +28,7 @@ __host__ constellation::constellation(const uint16_t pM)
  */
 //init constructor
 __host__ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device>& pCode, const char* pSimFileName, const char* pMapFileName)
-: mLdpcCode(pCode), mLdpcDecoder()
+: mLdpcCode(pCode), mLdpcDecoder(), mThreads(1)
 {
     try
     {
@@ -186,7 +186,9 @@ __host__ void ldpc_sim_device::mem_prefetch()
 }
 
 
-__host__ void ldpc_sim_device::start()
+//start simulation for parallel frame processing on gpu
+//specified with mThreads
+__host__ void ldpc_sim_device::start_device()
 {
     double sigma2;
     uint64_t frames;
@@ -205,9 +207,104 @@ __host__ void ldpc_sim_device::start()
     printResStr[0].assign("snr fer ber frames avg_iter");
     #endif
 
-    /*
-     * START: SIMULATION PART
-     */
+    for (size_t i = 0; i < mSnrs.size(); ++i)
+    {
+        bec = 0;
+        fec = 0;
+        frames = 0;
+        iters = 0;
+        sigma2 = pow(10, -mSnrs[i]/10);
+        auto time_start = std::chrono::high_resolution_clock::now();
+        do
+        {
+            //launch the frame processing kernel
+            cudakernel::sim::frame_proc<<<mThreads, 1>>>(this, sigma2);
+            cudeDeviceSynchronize();
+
+            //now check the processed frames
+            for (uint16_t k = 0; k < mThreads; ++k) //TODO adjust for parallel threads
+            {
+                frames++;
+                bec_tmp = 0;
+                for(size_t j = 0; j < mLdpcCode->nc(); j++)
+                {
+                    bec_tmp += (mLdpcDecoder->mLLROut[j] <= 0);
+                }
+
+                if (bec_tmp > 0)
+                {
+                    bec += bec_tmp;
+                    fec++;
+
+                    auto time_dur = std::chrono::high_resolution_clock::now() - time_start;
+                    size_t t = static_cast<size_t>(std::chrono::duration_cast<std::chrono::microseconds>(time_dur).count());
+                    printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e, TIME/FRAME=%.3fms, AVGITERS=%.2f\n",
+                       fec, mMinFec, frames, mSnrs[i],
+                       (double) bec/(frames*mLdpcCode->nc()), (double) fec/frames,
+                       (double) t/frames * 1e-3,
+                       (double) iters/frames
+                    );
+
+                    #ifdef LOG_FRAME_TIME
+                    sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.3f"
+                        , mSnrs[i]
+                        , (double) fec/frames
+                        , (double) bec/(frames*mLdpcCode->nc())
+                        , frames, (double) iters/frames
+                        , (double) t/frames * 1e-3
+                    );
+                    #else
+                    sprintf(resStr, "%lf %.3e %.3e %lu %.3e"
+                        , mSnrs[i]
+                        , (double) fec/frames
+                        , (double) bec/(frames*mLdpcCode->nc())
+                        , frames, (double) iters/frames
+                    );
+                    #endif
+
+                    printResStr[i+1].assign(resStr);
+
+                    try
+                    {
+                        fp.open(mLogfile);
+                        for (const auto& x : printResStr)
+                        {
+                            fp << x << "\n";
+                        }
+                        fp.close();
+                    }
+                    catch(...)
+                    {
+                        std::cout << "Warning: can not open logfile " << mLogfile << " for writing" << "\n";
+                    }
+
+                    log_error(frames, mSnrs[i]);
+                }
+            }
+        } while (fec < mMinFec && frames < mMaxFrames); //end while
+    }//end for
+}
+
+
+//start simulation on cpu
+__host__ void ldpc_sim_device::start()
+{
+    double sigma2;
+    uint64_t frames;
+    uint64_t bec = 0;
+    uint64_t fec = 0;
+    uint64_t iters;
+    size_t bec_tmp;
+
+    std::vector<std::string> printResStr(mSnrs.size()+1, std::string());
+    std::ofstream fp;
+    char resStr[128];
+
+    #ifdef LOG_FRAME_TIME
+    printResStr[0].assign("snr fer ber frames avg_iter time_frame[ms]");
+    #else
+    printResStr[0].assign("snr fer ber frames avg_iter");
+    #endif
 
     for (size_t i = 0; i < mSnrs.size(); ++i)
     {
@@ -325,13 +422,7 @@ __host__ double ldpc_sim_device::randn()
 }
 
 
-__device__ double ldpc_sim_device::randn_device()
-{
-
-}
-
-
-__host__ __device__ double ldpc_sim_device::simulate_awgn(double sigma2)
+__host__ __device__ double ldpc_sim_device::simulate_awgn(double pSigma2)
 {
     double a = 0;
     double Pn = 0;
@@ -339,7 +430,7 @@ __host__ __device__ double ldpc_sim_device::simulate_awgn(double sigma2)
 
     for (size_t i = 0; i < mN; i++)
     {
-        a = randn() * sqrt(sigma2);
+        a = randn() * sqrt(pSigma2);
         Pn += a * a;
         Px += mConstellation.X()[mX[i]] * mConstellation.X()[mX[i]];
         mY[i] = mConstellation.X()[mX[i]] + a;

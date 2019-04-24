@@ -19,26 +19,10 @@ __global__ void cudakernel::sim::awgn()
 	}
 }
 */
-__global__ void cudakernel::sim::frame_proc(cudamgd_ptr<ldpc_sim_device> pSim)
-{
-	
-}
-
-__global__ void cudakernel::sim::awgn(cudamgd_ptr<ldpc_sim_device> pSim, double sigma2)
-{
-	const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
-
-	double a = 0;
-
-	for (size_t i = ix; i < pSim->n(); i += sx)
-	{
-		a = curand_normal(&(pSim->mCurandState[i])) * sqrt(sigma2);
-		pSim->mY[i] = pSim->cstll().X()[pSim->mX[i]] + a;
-	}
-}
-
-__global__ void cudakernel::sim::setup_randn(cudamgd_ptr<ldpc_sim_device> pSim)
+/*
+ *	Simulation kernels
+ */
+ __global__ void cudakernel::sim::setup_randn(ldpc_sim_device* pSim)
 {
 	// initialize curand
 	const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
@@ -49,6 +33,115 @@ __global__ void cudakernel::sim::setup_randn(cudamgd_ptr<ldpc_sim_device> pSim)
 		curand_init(clock64(), i, 0, &(pSim->mCurandState[i]));
 	}
 }
+
+
+__global__ void cudakernel::sim::frame_proc(ldpc_sim_device* pSim, double pSigma2)
+{
+	//encodeall0
+    cudakernel::sim::encode_all0<<<get_num_size(pSim->ldpc_code()->nct(), NUM_THREADS), NUM_THREADS>>>(pSim);
+
+    cudaDeviceSynchronize(); //synchronize before function call
+    //map c to x
+    pSim->map_c_to_x();
+
+    //sim awgn
+    cudakernel::sim::awgn<<<get_num_size(pSim->n(), NUM_THREADS), NUM_THREADS>>>(pSim, pSigma2);
+
+    //num & punture
+    //TODO
+
+    //calc_llrs
+    cudakernel::sim::calc_llrs<<<get_num_size(pSim->n(), NUM_THREADS), NUM_THREADS>>>(pSim, pSigma2);
+    cudaDeviceSynchronize();
+    for(size_t j = 0; j < pSim->ldpc_code()->nc(); j++) {
+        pSim->mLdpcDecoder->mLLRIn[j] *= (1-2*pSim->mC[j]);
+    }
+
+    //decode
+    cudakernel::decoder::decode_layered<<<1,1>>>(pSim->mLdpcDecoder);
+}
+
+
+//encode the input to all zero
+__global__ void cudakernel::sim::encode_all0(ldpc_sim_device* pSim)
+{
+	const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t sx = blockDim.x * gridDim.x;
+
+    for(size_t i = ix; i < pSim->ldpc_code()->nct(); i+=sx) {
+        pSim->mC[pSim->bits_pos()[i]] = (curand_uniform(&(pSim->mCurandState[0])) > 0.5000); //TODO - own state
+    }
+
+    for(size_t i = ix; i < pSim->ldpc_code()->num_puncture(); i+=sx) {
+        pSim->mC[pSim->ldpc_code()->puncture()[i]] = (curand_uniform(&(pSim->mCurandState[0])) > 0.5000); //TODO - own state
+    }
+
+    for(size_t i = 0; i < pSim->ldpc_code()->num_shorten(); i++) {
+        pSim->mC[pSim->ldpc_code()->shorten()[i]] = 0;
+    }
+
+    //map_c_to_x()
+}
+
+
+__global__ void cudakernel::sim::awgn(ldpc_sim_device* pSim, double pSigma2)
+{
+	const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t sx = blockDim.x * gridDim.x;
+
+	double a = 0;
+
+	for (size_t i = ix; i < pSim->n(); i += sx)
+	{
+		a = curand_normal(&(pSim->mCurandState[i])) * sqrt(pSigma2);
+		pSim->mY[i] = pSim->cstll().X()[pSim->mX[i]] + a;
+        //Pn += a * a;
+        //Px += pSim->cstll().X()[pSim->mX[i]] * pSim->cstll().X()[pSim->mX[i]];
+	}
+
+    //return Px/Pn
+}
+
+
+__global__ void cudakernel::sim::calc_llrs(ldpc_sim_device* pSim, double pSigma2)
+{
+	const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t sx = blockDim.x * gridDim.x;
+
+    for(size_t l = ix; l < pSim->n(); l+=sx)
+    {
+        double tmp0, tmp1;
+
+        for(size_t i = 0; i < pSim->cstll().log2M(); i++)
+        {
+            tmp0 = 0.0;
+            tmp1 = 0.0;
+            for(size_t j = 0; j < pSim->cstll().M(); j++) {
+                if(pSim->labels()[j] & (1 << (pSim->cstll().log2M()-1-i))) {
+                    tmp1 += exp(-(pSim->mY[l]-pSim->cstll().X()[j])*(pSim->mY[l]-pSim->cstll().X()[j])/(2*sigma2)) * pSim->cstll().pX()[j];
+                } else {
+                    tmp0 += exp(-(pSim->mY[l]-pSim->cstll().X()[j])*(pSim->mY[l]-pSim->cstll().X()[j])/(2*sigma2)) * pSim->cstll().pX()[j];
+                }
+            }
+            double val = log(tmp0/tmp1);
+            // check usually required when PAS is used with large constellations
+            // and severely shaped distributions
+            if(isinf(val) == +1) {
+                pSim->mLTmp[i] = MAX_LLR;
+            } else if(isinf(val) == -1) {
+                pSim->mLTmp[i] = MIN_LLR;
+            } else {
+                pSim->mLTmp[i] = val;
+            }
+        }
+
+        for(size_t k = 0; k < pSim->bits(); k++) {
+            pSim->mLdpcDecoder->mLLRIn[pSim->bit_mapper()[k][l]] = pSim->mLTmp[k];
+        }
+    }
+}
+
+
 
 /*
  *	Decoder kernels

@@ -115,11 +115,10 @@ namespace ldpc
 		__host__ ldpc_sim_device(cudamgd_ptr<ldpc_code_device>& pCode, const char* pSimFileName, const char* pMapFileName);
 		__host__ void mem_prefetch();
 
+		__host__ void start_device();
 		__host__ void start();
 
 		__host__ double randn();
-		__device__ double randn_device();
-
 		__host__ __device__ double simulate_awgn(double pSigma2);
 		__host__ __device__ void encode() {}
 		__host__ __device__ void encode_all0();
@@ -149,6 +148,7 @@ namespace ldpc
 		cudamgd_ptr<ldpc_code_device> mLdpcCode;
 
 		constellation mConstellation;
+		uint16_t mThreads;
 
 		size_t mN;
 		size_t mBits;
