@@ -96,7 +96,7 @@ namespace ldpc
 	class ldpc_code_device
 	{
 	public:
-		__host__ ldpc_code_device(const char* pFileName, const char* pClFile, bool pUseLayer);
+		__host__ ldpc_code_device(const char* pFileName, const char* pClFile);
 		__host__ void mem_prefetch();
 		__host__ void print();
 

@@ -166,7 +166,7 @@ namespace ldpc
 		size_t mMinFec;
 		size_t mBPIter;
 
-		char mLogfile[MAX_FILENAME_LEN];
+		std::string mLogfile;
 		double mSE;
 
 		vec_double_t mSnrs;

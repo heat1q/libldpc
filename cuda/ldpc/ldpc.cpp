@@ -490,7 +490,7 @@ __host__ __device__ int8_t ldpc::sign(const double& a)
 * Code device
 */
 //init constructor
-__host__ ldpc_code_device::ldpc_code_device(const char* pFileName, const char* pClFile, bool pUseLayer)
+__host__ ldpc_code_device::ldpc_code_device(const char* pFileName, const char* pClFile)
 : mMaxDC(0)
 {
 	try
@@ -499,7 +499,7 @@ __host__ ldpc_code_device::ldpc_code_device(const char* pFileName, const char* p
 		if(!fpCode) { throw std::runtime_error("can not open codefile for reading."); }
 
 		FILE *fpLayer;
-		if (pUseLayer)
+		if (strcmp(pClFile, "") != 0)
 		{
 			fpLayer = fopen(pClFile, "r");
 			if(!fpLayer) { throw std::runtime_error("Can not open layer file"); }
@@ -576,7 +576,7 @@ __host__ ldpc_code_device::ldpc_code_device(const char* pFileName, const char* p
 			if(mCW[i] > mMaxDC) { mMaxDC = mCW[i]; }
 		}
 
-		if (pUseLayer)
+		if (strcmp(pClFile, "") != 0)
 		{
 			//setup layers
 			fscanf(fpLayer, "nl: %lu\n", &mNL);
