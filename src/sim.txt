@@ -1,4 +1,4 @@
-name: results_sim_high_res.txt
+name: results.txt
 M: 2
 bits: 1
 labels: 0, 1
