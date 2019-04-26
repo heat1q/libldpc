@@ -26,7 +26,7 @@ __host__ constellation::constellation(const uint16_t pM)
  * ldpc_sim_device
  */
 //init constructor
-__host__ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> &pCode, const char *pSimFileName, const char *pMapFileName)
+__host__ ldpc_sim_device::ldpc_sim_device(cuda_ptr<ldpc_code_device> &pCode, const char *pSimFileName, const char *pMapFileName)
     : mLdpcCode(pCode), mLdpcDecoder(), mThreads(1)
 {
     try
@@ -168,7 +168,7 @@ __host__ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> &pCode, 
 
         //changed with each frame
         //set up decoder
-        mLdpcDecoder = cudamgd_ptr<ldpc_decoder_device>(
+        mLdpcDecoder = cuda_ptr<ldpc_decoder_device>(
             ldpc_decoder_device(mLdpcCode, mBPIter, true));
 
         //channel i/o
@@ -181,7 +181,7 @@ __host__ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> &pCode, 
         mCurandStateEncoding = vector_mgd<curandState_t>(mLdpcCode->nct());
         mCurandState = vector_mgd<curandState_t>(mN);
 
-        mem_prefetch();
+        //mem_prefetch();
     }
     catch (std::exception &e)
     {

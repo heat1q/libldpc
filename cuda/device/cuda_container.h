@@ -14,13 +14,13 @@ namespace ldpc
 	}
 
 	template <typename T>
-	class cudamgd_ptr
+	class cuda_ptr
 	{
 	public:
-		__host__ __device__ cudamgd_ptr()
+		__host__ __device__ cuda_ptr()
 		: mContainer(nullptr),  mRefCount(nullptr) {}
 
-		__host__ explicit cudamgd_ptr(T* pVal) //init constructor with pointer to obj, only on host
+		__host__ explicit cuda_ptr(T* pVal) //init constructor with pointer to obj, only on host
 		: mContainer(pVal),  mRefCount(nullptr)
 		{
 			try
@@ -40,7 +40,7 @@ namespace ldpc
 			}
 		}
 
-		__host__ cudamgd_ptr(const T& pVal) //init constructor, only on host
+		__host__ cuda_ptr(const T& pVal) //init constructor, only on host
 		: mContainer(nullptr), mRefCount(nullptr)
 		{
 			try
@@ -68,10 +68,10 @@ namespace ldpc
 			}
 		}
 
-		__host__ __device__ cudamgd_ptr(const cudamgd_ptr& pCopy) //copy constructor
+		__host__ __device__ cuda_ptr(const cuda_ptr& pCopy) //copy constructor
 		: mContainer(pCopy.mContainer), mRefCount(pCopy.mRefCount) { (*mRefCount)++; }
 
-		__host__ __device__ ~cudamgd_ptr()
+		__host__ __device__ ~cuda_ptr()
 		{
 			if (mRefCount != nullptr)
 			{
@@ -93,7 +93,7 @@ namespace ldpc
 		}
 
 		//copy/move assignment operator
-		__host__ __device__ cudamgd_ptr& operator=(cudamgd_ptr pCopy) noexcept
+		__host__ __device__ cuda_ptr& operator=(cuda_ptr pCopy) noexcept
 		{
 			swap(mContainer, pCopy.mContainer);
 			swap(mRefCount, pCopy.mRefCount);

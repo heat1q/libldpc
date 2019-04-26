@@ -1,9 +1,8 @@
 #include "ldpcsim.h"
-#include "device/vectormgd.h"
 
 using namespace ldpc;
 
-// /usr/local/cuda-9.2/bin/nvcc -x cu -std=c++11 sim_cuda.cpp ldpcsim.cpp ldpc/ldpc.cpp ldpc/decoder.cpp device/cudamgd.cpp device/kernel.cpp device/ldpcsimdevice.cpp  -o sim_cuda -arch sm_35 -rdc=true -O3 -w
+// /usr/local/cuda-9.2/bin/nvcc -x cu -std=c++11 sim_cuda.cpp ldpc/ldpc.cpp ldpc/decoder.cpp device/kernel.cpp device/ldpcsimdevice.cpp  -o sim_cuda -arch sm_35 -rdc=true -O3 -w
 int main(int argc, char *argv[])
 {
 	bool abort = false;
@@ -92,11 +91,11 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	cudamgd_ptr<ldpc_code_device> code_dev(
+	cuda_ptr<ldpc_code_device> code_dev(
 		ldpc_code_device(
 			codeFile.c_str(), layerFile.c_str()));
 
-	cudamgd_ptr<ldpc_sim_device> sim_dev(
+	cuda_ptr<ldpc_sim_device> sim_dev(
 		ldpc_sim_device(
 			code_dev, simFile.c_str(), mapFile.c_str()));
 
@@ -104,27 +103,5 @@ int main(int argc, char *argv[])
 	//sim_dev->start();
 	sim_dev->start_device();
 
-	/*
-    //set up decoder on unified memory
-	try
-	{
-		cudamgd_ptr<ldpc_decoder_device> dec_dev(
-			ldpc_decoder_device(code_dev, 50, false)
-		);
-
-		for (size_t i = 0; i < code_dev->nc(); ++i) {
-			dec_dev->mLLRIn[i] = ldpc_sim::randn();
-		}
-
-		//dec_dev->decode_layered();
-		TIME_PROF("GPU Layered", dec_dev->decode_layered(), "ms");
-		//TIME_PROF("CPU Layered", dec_dev->decode_layered_legacy(), "ms");
-		//TIME_PROF("CPU Legacy", dec_dev->decode_legacy(), "ms");
-	}
-	catch(...)
-	{
-		std::cout << "Error ldpc_decoder_device" << '\n';
-	}
-*/
 	return 0;
 }
