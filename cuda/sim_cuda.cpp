@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
 	std::string simFile;
 	std::string mapFile;
 	std::string layerFile;
-	uint16_t numThreads;
+	uint16_t numThreads = 1;
 
 	if (argc == 7)
 	{
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
 			}
 			else if (strcmp(argv[2 * i + 1], "-threads") == 0)
 			{
-				numThreads = static_cast<unsigned short>(atoi(argv[2 * i + 1]));
+				numThreads = static_cast<unsigned short>(atoi(argv[2 * i + 2]));
 			}
 			else
 			{
@@ -97,11 +97,14 @@ int main(int argc, char *argv[])
 
 	cuda_ptr<ldpc_sim_device> sim_dev(
 		ldpc_sim_device(
-			code_dev, simFile.c_str(), mapFile.c_str()));
+			code_dev, simFile.c_str(), mapFile.c_str(), numThreads));
 
 	sim_dev->print();
-	//sim_dev->start();
+#if defined USE_LEGACY_DEC || defined USE_CPU_FRAME
+	sim_dev->start();
+#else
 	sim_dev->start_device();
+#endif
 
 	return 0;
 }

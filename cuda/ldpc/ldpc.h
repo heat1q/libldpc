@@ -14,7 +14,9 @@ using vec_symbols_t = vector_mgd<unsigned>;
 using vec_size_t = vector_mgd<size_t>;
 using vec_double_t = vector_mgd<double>;
 
-using mat_size_t = vector_mgd<vector_mgd<size_t>>;
+using mat_bits_t = vector_mgd< vector_mgd<bits_t> >;
+using mat_size_t = vector_mgd< vector_mgd<size_t> >;
+using mat_double_t = vector_mgd< vector_mgd<double> >;
 
 class ldpc_code_device
 {
@@ -155,11 +157,11 @@ namespace sim
 {
 __global__ void setup_rng(ldpc_sim_device *pSim);
 __global__ void frame_proc(ldpc_sim_device *pSim, double pSigma2);
-__global__ void encode_all0(ldpc_sim_device *pSim);
-__global__ void awgn(ldpc_sim_device *pSim, double pSigma2);
-__global__ void calc_llrs(ldpc_sim_device *pSim, double pSigma2);
-__global__ void calc_llrin(ldpc_sim_device *pSim);
-__global__ void map_c_to_x(ldpc_sim_device *pSim);
+__global__ void encode_all0(ldpc_sim_device *pSim, uint16_t pBlockID);
+__global__ void awgn(ldpc_sim_device *pSim, double pSigma2, uint16_t pBlockID);
+__global__ void calc_llrs(ldpc_sim_device *pSim, double pSigma2, uint16_t pBlockID);
+__global__ void calc_llrin(ldpc_sim_device *pSim, uint16_t pBlockID);
+__global__ void map_c_to_x(ldpc_sim_device *pSim, uint16_t pBlockID);
 } // namespace sim
 } // namespace cudakernel
 

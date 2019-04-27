@@ -65,6 +65,9 @@
 
 namespace ldpc
 {
+using vec_ldpc_dec_t = vector_mgd< cuda_ptr<ldpc_decoder_device> >;
+using mat_curandState_t = vector_mgd< vector_mgd<curandState_t> >;
+
 class constellation
 {
   public:
@@ -91,7 +94,7 @@ class constellation
 class ldpc_sim_device
 {
   public:
-	__host__ ldpc_sim_device(cuda_ptr<ldpc_code_device> &pCode, const char *pSimFileName, const char *pMapFileName);
+	__host__ ldpc_sim_device(cuda_ptr<ldpc_code_device> &pCode, const char *pSimFileName, const char *pMapFileName, uint16_t pNumThreads);
 	__host__ void mem_prefetch();
 
 	__host__ void start_device();
@@ -105,17 +108,16 @@ class ldpc_sim_device
 	__host__ __device__ void calc_llrs(double sigma2);
 
 	__host__ void print();
-	__host__ void log_error(size_t pFrameNum, double pSNR);
+	__host__ void log_error(size_t pFrameNum, double pSNR, uint16_t pThreads);
 
 	//changed with each frame
-	cuda_ptr<ldpc_decoder_device> mLdpcDecoder;
-	vec_size_t mX;
-	vec_double_t mY;
-	vec_bits_t mC;
-	vec_double_t mLTmp;
+	vec_ldpc_dec_t mLdpcDecoderVec;
+	mat_size_t mX;
+	mat_double_t mY;
+	mat_bits_t mC;
 
-	vector_mgd<curandState_t> mCurandState;
-	vector_mgd<curandState_t> mCurandStateEncoding;
+	mat_curandState_t mCurandState;
+	mat_curandState_t mCurandStateEncoding;
 
 	__host__ __device__ cuda_ptr<ldpc_code_device> ldpc_code() const { return mLdpcCode; }
 	__host__ __device__ const constellation &cstll() const { return mConstellation; }
