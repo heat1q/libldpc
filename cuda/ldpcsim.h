@@ -2,7 +2,7 @@
 
 #include <chrono>
 #include <vector>
-#include <string.h>
+#include <string>
 #include <fstream>
 
 #include "curand_kernel.h"
@@ -42,10 +42,14 @@
 		printf("%.3f %s\n", static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count()) * a, str_unit.c_str()); \
 	} while (0);
 
-#define NUM_THREADS 128
-#define gpuErrchk(ans) { ldpc::gpuAssert((ans), __FILE__, __LINE__); }
+#ifndef NUMK_THREADS
+#define NUMK_THREADS 128
+#endif
 
-#define LOG_FRAME_TIME
+#define gpuErrchk(ans)                              \
+	{                                               \
+		ldpc::gpuAssert((ans), __FILE__, __LINE__); \
+	}
 
 #define MAX_FILENAME_LEN 256
 #define MAX_LLR 9999.9
@@ -65,14 +69,14 @@
 
 namespace ldpc
 {
-using vec_ldpc_dec_t = vector_mgd< cuda_ptr<ldpc_decoder_device> >;
-using mat_curandState_t = vector_mgd< vector_mgd<curandState_t> >;
+using vec_ldpc_dec_t = cuda_vector<cuda_ptr<ldpc_decoder_device>>;
+using mat_curandState_t = cuda_vector<cuda_vector<curandState_t>>;
 
 class constellation
 {
   public:
 	__host__ __device__ constellation() {}
-	__host__ constellation(const labels_t pM);
+	__host__ constellation(labels_t pM);
 	__host__ void mem_prefetch()
 	{
 		mPX.mem_prefetch();
@@ -94,7 +98,7 @@ class constellation
 class ldpc_sim_device
 {
   public:
-	__host__ ldpc_sim_device(cuda_ptr<ldpc_code_device> &pCode, const char *pSimFileName, const char *pMapFileName, uint16_t pNumThreads);
+	__host__ ldpc_sim_device(cuda_ptr<ldpc_code_device> &pCode, const char *pSimFileName, const char *pMapFileName, labels_t pNumThreads);
 	__host__ void mem_prefetch();
 
 	__host__ void start_device();
@@ -108,7 +112,7 @@ class ldpc_sim_device
 	__host__ __device__ void calc_llrs(double sigma2);
 
 	__host__ void print();
-	__host__ void log_error(size_t pFrameNum, double pSNR, uint16_t pThreads);
+	__host__ void log_error(std::size_t pFrameNum, double pSNR, labels_t pThreads);
 
 	//changed with each frame
 	vec_ldpc_dec_t mLdpcDecoderVec;
@@ -119,26 +123,25 @@ class ldpc_sim_device
 	mat_curandState_t mCurandState;
 	mat_curandState_t mCurandStateEncoding;
 
-	__host__ __device__ cuda_ptr<ldpc_code_device> ldpc_code() const { return mLdpcCode; }
+	cuda_ptr<ldpc_code_device> mLdpcCode;
+
 	__host__ __device__ const constellation &cstll() const { return mConstellation; }
-	__host__ __device__ size_t n() const { return mN; }
-	__host__ __device__ size_t bits() const { return mBits; }
+	__host__ __device__ std::size_t n() const { return mN; }
+	__host__ __device__ std::size_t bits() const { return mBits; }
 	__host__ __device__ const vec_labels_t &labels() const { return mLabels; }
 	__host__ __device__ const vec_labels_t &labels_rev() const { return mLabelsRev; }
 	__host__ __device__ const vec_size_t &bits_pos() const { return mBitPos; }
 	__host__ __device__ const mat_size_t &bit_mapper() const { return mBitMapper; }
 
   private:
-	cuda_ptr<ldpc_code_device> mLdpcCode;
-
 	constellation mConstellation;
-	uint16_t mThreads;
+	labels_t mThreads;
 
-	size_t mN;
-	size_t mBits;
-	size_t mMaxFrames;
-	size_t mMinFec;
-	size_t mBPIter;
+	std::size_t mN;
+	std::size_t mBits;
+	std::size_t mMaxFrames;
+	std::size_t mMinFec;
+	std::size_t mBPIter;
 
 	std::string mLogfile;
 	double mSE;

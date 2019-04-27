@@ -2,9 +2,8 @@
 
 #include <math.h>
 
-using namespace ldpc;
-
-
+namespace ldpc
+{
 /*
 * Code device
 */
@@ -44,7 +43,7 @@ __host__ ldpc_code_device::ldpc_code_device(const char *pFileName, const char *p
 		if (mNumPuncture != 0)
 		{
 			mPuncture = vec_size_t(mNumPuncture);
-			for (size_t i = 0; i < mNumPuncture; i++)
+			for (std::size_t i = 0; i < mNumPuncture; i++)
 			{
 				fscanf(fpCode, " %lu ", &(mPuncture[i]));
 				if (mPuncture[i] < mK)
@@ -62,7 +61,7 @@ __host__ ldpc_code_device::ldpc_code_device(const char *pFileName, const char *p
 		if (mNumShorten != 0)
 		{
 			mShorten = vec_size_t(mNumShorten);
-			for (size_t i = 0; i < mNumShorten; i++)
+			for (std::size_t i = 0; i < mNumShorten; i++)
 			{
 				fscanf(fpCode, " %lu ", &(mShorten[i]));
 			}
@@ -76,7 +75,7 @@ __host__ ldpc_code_device::ldpc_code_device(const char *pFileName, const char *p
 		mR = vec_size_t(mNNZ);
 		mC = vec_size_t(mNNZ);
 
-		for (size_t i = 0; i < mNNZ; i++)
+		for (std::size_t i = 0; i < mNNZ; i++)
 		{
 			fscanf(fpCode, "%lu %lu\n", &(mR[i]), &(mC[i]));
 			mCW[mR[i]]++;
@@ -84,24 +83,24 @@ __host__ ldpc_code_device::ldpc_code_device(const char *pFileName, const char *p
 		}
 
 		mCN = mat_size_t(mM, vec_size_t());
-		for (size_t i = 0; i < mM; i++)
+		for (std::size_t i = 0; i < mM; i++)
 		{
 			mCN[i] = vec_size_t(mCW[i]);
 		}
 
 		mVN = mat_size_t(mN, vec_size_t());
-		for (size_t i = 0; i < mN; i++)
+		for (std::size_t i = 0; i < mN; i++)
 		{
 			mVN[i] = vec_size_t(mVW[i]);
 		}
 
-		for (size_t i = 0; i < mNNZ; i++)
+		for (std::size_t i = 0; i < mNNZ; i++)
 		{
 			mCN[mR[i]][cwTmp[mR[i]]++] = i;
 			mVN[mC[i]][vwTmp[mC[i]]++] = i;
 		}
 
-		for (size_t i = 0; i < mM; i++)
+		for (std::size_t i = 0; i < mM; i++)
 		{
 			if (mCW[i] > mMaxDC)
 			{
@@ -117,11 +116,11 @@ __host__ ldpc_code_device::ldpc_code_device(const char *pFileName, const char *p
 			mLW = vec_size_t(mNL);
 			mLayers = mat_size_t(mNL, vec_size_t());
 
-			for (size_t i = 0; i < mNL; ++i)
+			for (std::size_t i = 0; i < mNL; ++i)
 			{
 				fscanf(fpLayer, "cn[i]: %lu\n", &(mLW[i]));
 				mLayers[i] = vec_size_t(mLW[i]);
-				for (size_t j = 0; j < mLW[i]; ++j)
+				for (std::size_t j = 0; j < mLW[i]; ++j)
 					fscanf(fpLayer, "%lu\n", &(mLayers[i][j]));
 			}
 
@@ -132,7 +131,7 @@ __host__ ldpc_code_device::ldpc_code_device(const char *pFileName, const char *p
 			mNL = 1;
 			mLW = vec_size_t(mNL, mM);
 			mLayers = mat_size_t(mNL, vec_size_t(mM));
-			for (size_t i = 0; i < mM; ++i)
+			for (std::size_t i = 0; i < mM; ++i)
 			{
 				mLayers[0][i] = i;
 			}
@@ -151,7 +150,6 @@ __host__ ldpc_code_device::ldpc_code_device(const char *pFileName, const char *p
 
 __host__ void ldpc_code_device::print()
 {
-	std::cout << "=========== LDPC ===========" << "\n";
 	std::cout << "nc : " << mN << "\n";
 	std::cout << "mc : " << mM << "\n";
 	std::cout << "kc : " << mK << "\n";
@@ -164,11 +162,10 @@ __host__ void ldpc_code_device::print()
 	std::cout << "num puncture sys: " << mNumPunctureSys << "\n";
 	std::cout << "num puncture par: " << mNumPuncturePar << "\n";
 	std::cout << "num shorten: " << mNumShorten << "\n";
-	std::cout << "=========== LDPC: END ===========" << std::endl;
-
+/*
 	printf("=========== LDPC LAYERS ===========\n");
 	printf("nl: %lu\n", mNL);
-	for (size_t i = 0; i < mNL; ++i)
+	for (std::size_t i = 0; i < mNL; ++i)
 	{
 		printf("cn[%lu]: %lu\n", i, mLW[i]);
 		for (auto x : mLayers[i])
@@ -178,6 +175,7 @@ __host__ void ldpc_code_device::print()
 		printf("\n");
 	}
 	printf("========= LDPC LAYERS: END ========\n");
+*/
 }
 
 /*
@@ -227,13 +225,13 @@ __host__ void ldpc_code_device::mem_prefetch()
 	}
 }
 
-void ldpc::dec2bin(uint64_t val, uint8_t m)
+__host__ __device__ void dec2bin(std::size_t val, uint8_t m)
 {
-	for (size_t i = 0; i < m; i++)
+	for (std::size_t i = 0; i < m; i++)
 		printf("%lu", (val >> (m - i - 1) & 0x01));
 }
 
-__host__ __device__ double ldpc::jacobian(const double &L1, const double &L2)
+__host__ __device__ double jacobian(double L1, double L2)
 {
 #ifdef CN_APPROX_LIN
 	return sign(L1) * sign(L2) * fmin(fabs(L1), fabs(L2)) + jacobian_lin_approx(L1 + L2) - jacobian_lin_approx(L1 - L2);
@@ -244,7 +242,7 @@ __host__ __device__ double ldpc::jacobian(const double &L1, const double &L2)
 #endif
 }
 
-__host__ __device__ double ldpc::jacobian_lin_approx(const double &L)
+__host__ __device__ double jacobian_lin_approx(double L)
 {
 	double Labs = fabs(L);
 
@@ -262,7 +260,8 @@ __host__ __device__ double ldpc::jacobian_lin_approx(const double &L)
 	}
 }
 
-__host__ __device__ int8_t ldpc::sign(const double &a)
+__host__ __device__ int sign(double a)
 {
 	return (a <= 0) ? -1 : 1;
 }
+} // namespace ldpc

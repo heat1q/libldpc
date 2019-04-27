@@ -1,47 +1,47 @@
 #include "../ldpcsim.h"
 
-using namespace ldpc;
-
+namespace ldpc
+{
 /*
 *	Simulation kernels
 */
 __global__ void cudakernel::sim::setup_rng(ldpc_sim_device *pSim)
 {
     // initialize curand
-    const uint16_t ix = blockIdx.x;
-    const size_t tx = threadIdx.x;
-    const size_t sx = blockDim.x ;
+    const labels_t ix = blockIdx.x;
+    const std::size_t tx = threadIdx.x;
+    const std::size_t sx = blockDim.x;
 
-    for (size_t i = tx; i < pSim->n(); i += sx)
+    for (std::size_t i = tx; i < pSim->n(); i += sx)
     {
-        curand_init(clock64()+ix, i, 0, &(pSim->mCurandState[ix][i]));
+        curand_init(clock64() + ix, i, 0, &(pSim->mCurandState[ix][i]));
     }
 
-    for (size_t j = tx; j < pSim->ldpc_code()->nct(); j += sx)
+    for (std::size_t j = tx; j < pSim->mLdpcCode->nct(); j += sx)
     {
-        curand_init(clock64()+ix, j, 0, &(pSim->mCurandStateEncoding[ix][j]));
+        curand_init(clock64() + ix, j, 0, &(pSim->mCurandStateEncoding[ix][j]));
     }
 }
 
 __global__ void cudakernel::sim::frame_proc(ldpc_sim_device *pSim, double pSigma2)
 {
-    const uint16_t ix = blockIdx.x;
+    const labels_t ix = blockIdx.x;
 
     //encodeall0
-    cudakernel::sim::encode_all0<<<get_num_size(pSim->ldpc_code()->nct(), NUM_THREADS), NUM_THREADS>>>(pSim, ix);
+    cudakernel::sim::encode_all0<<<get_num_size(pSim->mLdpcCode->nct(), NUMK_THREADS), NUMK_THREADS>>>(pSim, ix);
 
     //map c to x
-    cudakernel::sim::map_c_to_x<<<get_num_size(pSim->n(), NUM_THREADS), NUM_THREADS>>>(pSim, ix);
+    cudakernel::sim::map_c_to_x<<<get_num_size(pSim->n(), NUMK_THREADS), NUMK_THREADS>>>(pSim, ix);
 
     //sim awgn
-    cudakernel::sim::awgn<<<get_num_size(pSim->n(), NUM_THREADS), NUM_THREADS>>>(pSim, pSigma2, ix);
+    cudakernel::sim::awgn<<<get_num_size(pSim->n(), NUMK_THREADS), NUMK_THREADS>>>(pSim, pSigma2, ix);
 
     //num & punture
     //TODO
 
     //calc llrin
-    cudakernel::sim::calc_llrs<<<get_num_size(pSim->n(), NUM_THREADS), NUM_THREADS>>>(pSim, pSigma2, ix);
-    cudakernel::sim::calc_llrin<<<get_num_size(pSim->ldpc_code()->nc(), NUM_THREADS), NUM_THREADS>>>(pSim, ix);
+    cudakernel::sim::calc_llrs<<<get_num_size(pSim->n(), NUMK_THREADS), NUMK_THREADS>>>(pSim, pSigma2, ix);
+    cudakernel::sim::calc_llrin<<<get_num_size(pSim->mLdpcCode->nc(), NUMK_THREADS), NUMK_THREADS>>>(pSim, ix);
 
     //decode
     cudakernel::decoder::decode_layered<<<1, 1>>>(pSim->mLdpcDecoderVec[ix].get());
@@ -50,37 +50,37 @@ __global__ void cudakernel::sim::frame_proc(ldpc_sim_device *pSim, double pSigma
 }
 
 //encode the input to all zero
-__global__ void cudakernel::sim::encode_all0(ldpc_sim_device *pSim, uint16_t pBlockID)
+__global__ void cudakernel::sim::encode_all0(ldpc_sim_device *pSim, labels_t pBlockID)
 {
-    const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
+    const std::size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::size_t sx = blockDim.x * gridDim.x;
 
-    for (size_t i = ix; i < pSim->ldpc_code()->nct(); i += sx)
+    for (std::size_t i = ix; i < pSim->mLdpcCode->nct(); i += sx)
     {
         pSim->mC[pBlockID][pSim->bits_pos()[i]] = (curand_uniform(&(pSim->mCurandStateEncoding[pBlockID][i])) > 0.5000);
     }
 
-    for (size_t i = ix; i < pSim->ldpc_code()->num_puncture(); i += sx)
+    for (std::size_t i = ix; i < pSim->mLdpcCode->num_puncture(); i += sx)
     {
-        pSim->mC[pBlockID][pSim->ldpc_code()->puncture()[i]] = (curand_uniform(&(pSim->mCurandStateEncoding[pBlockID][i])) > 0.5000);
+        pSim->mC[pBlockID][pSim->mLdpcCode->puncture()[i]] = (curand_uniform(&(pSim->mCurandStateEncoding[pBlockID][i])) > 0.5000);
     }
 
-    for (size_t i = 0; i < pSim->ldpc_code()->num_shorten(); i++)
+    for (std::size_t i = 0; i < pSim->mLdpcCode->num_shorten(); i++)
     {
-        pSim->mC[pBlockID][pSim->ldpc_code()->shorten()[i]] = 0;
+        pSim->mC[pBlockID][pSim->mLdpcCode->shorten()[i]] = 0;
     }
 
     //map_c_to_x()
 }
 
-__global__ void cudakernel::sim::awgn(ldpc_sim_device *pSim, double pSigma2, uint16_t pBlockID)
+__global__ void cudakernel::sim::awgn(ldpc_sim_device *pSim, double pSigma2, labels_t pBlockID)
 {
-    const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
+    const std::size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::size_t sx = blockDim.x * gridDim.x;
 
     double a = 0;
 
-    for (size_t i = ix; i < pSim->n(); i += sx)
+    for (std::size_t i = ix; i < pSim->n(); i += sx)
     {
         a = curand_normal(&(pSim->mCurandState[pBlockID][i])) * sqrt(pSigma2);
         pSim->mY[pBlockID][i] = pSim->cstll().X()[pSim->mX[pBlockID][i]] + a;
@@ -91,22 +91,22 @@ __global__ void cudakernel::sim::awgn(ldpc_sim_device *pSim, double pSigma2, uin
     //return Px/Pn
 }
 
-__global__ void cudakernel::sim::calc_llrs(ldpc_sim_device *pSim, double pSigma2, uint16_t pBlockID)
+__global__ void cudakernel::sim::calc_llrs(ldpc_sim_device *pSim, double pSigma2, labels_t pBlockID)
 {
-    const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
+    const std::size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::size_t sx = blockDim.x * gridDim.x;
 
     double llr_tmp[SIM_NUM_BITS];
 
-    for (size_t l = ix; l < pSim->n(); l += sx)
+    for (std::size_t l = ix; l < pSim->n(); l += sx)
     {
         double tmp0, tmp1;
 
-        for (size_t i = 0; i < pSim->cstll().log2M(); i++)
+        for (std::size_t i = 0; i < pSim->cstll().log2M(); i++)
         {
             tmp0 = 0.0;
             tmp1 = 0.0;
-            for (size_t j = 0; j < pSim->cstll().M(); j++)
+            for (std::size_t j = 0; j < pSim->cstll().M(); j++)
             {
                 if (pSim->labels()[j] & (1 << (pSim->cstll().log2M() - 1 - i)))
                 {
@@ -134,35 +134,35 @@ __global__ void cudakernel::sim::calc_llrs(ldpc_sim_device *pSim, double pSigma2
             }
         }
 
-        for (size_t k = 0; k < pSim->bits(); k++)
+        for (std::size_t k = 0; k < pSim->bits(); k++)
         {
             pSim->mLdpcDecoderVec[pBlockID]->mLLRIn[pSim->bit_mapper()[k][l]] = llr_tmp[k];
         }
     }
 }
 
-__global__ void cudakernel::sim::calc_llrin(ldpc_sim_device *pSim, uint16_t pBlockID)
+__global__ void cudakernel::sim::calc_llrin(ldpc_sim_device *pSim, labels_t pBlockID)
 {
-    const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
+    const std::size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::size_t sx = blockDim.x * gridDim.x;
 
-    for (size_t i = ix; i < pSim->ldpc_code()->nc(); i += sx)
+    for (std::size_t i = ix; i < pSim->mLdpcCode->nc(); i += sx)
     {
         pSim->mLdpcDecoderVec[pBlockID]->mLLRIn[i] *= (1 - 2 * pSim->mC[pBlockID][i]);
     }
 }
 
-__global__ void cudakernel::sim::map_c_to_x(ldpc_sim_device *pSim, uint16_t pBlockID)
+__global__ void cudakernel::sim::map_c_to_x(ldpc_sim_device *pSim, labels_t pBlockID)
 {
-    const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
+    const std::size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::size_t sx = blockDim.x * gridDim.x;
 
-    size_t tmp;
+    std::size_t tmp;
 
-    for (size_t i = ix; i < pSim->n(); i += sx)
+    for (std::size_t i = ix; i < pSim->n(); i += sx)
     {
         tmp = 0;
-        for (size_t j = 0; j < pSim->bits(); j++)
+        for (std::size_t j = 0; j < pSim->bits(); j++)
         {
             tmp += pSim->mC[pBlockID][pSim->bit_mapper()[j][i]] << (pSim->bits() - 1 - j);
         }
@@ -176,13 +176,13 @@ __global__ void cudakernel::sim::map_c_to_x(ldpc_sim_device *pSim, uint16_t pBlo
  */
 __global__ void cudakernel::decoder::clean_decoder(ldpc_decoder_device *pDecMgd)
 {
-    const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
+    const std::size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::size_t sx = blockDim.x * gridDim.x;
 
-    for (size_t i = ix; i < pDecMgd->mLSum.size(); i += sx)
+    for (std::size_t i = ix; i < pDecMgd->mLSum.size(); i += sx)
     {
         pDecMgd->mLSum[i] = 0.0;
-        for (size_t l = 0; l < pDecMgd->mLdpcCode->nl(); ++l)
+        for (std::size_t l = 0; l < pDecMgd->mLdpcCode->nl(); ++l)
         {
             pDecMgd->mLc2v[l * pDecMgd->mLdpcCode->nnz() + i] = 0.0;
             pDecMgd->mLv2c[l * pDecMgd->mLdpcCode->nnz() + i] = 0.0;
@@ -193,26 +193,26 @@ __global__ void cudakernel::decoder::clean_decoder(ldpc_decoder_device *pDecMgd)
 
 __global__ void cudakernel::decoder::decode_layered(ldpc_decoder_device *pDecMgd)
 {
-    size_t pI;
+    std::size_t pI;
 
-    const size_t gridSizeNC = get_num_size(pDecMgd->mLdpcCode->nc(), NUM_THREADS);
-    const size_t gridSizeNNZ = get_num_size(pDecMgd->mLdpcCode->nnz(), NUM_THREADS);
+    const std::size_t gridSizeNC = get_num_size(pDecMgd->mLdpcCode->nc(), NUMK_THREADS);
+    const std::size_t gridSizeNNZ = get_num_size(pDecMgd->mLdpcCode->nnz(), NUMK_THREADS);
 
     //zero everything out
-    cudakernel::decoder::clean_decoder<<<gridSizeNNZ, NUM_THREADS>>>(pDecMgd);
+    cudakernel::decoder::clean_decoder<<<gridSizeNNZ, NUMK_THREADS>>>(pDecMgd);
 
-    uint16_t I = 0;
+    labels_t I = 0;
     while (I < pDecMgd->max_iter())
     {
-        for (uint64_t l = 0; l < pDecMgd->mLdpcCode->nl(); ++l)
+        for (std::size_t l = 0; l < pDecMgd->mLdpcCode->nl(); ++l)
         {
             pI = pDecMgd->mLdpcCode->nnz() * l;
 
             //launching kernels
-            cudakernel::decoder::decode_lyr_vnupdate<<<gridSizeNC, NUM_THREADS>>>(pDecMgd, pI);
-            cudakernel::decoder::decode_lyr_cnupdate<<<get_num_size(pDecMgd->mLdpcCode->lw()[l], NUM_THREADS / 2), NUM_THREADS / 2>>>(pDecMgd, pI, l);
-            cudakernel::decoder::decode_lyr_sumllr<<<gridSizeNNZ, NUM_THREADS>>>(pDecMgd, pI);
-            cudakernel::decoder::decode_lyr_appcalc<<<gridSizeNC, NUM_THREADS>>>(pDecMgd);
+            cudakernel::decoder::decode_lyr_vnupdate<<<gridSizeNC, NUMK_THREADS>>>(pDecMgd, pI);
+            cudakernel::decoder::decode_lyr_cnupdate<<<get_num_size(pDecMgd->mLdpcCode->lw()[l], NUMK_THREADS / 2), NUMK_THREADS / 2>>>(pDecMgd, pI, l);
+            cudakernel::decoder::decode_lyr_sumllr<<<gridSizeNNZ, NUMK_THREADS>>>(pDecMgd, pI);
+            cudakernel::decoder::decode_lyr_appcalc<<<gridSizeNC, NUMK_THREADS>>>(pDecMgd);
 
             if (pDecMgd->early_termination())
             {
@@ -232,24 +232,24 @@ break_here:
     pDecMgd->mIter = I;
 }
 
-__global__ void cudakernel::decoder::decode_lyr_vnupdate(ldpc_decoder_device *pDecMgd, size_t pI)
+__global__ void cudakernel::decoder::decode_lyr_vnupdate(ldpc_decoder_device *pDecMgd, std::size_t pI)
 {
-    size_t *vn;
-    size_t vw;
+    std::size_t *vn;
+    std::size_t vw;
 
-    const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
+    const std::size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::size_t sx = blockDim.x * gridDim.x;
 
     //VN processing
-    for (size_t i = ix; i < pDecMgd->mLdpcCode->nc(); i += sx)
+    for (std::size_t i = ix; i < pDecMgd->mLdpcCode->nc(); i += sx)
     {
         double tmp = pDecMgd->mLLRIn[i];
         vw = pDecMgd->mLdpcCode->vn()[i].size();
-        vn = pDecMgd->mLdpcCode->vn()[i].data();
+        vn = pDecMgd->mLdpcCode->vn()[i].get();
         while (vw--)
             tmp += pDecMgd->mLSum[*vn++];
 
-        vn = pDecMgd->mLdpcCode->vn()[i].data();
+        vn = pDecMgd->mLdpcCode->vn()[i].get();
         vw = pDecMgd->mLdpcCode->vn()[i].size();
         while (vw--)
         {
@@ -259,25 +259,25 @@ __global__ void cudakernel::decoder::decode_lyr_vnupdate(ldpc_decoder_device *pD
     }
 }
 
-__global__ void cudakernel::decoder::decode_lyr_cnupdate(ldpc_decoder_device *pDecMgd, size_t pI, uint64_t pL)
+__global__ void cudakernel::decoder::decode_lyr_cnupdate(ldpc_decoder_device *pDecMgd, std::size_t pI, std::size_t pL)
 {
-    size_t *cn;
-    size_t cw;
+    std::size_t *cn;
+    std::size_t cw;
 
-    const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
+    const std::size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::size_t sx = blockDim.x * gridDim.x;
 
     double f_tmp[DEC_MAX_DC];
     double b_tmp[DEC_MAX_DC];
 
     //CN processing
-    for (size_t i = ix; i < pDecMgd->mLdpcCode->layers()[pL].size(); i += sx)
+    for (std::size_t i = ix; i < pDecMgd->mLdpcCode->layers()[pL].size(); i += sx)
     {
         cw = pDecMgd->mLdpcCode->cn()[pDecMgd->mLdpcCode->layers()[pL][i]].size();
-        cn = pDecMgd->mLdpcCode->cn()[pDecMgd->mLdpcCode->layers()[pL][i]].data();
+        cn = pDecMgd->mLdpcCode->cn()[pDecMgd->mLdpcCode->layers()[pL][i]].get();
         f_tmp[0] = pDecMgd->mLv2c[pI + *cn];
         b_tmp[cw - 1] = pDecMgd->mLv2c[pI + *(cn + cw - 1)];
-        for (size_t j = 1; j < cw; j++)
+        for (std::size_t j = 1; j < cw; j++)
         {
             f_tmp[j] = jacobian(f_tmp[j - 1], pDecMgd->mLv2c[pI + *(cn + j)]);
             b_tmp[cw - 1 - j] = jacobian(b_tmp[cw - j], pDecMgd->mLv2c[pI + *(cn + cw - j - 1)]);
@@ -286,20 +286,20 @@ __global__ void cudakernel::decoder::decode_lyr_cnupdate(ldpc_decoder_device *pD
         pDecMgd->mLc2v[pI + *cn] = b_tmp[1];
         pDecMgd->mLc2v[pI + *(cn + cw - 1)] = f_tmp[cw - 2];
 
-        for (size_t j = 1; j < cw - 1; j++)
+        for (std::size_t j = 1; j < cw - 1; j++)
         {
             pDecMgd->mLc2v[pI + *(cn + j)] = jacobian(f_tmp[j - 1], b_tmp[j + 1]);
         }
     }
 }
 
-__global__ void cudakernel::decoder::decode_lyr_sumllr(ldpc_decoder_device *pDecMgd, size_t pI)
+__global__ void cudakernel::decoder::decode_lyr_sumllr(ldpc_decoder_device *pDecMgd, std::size_t pI)
 {
-    const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
+    const std::size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::size_t sx = blockDim.x * gridDim.x;
 
     //sum llrs
-    for (size_t i = ix; i < pDecMgd->mLdpcCode->nnz(); i += sx)
+    for (std::size_t i = ix; i < pDecMgd->mLdpcCode->nnz(); i += sx)
     {
         pDecMgd->mLSum[i] += pDecMgd->mLc2v[pI + i] - pDecMgd->mLc2vPre[pI + i];
         pDecMgd->mLc2vPre[pI + i] = pDecMgd->mLc2v[pI + i];
@@ -308,17 +308,17 @@ __global__ void cudakernel::decoder::decode_lyr_sumllr(ldpc_decoder_device *pDec
 
 __global__ void cudakernel::decoder::decode_lyr_appcalc(ldpc_decoder_device *pDecMgd)
 {
-    size_t *vn;
-    size_t vw;
+    std::size_t *vn;
+    std::size_t vw;
 
-    const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
+    const std::size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::size_t sx = blockDim.x * gridDim.x;
 
     //app calc
-    for (size_t i = ix; i < pDecMgd->mLdpcCode->nc(); i += sx)
+    for (std::size_t i = ix; i < pDecMgd->mLdpcCode->nc(); i += sx)
     {
         pDecMgd->mLLROut[i] = pDecMgd->mLLRIn[i];
-        vn = pDecMgd->mLdpcCode->vn()[i].data();
+        vn = pDecMgd->mLdpcCode->vn()[i].get();
         vw = pDecMgd->mLdpcCode->vn()[i].size();
         while (vw--)
             pDecMgd->mLLROut[i] += pDecMgd->mLSum[*vn++];
@@ -328,10 +328,10 @@ __global__ void cudakernel::decoder::decode_lyr_appcalc(ldpc_decoder_device *pDe
 
 __global__ void cudakernel::decoder::calc_synd(ldpc_decoder_device *pDecMgd)
 {
-    const size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t sx = blockDim.x * gridDim.x;
+    const std::size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::size_t sx = blockDim.x * gridDim.x;
 
-    for (size_t i = ix; i < pDecMgd->mLdpcCode->mc(); i += sx)
+    for (std::size_t i = ix; i < pDecMgd->mLdpcCode->mc(); i += sx)
     {
         pDecMgd->mSynd[i] = 0;
         for (auto cni : pDecMgd->mLdpcCode->cn()[i])
@@ -345,3 +345,4 @@ __global__ void cudakernel::decoder::calc_synd(ldpc_decoder_device *pDecMgd)
         }
     }
 }
+} // namespace ldpc
