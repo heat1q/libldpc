@@ -58,7 +58,7 @@ else
 fi
 
 #compile
-echo "Compiling: sh make.sh $sim_name $defines"
+echo "Compiling: sh make.sh $sim_name ""$defines"""
 sh make.sh $sim_name $defines
 
 cp "$simfile" "$temp_dir/sim.txt"
