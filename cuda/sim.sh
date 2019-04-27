@@ -4,6 +4,7 @@ codefile="$1"
 simfile="$2"
 mapfile="$3"
 layerfile="$4"
+defines="$5"
 
 if ! [ -e $codefile ] || [ "$codefile" = "" ]
 then
@@ -57,7 +58,8 @@ else
 fi
 
 #compile
-sh make.sh $sim_name
+echo "Compiling: sh make.sh $sim_name $defines"
+sh make.sh $sim_name $defines
 
 cp "$simfile" "$temp_dir/sim.txt"
 mv "$sim_name" "$temp_dir"
@@ -70,13 +72,26 @@ sed -i "1s/.*/name: res_$sim_name.txt/" sim.txt
 #make executable
 chmod +x $sim_name
 
+#num threads
+param=""
+param2=""
+if [ "$6" != "" ]
+then
+    param2="-threads $6"
+else
+    param2="-threads 1"
+fi
+
 #run
 if [ "$4" != "" ]
 then
-    ./$sim_name -code "../$codefile" -sim sim.txt -map "../$mapfile" -layer "../$layerfile"
+    param="-code ../$codefile -sim sim.txt -map ../$mapfile -layer ../$layerfile $param2"
 else
-    ./$sim_name -code "../$codefile" -sim sim.txt -map "../$mapfile"
+    param="-code ../$codefile -sim sim.txt -map ../$mapfile $param2"
 fi
+
+echo "Running: ./$sim_name $param"
+./$sim_name $param
 
 #cleanup
 rm "$sim_name"
