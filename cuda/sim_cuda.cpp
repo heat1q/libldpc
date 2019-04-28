@@ -1,9 +1,6 @@
 #include "ldpcsim.h"
-#include "device/vectormgd.h"
 
-using namespace ldpc;
-
-// /usr/local/cuda-9.2/bin/nvcc -x cu -std=c++11 sim_cuda.cpp ldpcsim.cpp ldpc/ldpc.cpp ldpc/decoder.cpp device/cudamgd.cpp device/kernel.cpp device/ldpcsimdevice.cpp  -o sim_cuda -arch sm_35 -rdc=true -O3 -w
+// /usr/local/cuda-9.2/bin/nvcc -x cu -std=c++11 sim_cuda.cpp ldpc/ldpc.cpp ldpc/decoder.cpp device/kernel.cpp device/ldpcsimdevice.cpp  -o sim_cuda -arch sm_35 -rdc=true -O3 -w
 int main(int argc, char *argv[])
 {
 	bool abort = false;
@@ -12,7 +9,7 @@ int main(int argc, char *argv[])
 	std::string simFile;
 	std::string mapFile;
 	std::string layerFile;
-	uint16_t numThreads;
+	ldpc::labels_t numThreads = 1;
 
 	if (argc == 7)
 	{
@@ -58,7 +55,7 @@ int main(int argc, char *argv[])
 			}
 			else if (strcmp(argv[2 * i + 1], "-threads") == 0)
 			{
-				numThreads = static_cast<unsigned short>(atoi(argv[2 * i + 1]));
+				numThreads = static_cast<unsigned short>(atoi(argv[2 * i + 2]));
 			}
 			else
 			{
@@ -71,60 +68,92 @@ int main(int argc, char *argv[])
 		abort = true;
 	}
 
+	if (numThreads <= 0 || numThreads > 64)
+	{
+		abort = true;
+	}
+
+	//some blabla
+	std::cout << "==================================== LDPC Simulation ===================================\n";
+	std::cout << "codefile: " << codeFile << "\n";
+	std::cout << "simfile: " << simFile << "\n";
+	std::cout << "mappingfile: " << mapFile << "\n";
+	if (!layerFile.empty()) 
+	{ 
+		std::cout << "layerfile: " << layerFile << "\n";	
+	}
+	std::cout << "threads: " << numThreads << "\n";
+	std::cout << "\nDFLAGS:\tSIM_NUM_BITS=" << SIM_NUM_BITS << ", DEC_MAX_DC=" << DEC_MAX_DC
+			  << ", NUMK_THREADS=" << NUMK_THREADS << "\n\t";
+#ifdef LOG_FRAME_TIME
+	std::cout << "LOG_FRAME_TIME ";
+#endif
+#ifdef SHORT_LOG
+	std::cout << "SHORT_LOG ";
+#endif
+#ifdef USE_LEGACY_DEC
+	std::cout << "USE_LEGACY_DEC ";
+#endif
+#ifdef USE_CPU_FRAME
+	std::cout << "USE_CPU_FRAME ";
+#endif
+	std::cout << "\n";
 	if (abort)
 	{
-		std::cout << "======================== LDPC Simulation ========================\n";
-		std::cout << "                        (Layered Decoding)                       \n";
-		std::cout << "                         Usage Reminder:                         \n";
-		std::cout << "         Main -code CodeFile -sim SimFile -map MappingFile       \n";
-		std::cout << "               optional: -layer LayerFile                        \n";
-		std::cout << "                         -threads NumThreads                     \n";
-		std::cout << "                                                                 \n";
-		std::cout << "                                                                 \n";
-		std::cout << "                CodeFile: Name of the code file                  \n";
-		std::cout << "               CodeMapFile: Name of mapping file                 \n";
-		std::cout << "               SimFile: Name of simulation file                  \n";
-		std::cout << "              LayerFile: Name of code layer file                 \n";
-		std::cout << "                         for layered decoding                    \n";
-		std::cout << "              NumThreads: Number of threads for parallel         \n";
-		std::cout << "                          processing of frames (default: 1)      \n";
-		std::cout << "=================================================================" << std::endl;
+		std::cout << "==================================== USAGE REMINDER ====================================\n";
+		std::cout << "                    ./Main  -code CodeFile -sim SimFile -map MappingFile                 \n";
+		std::cout << "                  optional: -layer LayerFile                                             \n";
+		std::cout << "                            -threads Num                                                 \n";
+		std::cout << "                                                                                         \n";
+		std::cout << "                  CodeFile: Name of the code file                                        \n";
+		std::cout << "               CodeMapFile: Name of mapping file                                         \n";
+		std::cout << "                   SimFile: Name of simulation file                                      \n";
+		std::cout << "                                                                                         \n";
+		std::cout << "                 LayerFile: Name of code layer file for layered decoding                 \n";
+		std::cout << "                       Num: Number of frames processed in parallel (check GPU Load)      \n";
+		std::cout << "                            (default: 1)                                                 \n";
+		std::cout << "========================================================================================" << std::endl;
 		exit(EXIT_FAILURE);
 	}
 
-	cudamgd_ptr<ldpc_code_device> code_dev(
-		ldpc_code_device(
+	ldpc::cuda_ptr<ldpc::ldpc_code_device> code_dev(
+		ldpc::ldpc_code_device(
 			codeFile.c_str(), layerFile.c_str()));
 
-	cudamgd_ptr<ldpc_sim_device> sim_dev(
-		ldpc_sim_device(
-			code_dev, simFile.c_str(), mapFile.c_str()));
+	std::cout << "========================================================================================" << std::endl;
+	code_dev->print();
+	std::cout << "========================================================================================" << std::endl;
+
+	if (code_dev->max_dc() > DEC_MAX_DC)
+	{
+		std::cout << "ERROR: maximum checknode degree(max_dc=" << code_dev->max_dc() << ") exceeds buffer(=" << DEC_MAX_DC << "). Adjust DEC_MAX_DC flag. Aborting...\n";
+		exit(EXIT_FAILURE);
+	}
+
+	ldpc::cuda_ptr<ldpc::ldpc_sim_device> sim_dev(
+		ldpc::ldpc_sim_device(
+			code_dev, simFile.c_str(), mapFile.c_str(), numThreads));
+
+	if (sim_dev->bits() > SIM_NUM_BITS)
+	{
+		std::cout << "ERROR: number of bits(bits=" << sim_dev->bits() << ") exceeds buffer(=" << SIM_NUM_BITS << "). Adjust SIM_NUM_BITS flag. Aborting...\n";
+		exit(EXIT_FAILURE);
+	}
 
 	sim_dev->print();
-	//sim_dev->start();
+	std::cout << "========================================================================================" << std::endl;
+
+	//sim_dev->print();
+#ifdef SHORT_LOG
+	std::cout << "  FEC   |      FRAME     |   SNR   |    BER     |   FER      | AVGITERS  |  TIME/FRAME   \n";
+	std::cout << "========+================+=========+============+============+===========+==============" << std::endl;
+#endif
+
+#if defined USE_LEGACY_DEC || defined USE_CPU_FRAME
+	sim_dev->start();
+#else
 	sim_dev->start_device();
+#endif
 
-	/*
-    //set up decoder on unified memory
-	try
-	{
-		cudamgd_ptr<ldpc_decoder_device> dec_dev(
-			ldpc_decoder_device(code_dev, 50, false)
-		);
-
-		for (size_t i = 0; i < code_dev->nc(); ++i) {
-			dec_dev->mLLRIn[i] = ldpc_sim::randn();
-		}
-
-		//dec_dev->decode_layered();
-		TIME_PROF("GPU Layered", dec_dev->decode_layered(), "ms");
-		//TIME_PROF("CPU Layered", dec_dev->decode_layered_legacy(), "ms");
-		//TIME_PROF("CPU Legacy", dec_dev->decode_legacy(), "ms");
-	}
-	catch(...)
-	{
-		std::cout << "Error ldpc_decoder_device" << '\n';
-	}
-*/
 	return 0;
 }

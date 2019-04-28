@@ -3,20 +3,20 @@
 #include <math.h>
 #include <exception>
 
-using namespace ldpc;
-
+namespace ldpc
+{
 //Init constructor
-__host__ constellation::constellation(const uint16_t pM)
+__host__ constellation::constellation(labels_t pM)
     : mM(pM), mLog2M(log2(pM)), mPX(pM, 1.0 / pM), mX(pM, 0.0)
 {
     double m = 0;
-    for (size_t j = 0; j < mM; ++j)
+    for (std::size_t j = 0; j < mM; ++j)
     {
         mX[j] = (double)-mM + 1 + 2 * j;
         m += mX[j] * mX[j] * mPX[j];
     }
 
-    for (size_t j = 0; j < mM; ++j)
+    for (std::size_t j = 0; j < mM; ++j)
     {
         mX[j] = mX[j] / sqrt(m);
     }
@@ -26,8 +26,8 @@ __host__ constellation::constellation(const uint16_t pM)
  * ldpc_sim_device
  */
 //init constructor
-__host__ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> &pCode, const char *pSimFileName, const char *pMapFileName)
-    : mLdpcCode(pCode), mLdpcDecoder(), mThreads(1)
+__host__ ldpc_sim_device::ldpc_sim_device(cuda_ptr<ldpc_code_device> &pCode, const char *pSimFileName, const char *pMapFileName, labels_t pNumThreads)
+    : mLdpcCode(pCode), mLdpcDecoderVec(), mThreads(pNumThreads)
 {
     try
     {
@@ -46,27 +46,27 @@ __host__ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> &pCode, 
         std::getline(fsSim, fsLine);
         mLogfile = fsLine.substr(fsLine.find(":") + 2); //name
 
-        uint16_t M;
+        labels_t M;
         std::getline(fsSim, fsLine);
         fsSubStr = fsLine.substr(fsLine.find(":") + 2); //M
-        M = static_cast<unsigned short>(std::stoul(fsSubStr));
+        M = static_cast<labels_t>(std::stoul(fsSubStr));
 
         //setup constellation
         mConstellation = constellation(M);
 
         std::getline(fsSim, fsLine);
         fsSubStr = fsLine.substr(fsLine.find(":") + 2); //bits
-        mBits = static_cast<unsigned short>(std::stoul(fsSubStr));
+        mBits = static_cast<labels_t>(std::stoul(fsSubStr));
 
-        mLabels = vector_mgd<uint16_t>();
+        mLabels = cuda_vector<labels_t>();
         std::getline(fsSim, fsLine);
         fsSubStr = fsLine.substr(fsLine.find(":") + 2); //labels
         strcpy(tmp, fsSubStr.c_str());
         tokp = strtok(tmp, ", ");
-        size_t i = 0;
+        std::size_t i = 0;
         while (tokp != nullptr)
         {
-            mLabels.push_back((unsigned short)atoi(tokp));
+            mLabels.push_back(static_cast<labels_t>(atoi(tokp)));
             tokp = strtok(nullptr, ", ");
             i++;
         }
@@ -76,13 +76,13 @@ __host__ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> &pCode, 
         }
 
         //reverse labels
-        mLabelsRev = vector_mgd<uint16_t>(M, 0);
-        for (size_t i = 0; i < M; ++i)
+        mLabelsRev = cuda_vector<labels_t>(M, 0);
+        for (std::size_t i = 0; i < M; ++i)
         {
             mLabelsRev[mLabels[i]] = i;
         }
 
-        mSnrs = vector_mgd<double>();
+        mSnrs = cuda_vector<double>();
         std::getline(fsSim, fsLine);
         fsSubStr = fsLine.substr(fsLine.find(":") + 2); //snrs
         strcpy(tmp, fsSubStr.c_str());
@@ -101,7 +101,6 @@ __host__ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> &pCode, 
 
         std::getline(fsSim, fsLine);
         fsSubStr = fsLine.substr(fsLine.find(":") + 2); //min fec
-        std::cout << fsSubStr << std::endl;
         mMinFec = std::stoul(fsSubStr);
 
         std::getline(fsSim, fsLine);
@@ -117,9 +116,9 @@ __host__ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> &pCode, 
         mSE = (((double)mLdpcCode->kct()) / mLdpcCode->nct()) * mBits;
 
         //setup bitmapper
-        mBitMapper = vector_mgd<vector_mgd<size_t>>(mBits, vector_mgd<size_t>(mN, 0));
+        mBitMapper = cuda_vector<cuda_vector<std::size_t>>(mBits, cuda_vector<std::size_t>(mN, 0));
         std::getline(fsMap, fsLine);
-        size_t pos = 0;
+        std::size_t pos = 0;
         for (auto &ibm : mBitMapper)
         {
             for (auto &jbm : ibm)
@@ -131,14 +130,14 @@ __host__ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> &pCode, 
             }
         }
 
-        mBitPos = vector_mgd<size_t>(mLdpcCode->nct(), 0);
+        mBitPos = cuda_vector<std::size_t>(mLdpcCode->nct(), 0);
         bits_t found_p = 0;
         bits_t found_s = 0;
 
-        size_t idx = 0;
-        for (size_t i = 0; i < mLdpcCode->nc(); i++)
+        std::size_t idx = 0;
+        for (std::size_t i = 0; i < mLdpcCode->nc(); i++)
         {
-            for (size_t j = 0; j < mLdpcCode->num_shorten(); j++)
+            for (std::size_t j = 0; j < mLdpcCode->num_shorten(); j++)
             {
                 if (mLdpcCode->shorten()[j] == i)
                 {
@@ -146,7 +145,7 @@ __host__ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> &pCode, 
                     break;
                 }
             }
-            for (size_t j = 0; j < mLdpcCode->num_puncture(); j++)
+            for (std::size_t j = 0; j < mLdpcCode->num_puncture(); j++)
             {
                 if (mLdpcCode->puncture()[j] == i)
                 {
@@ -168,30 +167,32 @@ __host__ ldpc_sim_device::ldpc_sim_device(cudamgd_ptr<ldpc_code_device> &pCode, 
 
         //changed with each frame
         //set up decoder
-        mLdpcDecoder = cudamgd_ptr<ldpc_decoder_device>(
-            ldpc_decoder_device(mLdpcCode, mBPIter, true));
+        for (std::size_t i = 0; i < mThreads; i++)
+        {
+            mLdpcDecoderVec.push_back(cuda_ptr<ldpc_decoder_device>(ldpc_decoder_device(mLdpcCode, mBPIter, true)));
+        }
 
         //channel i/o
-        mX = vec_size_t(mN);
-        mY = vec_double_t(mN);
-        mC = vec_bits_t(mLdpcCode->nc());
-        mLTmp = vec_double_t(mBits);
+        mX = mat_size_t(mThreads, vec_size_t(mN));
+        mY = mat_double_t(mThreads, vec_double_t(mN));
+        mC = mat_bits_t(mThreads, vec_bits_t(mLdpcCode->nc()));
 
         //rng states
-        mCurandStateEncoding = vector_mgd<curandState_t>(mLdpcCode->nct());
-        mCurandState = vector_mgd<curandState_t>(mN);
+        mCurandStateEncoding = mat_curandState_t(mThreads, cuda_vector<curandState_t>(mLdpcCode->nct()));
+        mCurandState = mat_curandState_t(mThreads, cuda_vector<curandState_t>(mN));
 
-        mem_prefetch();
+        //mem_prefetch();
     }
     catch (std::exception &e)
     {
-        std::cout << "Error: " << e.what() << "\n";
+        std::cout << "Error: ldpc_sim_device::ldpc_sim_device() " << e.what() << "\n";
         exit(EXIT_FAILURE);
     }
 }
 
 __host__ void ldpc_sim_device::mem_prefetch()
 {
+    /*
     mConstellation.mem_prefetch();
 
     for (auto &bmi : mBitMapper)
@@ -205,13 +206,13 @@ __host__ void ldpc_sim_device::mem_prefetch()
     mLabels.mem_prefetch();
     mSnrs.mem_prefetch();
 
-    mX.mem_prefetch();
-    mY.mem_prefetch();
-    mC.mem_prefetch();
-    mLTmp.mem_prefetch();
+    mX[0].mem_prefetch();
+    mY[0].mem_prefetch();
+    mC[0].mem_prefetch();
 
     mCurandStateEncoding.mem_prefetch();
     mCurandState.mem_prefetch();
+*/
 }
 
 //start simulation for parallel frame processing on gpu
@@ -219,27 +220,27 @@ __host__ void ldpc_sim_device::mem_prefetch()
 __host__ void ldpc_sim_device::start_device()
 {
     //setup random number generators on device
-    cudakernel::sim::setup_rng<<<get_num_size(mN, NUM_THREADS), NUM_THREADS>>>(this);
+    cudakernel::sim::setup_rng<<<mThreads, NUMK_THREADS>>>(this);
     cudaDeviceSynchronize();
 
     double sigma2;
-    uint64_t frames;
-    uint64_t bec = 0;
-    uint64_t fec = 0;
-    uint64_t iters;
-    size_t bec_tmp;
+    std::size_t frames;
+    std::size_t bec = 0;
+    std::size_t fec = 0;
+    std::size_t iters;
+    std::size_t bec_tmp;
 
     std::vector<std::string> printResStr(mSnrs.size() + 1, std::string());
     std::ofstream fp;
     char resStr[128];
 
 #ifdef LOG_FRAME_TIME
-    printResStr[0].assign("snr fer ber frames avg_iter time_frame[ms]");
+    printResStr[0].assign("snr fer ber frames avg_iter time");
 #else
     printResStr[0].assign("snr fer ber frames avg_iter");
 #endif
 
-    for (size_t i = 0; i < mSnrs.size(); ++i)
+    for (std::size_t i = 0; i < mSnrs.size(); ++i)
     {
         bec = 0;
         fec = 0;
@@ -252,16 +253,22 @@ __host__ void ldpc_sim_device::start_device()
             //launch the frame processing kernel
             cudakernel::sim::frame_proc<<<mThreads, 1>>>(this, sigma2);
             cudaDeviceSynchronize();
-            iters += mLdpcDecoder->mIter;
 
             //now check the processed frames
-            for (uint16_t k = 0; k < mThreads; ++k) //TODO adjust for parallel threads
+            for (labels_t k = 0; k < mThreads; ++k) //TODO adjust for parallel threads
             {
-                frames++;
-                bec_tmp = 0;
-                for (size_t j = 0; j < mLdpcCode->nc(); j++)
+                if (fec >= mMinFec)
                 {
-                    bec_tmp += (mLdpcDecoder->mLLROut[j] <= 0);
+                    break;
+                } //prevent checking more frames than necessary
+
+                iters += mLdpcDecoderVec[k]->mIter;
+                frames++;
+
+                bec_tmp = 0;
+                for (std::size_t j = 0; j < mLdpcCode->nc(); j++)
+                {
+                    bec_tmp += (mLdpcDecoderVec[k]->mLLROut[j] <= 0);
                 }
 
                 if (bec_tmp > 0)
@@ -269,16 +276,27 @@ __host__ void ldpc_sim_device::start_device()
                     bec += bec_tmp;
                     fec++;
 
-                    auto time_dur = std::chrono::high_resolution_clock::now() - time_start;
-                    size_t t = static_cast<size_t>(std::chrono::duration_cast<std::chrono::microseconds>(time_dur).count());
-                    printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e, TIME/FRAME=%.3fms, AVGITERS=%.2f\n",
+                    auto time_now = std::chrono::high_resolution_clock::now();
+                    auto time_dur = time_now - time_start; //eliminate const time for printing etc
+                    std::size_t t = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(time_dur).count());
+
+#ifdef SHORT_LOG
+                    printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %.3fms",
                            fec, mMinFec, frames, mSnrs[i],
                            (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
-                           (double)t / frames * 1e-3,
-                           (double)iters / frames);
+                           (double)iters / frames,
+                           (double)t / (frames + mThreads - k - 1) * 1e-3);
+                    fflush(stdout);
+#else
+                    printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e, AVGITERS=%.2f, TIME/FRAME=%.3fms\n",
+                           fec, mMinFec, frames, mSnrs[i],
+                           (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
+                           (double)iters / frames,
+                           (double)t / (frames + mThreads - k - 1) * 1e-3);
+#endif
 
 #ifdef LOG_FRAME_TIME
-                    sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.3f", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames, (double)t / frames * 1e-3);
+                    sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames, (double)t / frames * 1e-6);
 #else
                     sprintf(resStr, "%lf %.3e %.3e %lu %.3e", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames);
 #endif
@@ -300,22 +318,27 @@ __host__ void ldpc_sim_device::start_device()
                                   << "\n";
                     }
 
-                    log_error(frames, mSnrs[i]);
+                    log_error(frames, mSnrs[i], k);
+
+                    time_start += std::chrono::high_resolution_clock::now() - time_now; //dont measure time for printing files
                 }
             }
         } while (fec < mMinFec && frames < mMaxFrames); //end while
-    }                                                   //end for
+#ifdef SHORT_LOG
+        printf("\n");
+#endif
+    } //end for
 }
 
 //start simulation on cpu
 __host__ void ldpc_sim_device::start()
 {
     double sigma2;
-    uint64_t frames;
-    uint64_t bec = 0;
-    uint64_t fec = 0;
-    uint64_t iters;
-    size_t bec_tmp;
+    std::size_t frames;
+    std::size_t bec = 0;
+    std::size_t fec = 0;
+    std::size_t iters;
+    std::size_t bec_tmp;
 
     std::vector<std::string> printResStr(mSnrs.size() + 1, std::string());
     std::ofstream fp;
@@ -327,7 +350,7 @@ __host__ void ldpc_sim_device::start()
     printResStr[0].assign("snr fer ber frames avg_iter");
 #endif
 
-    for (size_t i = 0; i < mSnrs.size(); ++i)
+    for (std::size_t i = 0; i < mSnrs.size(); ++i)
     {
         bec = 0;
         fec = 0;
@@ -337,37 +360,40 @@ __host__ void ldpc_sim_device::start()
         auto time_start = std::chrono::high_resolution_clock::now();
         do
         {
-            encode_all0();         //40ms
-            simulate_awgn(sigma2); //100ms
+            encode_all0();
+            simulate_awgn(sigma2);
 
             //puncturing & shortening
             if (mLdpcCode->num_puncture() != 0)
             {
-                for (size_t j = 0; j < mLdpcCode->num_puncture(); j++)
+                for (std::size_t j = 0; j < mLdpcCode->num_puncture(); j++)
                 {
-                    mLdpcDecoder->mLLRIn[mLdpcCode->puncture()[j]] = 0;
+                    mLdpcDecoderVec[0]->mLLRIn[mLdpcCode->puncture()[j]] = 0;
                 }
             }
             if (mLdpcCode->num_shorten() != 0)
             {
-                for (size_t j = 0; j < mLdpcCode->num_shorten(); j++)
+                for (std::size_t j = 0; j < mLdpcCode->num_shorten(); j++)
                 {
-                    mLdpcDecoder->mLLRIn[mLdpcCode->shorten()[j]] = 99999.9;
+                    mLdpcDecoderVec[0]->mLLRIn[mLdpcCode->shorten()[j]] = 99999.9;
                 }
             }
 
-            calc_llrs(sigma2); //150ms
+            calc_llrs(sigma2);
 
-            //decode
-            iters += mLdpcDecoder->decode_layered();
-            //iter += mLdpcDecoder->decode_legacy();
+//decode
+#ifdef USE_LEGACY_DEC
+            iters += mLdpcDecoderVec[0]->decode_legacy();
+#else
+            iters += mLdpcDecoderVec[0]->decode_layered();
+#endif
 
             frames++;
 
             bec_tmp = 0;
-            for (size_t j = 0; j < mLdpcCode->nc(); j++)
+            for (std::size_t j = 0; j < mLdpcCode->nc(); j++)
             {
-                bec_tmp += (mLdpcDecoder->mLLROut[j] <= 0);
+                bec_tmp += (mLdpcDecoderVec[0]->mLLROut[j] <= 0);
             }
 
             if (bec_tmp > 0)
@@ -375,16 +401,26 @@ __host__ void ldpc_sim_device::start()
                 bec += bec_tmp;
                 fec++;
 
-                auto time_dur = std::chrono::high_resolution_clock::now() - time_start;
-                size_t t = static_cast<size_t>(std::chrono::duration_cast<std::chrono::microseconds>(time_dur).count());
-                printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e, TIME/FRAME=%.3fms, AVGITERS=%.2f\n",
+                auto time_now = std::chrono::high_resolution_clock::now();
+                auto time_dur = time_now - time_start; //eliminate const time for printing etc
+                std::size_t t = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(time_dur).count());
+#ifdef SHORT_LOG
+                printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %.3fms",
                        fec, mMinFec, frames, mSnrs[i],
                        (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
-                       (double)t / frames * 1e-3,
-                       (double)iters / frames);
+                       (double)iters / frames,
+                       (double)t / frames * 1e-3);
+                fflush(stdout);
+#else
+                printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e, AVGITERS=%.2f, TIME/FRAME=%.3fms\n",
+                       fec, mMinFec, frames, mSnrs[i],
+                       (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
+                       (double)iters / frames,
+                       (double)t / frames * 1e-3);
+#endif
 
 #ifdef LOG_FRAME_TIME
-                sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.3f", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames, (double)t / frames * 1e-3);
+                sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames, (double)t / frames * 1e-6);
 #else
                 sprintf(resStr, "%lf %.3e %.3e %lu %.3e", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames);
 #endif
@@ -406,10 +442,15 @@ __host__ void ldpc_sim_device::start()
                               << "\n";
                 }
 
-                log_error(frames, mSnrs[i]);
+                log_error(frames, mSnrs[i], 0);
+
+                time_start += std::chrono::high_resolution_clock::now() - time_now; //dont measure time for printing files
             }
         } while (fec < mMinFec && frames < mMaxFrames); //end while
-    }                                                   //end for
+#ifdef SHORT_LOG
+        printf("\n");
+#endif
+    } //end for
 }
 
 __host__ double ldpc_sim_device::randn()
@@ -438,12 +479,12 @@ __host__ __device__ double ldpc_sim_device::simulate_awgn(double pSigma2)
     double Pn = 0;
     double Px = 0;
 
-    for (size_t i = 0; i < mN; i++)
+    for (std::size_t i = 0; i < mN; i++)
     {
         a = randn() * sqrt(pSigma2);
         Pn += a * a;
-        Px += mConstellation.X()[mX[i]] * mConstellation.X()[mX[i]];
-        mY[i] = mConstellation.X()[mX[i]] + a;
+        Px += mConstellation.X()[mX[0][i]] * mConstellation.X()[mX[0][i]];
+        mY[0][i] = mConstellation.X()[mX[0][i]] + a;
     }
 
     return Px / Pn;
@@ -451,19 +492,19 @@ __host__ __device__ double ldpc_sim_device::simulate_awgn(double pSigma2)
 
 __host__ __device__ void ldpc_sim_device::encode_all0()
 {
-    for (size_t i = 0; i < mLdpcCode->nct(); i++)
+    for (std::size_t i = 0; i < mLdpcCode->nct(); i++)
     {
-        mC[mBitPos[i]] = rand() & 1;
+        mC[0][mBitPos[i]] = rand() & 1;
     }
 
-    for (size_t i = 0; i < mLdpcCode->num_puncture(); i++)
+    for (std::size_t i = 0; i < mLdpcCode->num_puncture(); i++)
     {
-        mC[mLdpcCode->puncture()[i]] = rand() & 1;
+        mC[0][mLdpcCode->puncture()[i]] = rand() & 1;
     }
 
-    for (size_t i = 0; i < mLdpcCode->num_shorten(); i++)
+    for (std::size_t i = 0; i < mLdpcCode->num_shorten(); i++)
     {
-        mC[mLdpcCode->shorten()[i]] = 0;
+        mC[0][mLdpcCode->shorten()[i]] = 0;
     }
 
     map_c_to_x();
@@ -471,40 +512,41 @@ __host__ __device__ void ldpc_sim_device::encode_all0()
 
 __host__ __device__ void ldpc_sim_device::map_c_to_x()
 {
-    size_t tmp;
+    std::size_t tmp;
 
-    for (size_t i = 0; i < mN; i++)
+    for (std::size_t i = 0; i < mN; i++)
     {
         tmp = 0;
-        for (size_t j = 0; j < mBits; j++)
+        for (std::size_t j = 0; j < mBits; j++)
         {
-            tmp += mC[mBitMapper[j][i]] << (mBits - 1 - j);
+            tmp += mC[0][mBitMapper[j][i]] << (mBits - 1 - j);
         }
 
-        mX[i] = mLabelsRev[tmp];
+        mX[0][i] = mLabelsRev[tmp];
     }
 }
 
 __host__ __device__ void ldpc_sim_device::calc_llrs(double sigma2)
 {
+    std::vector<double> llr_tmp(mBits);
 
-    for (size_t l = 0; l < mN; l++)
+    for (std::size_t l = 0; l < mN; l++)
     {
         double tmp0, tmp1;
 
-        for (size_t i = 0; i < mConstellation.log2M(); i++)
+        for (std::size_t i = 0; i < mConstellation.log2M(); i++)
         {
             tmp0 = 0.0;
             tmp1 = 0.0;
-            for (size_t j = 0; j < mConstellation.M(); j++)
+            for (std::size_t j = 0; j < mConstellation.M(); j++)
             {
                 if (mLabels[j] & (1 << (mConstellation.log2M() - 1 - i)))
                 {
-                    tmp1 += exp(-(mY[l] - mConstellation.X()[j]) * (mY[l] - mConstellation.X()[j]) / (2 * sigma2)) * mConstellation.pX()[j];
+                    tmp1 += exp(-(mY[0][l] - mConstellation.X()[j]) * (mY[0][l] - mConstellation.X()[j]) / (2 * sigma2)) * mConstellation.pX()[j];
                 }
                 else
                 {
-                    tmp0 += exp(-(mY[l] - mConstellation.X()[j]) * (mY[l] - mConstellation.X()[j]) / (2 * sigma2)) * mConstellation.pX()[j];
+                    tmp0 += exp(-(mY[0][l] - mConstellation.X()[j]) * (mY[0][l] - mConstellation.X()[j]) / (2 * sigma2)) * mConstellation.pX()[j];
                 }
             }
             double val = log(tmp0 / tmp1);
@@ -512,35 +554,32 @@ __host__ __device__ void ldpc_sim_device::calc_llrs(double sigma2)
             // and severely shaped distributions
             if (std::isinf(val) == +1)
             {
-                mLTmp[i] = MAX_LLR;
+                llr_tmp[i] = MAX_LLR;
             }
             else if (std::isinf(val) == -1)
             {
-                mLTmp[i] = MIN_LLR;
+                llr_tmp[i] = MIN_LLR;
             }
             else
             {
-                mLTmp[i] = val;
+                llr_tmp[i] = val;
             }
         }
 
-        for (size_t k = 0; k < mBits; k++)
+        for (std::size_t k = 0; k < mBits; k++)
         {
-            mLdpcDecoder->mLLRIn[mBitMapper[k][l]] = mLTmp[k];
+            mLdpcDecoderVec[0]->mLLRIn[mBitMapper[k][l]] = llr_tmp[k];
         }
     }
 
-    for (size_t j = 0; j < mLdpcCode->nc(); j++)
+    for (std::size_t j = 0; j < mLdpcCode->nc(); j++)
     {
-        mLdpcDecoder->mLLRIn[j] *= (1 - 2 * mC[j]);
+        mLdpcDecoderVec[0]->mLLRIn[j] *= (1 - 2 * mC[0][j]);
     }
 }
 
 __host__ void ldpc_sim_device::print()
 {
-    mLdpcCode->print();
-
-    printf("=========== SIM ===========\n");
     std::cout << "logfile: " << mLogfile << "\n";
     printf("n: %lu\n", mN);
     printf("M: %hu\n", mConstellation.M());
@@ -552,7 +591,7 @@ __host__ void ldpc_sim_device::print()
     }
     printf("\n");
     printf("labels:\n");
-    for (size_t i = 0; i < mConstellation.M(); i++)
+    for (std::size_t i = 0; i < mConstellation.M(); i++)
     {
         printf("\t%lu: ", i);
         dec2bin(mLabels[i], mBits);
@@ -562,19 +601,18 @@ __host__ void ldpc_sim_device::print()
     printf("min fec: %lu\n", mMinFec);
     printf("bp iter: %lu\n", mBPIter);
     printf("SE: %.4lf\n", mSE);
-    //for (size_t i = 0; i < mBits; i++)
+    //for (std::size_t i = 0; i < mBits; i++)
     //{
     //    printf("Bit Mapping B%lu: ", i);
-    //    for (size_t j = 0; j < mN; j++)
+    //    for (std::size_t j = 0; j < mN; j++)
     //    {
     //        printf("%lu, ", mBitMapper[i][j]);
     //    }
     //    printf("\n");
     //}
-    printf("=========== SIM: END ===========\n");
 }
 
-__host__ void ldpc_sim_device::log_error(size_t pFrameNum, double pSNR)
+__host__ void ldpc_sim_device::log_error(std::size_t pFrameNum, double pSNR, labels_t pThreads)
 {
     char errors_file[MAX_FILENAME_LEN];
     snprintf(errors_file, MAX_FILENAME_LEN, "errors_%s", mLogfile.c_str());
@@ -586,60 +624,60 @@ __host__ void ldpc_sim_device::log_error(size_t pFrameNum, double pSNR)
         exit(EXIT_FAILURE);
     }
 
-    /* calculation of syndrome and failed syndrome checks */
-    size_t synd_weight = 0;
-    for (auto si : mLdpcDecoder->mSynd)
+    // calculation of syndrome and failed syndrome checks
+    std::size_t synd_weight = 0;
+    for (auto si : mLdpcDecoderVec[pThreads]->mSynd)
     {
         synd_weight += si;
     }
-    std::vector<size_t> failed_checks_idx(synd_weight);
-    size_t j = 0;
-    for (size_t i = 0; i < mLdpcCode->mc(); i++)
+    std::vector<std::size_t> failed_checks_idx(synd_weight);
+    std::size_t j = 0;
+    for (std::size_t i = 0; i < mLdpcCode->mc(); i++)
     {
-        if (mLdpcDecoder->mSynd[i] == 1)
+        if (mLdpcDecoderVec[pThreads]->mSynd[i] == 1)
         {
             failed_checks_idx[j++] = i;
         }
     }
 
-    /* calculation of failed codeword bits */
-    size_t cw_dis = 0;
-    for (size_t i = 0; i < mLdpcCode->nc(); i++)
+    // calculation of failed codeword bits
+    std::size_t cw_dis = 0;
+    for (std::size_t i = 0; i < mLdpcCode->nc(); i++)
     {
 #ifdef ENCODE
-        cw_dis += ((mLdpcDecoder->mLLROut[i] <= 0) != mC[i]);
+        cw_dis += ((mLdpcDecoderVec[pThreads]->mLLROut[i] <= 0) != mC[pThreads][i]);
 #else
-        cw_dis += ((mLdpcDecoder->mLLROut[i] <= 0) != 0);
+        cw_dis += ((mLdpcDecoderVec[pThreads]->mLLROut[i] <= 0) != 0);
 #endif
     }
 
-    std::vector<size_t> x(mN);
-    std::vector<size_t> xhat(mN);
-    std::vector<size_t> chat(mLdpcCode->nc());
+    std::vector<std::size_t> x(mN);
+    std::vector<std::size_t> xhat(mN);
+    std::vector<std::size_t> chat(mLdpcCode->nc());
 
-    for (size_t i = 0; i < mLdpcCode->nc(); ++i)
+    for (std::size_t i = 0; i < mLdpcCode->nc(); ++i)
     {
-        chat[i] = (mLdpcDecoder->mLLROut[i] <= 0);
+        chat[i] = (mLdpcDecoderVec[pThreads]->mLLROut[i] <= 0);
     }
 
-    size_t tmp;
+    std::size_t tmp;
     //map c to x map_c_to_x(c, x);
-    for (size_t i = 0; i < mN; i++)
+    for (std::size_t i = 0; i < mN; i++)
     {
         tmp = 0;
-        for (size_t j = 0; j < mBits; j++)
+        for (std::size_t j = 0; j < mBits; j++)
         {
-            tmp += mC[mBitMapper[j][i]] << (mBits - 1 - j);
+            tmp += mC[pThreads][mBitMapper[j][i]] << (mBits - 1 - j);
         }
 
         x[i] = mLabelsRev[tmp];
     }
 
     //map_c_to_x(chat, xhat);
-    for (size_t i = 0; i < mN; i++)
+    for (std::size_t i = 0; i < mN; i++)
     {
         tmp = 0;
-        for (size_t j = 0; j < mBits; j++)
+        for (std::size_t j = 0; j < mBits; j++)
         {
             tmp += chat[mBitMapper[j][i]] << (mBits - 1 - j);
         }
@@ -648,7 +686,7 @@ __host__ void ldpc_sim_device::log_error(size_t pFrameNum, double pSNR)
     }
 
     double cw_dis_euc = 0;
-    for (size_t i = 0; i < mN; i++)
+    for (std::size_t i = 0; i < mN; i++)
     {
 #ifdef ENCODE
         cw_dis_euc += (mConstellation.X()[x[i]] - mConstellation.X()[xhat[i]]) * (mConstellation.X()[x[i]] - mConstellation.X()[xhat[i]]);
@@ -656,12 +694,12 @@ __host__ void ldpc_sim_device::log_error(size_t pFrameNum, double pSNR)
         cw_dis_euc += (mConstellation.X()[0] - mConstellation.X()[xhat[i]]) * (mConstellation.X()[0] - mConstellation.X()[xhat[i]]);
 #endif
     }
-    std::vector<size_t> failed_bits_idx(cw_dis);
+    std::vector<std::size_t> failed_bits_idx(cw_dis);
     j = 0;
-    for (size_t i = 0; i < mLdpcCode->nc(); i++)
+    for (std::size_t i = 0; i < mLdpcCode->nc(); i++)
     {
 #ifdef ENCODE
-        if (chat[i] != mC[i])
+        if (chat[i] != mC[pThreads][i])
         {
             failed_bits_idx[j++] = i;
         }
@@ -673,7 +711,7 @@ __host__ void ldpc_sim_device::log_error(size_t pFrameNum, double pSNR)
 #endif
     }
 
-    /* print results in file */
+    // print results in file
     fprintf(fp, "SNR: %.2f -- frame: %lu -- is codeword: %d -- dE(c,chat): %.3f -- dH(c,chat): %lu | ", pSNR, pFrameNum, synd_weight == 0, cw_dis_euc, cw_dis);
     for (auto failed_bits_idx_i : failed_bits_idx)
     {
@@ -688,3 +726,4 @@ __host__ void ldpc_sim_device::log_error(size_t pFrameNum, double pSNR)
     fprintf(fp, "\n");
     fclose(fp);
 }
+} // namespace ldpc
