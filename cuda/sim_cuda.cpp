@@ -68,18 +68,34 @@ int main(int argc, char *argv[])
 		abort = true;
 	}
 
-	std::cout << "==================================== LDPC Simulation ===================================\n";
-	for (std::size_t i = 0; i < argc; ++i)
+	if (numThreads <= 0 || numThreads > 64)
 	{
-		std::cout << argv[i] << " ";
+		abort = true;
 	}
-	std::cout << "\n\n DFLAGS: SIM_NUM_BITS=" << SIM_NUM_BITS << ", DEC_MAX_DC=" << DEC_MAX_DC
-			  << ", NUMK_THREADS=" << NUMK_THREADS;
+
+	//some blabla
+	std::cout << "==================================== LDPC Simulation ===================================\n";
+	std::cout << "codefile: " << codeFile << "\n";
+	std::cout << "simfile: " << simFile << "\n";
+	std::cout << "mappingfile: " << mapFile << "\n";
+	if (!layerFile.empty()) 
+	{ 
+		std::cout << "layerfile: " << layerFile << "\n";	
+	}
+	std::cout << "threads: " << numThreads << "\n";
+	std::cout << "\nDFLAGS:\tSIM_NUM_BITS=" << SIM_NUM_BITS << ", DEC_MAX_DC=" << DEC_MAX_DC
+			  << ", NUMK_THREADS=" << NUMK_THREADS << "\n\t";
 #ifdef LOG_FRAME_TIME
-	std::cout << ", LOG_FRAME_TIME";
+	std::cout << "LOG_FRAME_TIME ";
 #endif
 #ifdef SHORT_LOG
-	std::cout << ", SHORT_LOG";
+	std::cout << "SHORT_LOG ";
+#endif
+#ifdef USE_LEGACY_DEC
+	std::cout << "USE_LEGACY_DEC ";
+#endif
+#ifdef USE_CPU_FRAME
+	std::cout << "USE_CPU_FRAME ";
 #endif
 	std::cout << "\n";
 	if (abort)

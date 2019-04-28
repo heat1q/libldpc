@@ -235,7 +235,7 @@ __host__ void ldpc_sim_device::start_device()
     char resStr[128];
 
 #ifdef LOG_FRAME_TIME
-    printResStr[0].assign("snr fer ber frames avg_iter time_frame[ms]");
+    printResStr[0].assign("snr fer ber frames avg_iter time");
 #else
     printResStr[0].assign("snr fer ber frames avg_iter");
 #endif
@@ -248,7 +248,6 @@ __host__ void ldpc_sim_device::start_device()
         iters = 0;
         sigma2 = pow(10, -mSnrs[i] / 10);
         auto time_start = std::chrono::high_resolution_clock::now();
-        auto time_const = std::chrono::high_resolution_clock::now() - time_start;
         do
         {
             //launch the frame processing kernel
@@ -258,6 +257,11 @@ __host__ void ldpc_sim_device::start_device()
             //now check the processed frames
             for (labels_t k = 0; k < mThreads; ++k) //TODO adjust for parallel threads
             {
+                if (fec >= mMinFec)
+                {
+                    break;
+                } //prevent checking more frames than necessary
+
                 iters += mLdpcDecoderVec[k]->mIter;
                 frames++;
 
@@ -273,7 +277,7 @@ __host__ void ldpc_sim_device::start_device()
                     fec++;
 
                     auto time_now = std::chrono::high_resolution_clock::now();
-                    auto time_dur = time_now - time_start - time_const; //eliminate const time for printing etc
+                    auto time_dur = time_now - time_start; //eliminate const time for printing etc
                     std::size_t t = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(time_dur).count());
 
 #ifdef SHORT_LOG
@@ -281,18 +285,18 @@ __host__ void ldpc_sim_device::start_device()
                            fec, mMinFec, frames, mSnrs[i],
                            (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
                            (double)iters / frames,
-                           (double)t / frames * 1e-3);
+                           (double)t / (frames + mThreads - k - 1) * 1e-3);
                     fflush(stdout);
 #else
                     printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e, AVGITERS=%.2f, TIME/FRAME=%.3fms\n",
                            fec, mMinFec, frames, mSnrs[i],
                            (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
                            (double)iters / frames,
-                           (double)t / frames * 1e-3);
+                           (double)t / (frames + mThreads - k - 1) * 1e-3);
 #endif
 
 #ifdef LOG_FRAME_TIME
-                    sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.3f", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames, (double)t / frames * 1e-3);
+                    sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames, (double)t / frames * 1e-6);
 #else
                     sprintf(resStr, "%lf %.3e %.3e %lu %.3e", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames);
 #endif
@@ -316,7 +320,7 @@ __host__ void ldpc_sim_device::start_device()
 
                     log_error(frames, mSnrs[i], k);
 
-                    time_const = std::chrono::high_resolution_clock::now() - time_now; //calc const time for printing etc
+                    time_start += std::chrono::high_resolution_clock::now() - time_now; //dont measure time for printing files
                 }
             }
         } while (fec < mMinFec && frames < mMaxFrames); //end while
@@ -354,11 +358,10 @@ __host__ void ldpc_sim_device::start()
         iters = 0;
         sigma2 = pow(10, -mSnrs[i] / 10);
         auto time_start = std::chrono::high_resolution_clock::now();
-        auto time_const = std::chrono::high_resolution_clock::now() - time_start;
         do
         {
-            encode_all0();         //40ms
-            simulate_awgn(sigma2); //100ms
+            encode_all0();
+            simulate_awgn(sigma2);
 
             //puncturing & shortening
             if (mLdpcCode->num_puncture() != 0)
@@ -376,7 +379,7 @@ __host__ void ldpc_sim_device::start()
                 }
             }
 
-            calc_llrs(sigma2); //150ms
+            calc_llrs(sigma2);
 
 //decode
 #ifdef USE_LEGACY_DEC
@@ -399,7 +402,7 @@ __host__ void ldpc_sim_device::start()
                 fec++;
 
                 auto time_now = std::chrono::high_resolution_clock::now();
-                auto time_dur = time_now - time_start - time_const; //eliminate const time for printing etc
+                auto time_dur = time_now - time_start; //eliminate const time for printing etc
                 std::size_t t = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(time_dur).count());
 #ifdef SHORT_LOG
                 printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %.3fms",
@@ -417,7 +420,7 @@ __host__ void ldpc_sim_device::start()
 #endif
 
 #ifdef LOG_FRAME_TIME
-                sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.3f", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames, (double)t / frames * 1e-3);
+                sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames, (double)t / frames * 1e-6);
 #else
                 sprintf(resStr, "%lf %.3e %.3e %lu %.3e", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames);
 #endif
@@ -441,7 +444,7 @@ __host__ void ldpc_sim_device::start()
 
                 log_error(frames, mSnrs[i], 0);
 
-                time_const = std::chrono::high_resolution_clock::now() - time_now; //calc const time for printing etc
+                time_start += std::chrono::high_resolution_clock::now() - time_now; //dont measure time for printing files
             }
         } while (fec < mMinFec && frames < mMaxFrames); //end while
 #ifdef SHORT_LOG
