@@ -7,7 +7,12 @@
 
 #include "curand_kernel.h"
 
+#ifndef GPU_ID
+#define GPU_ID 0
+#endif
+
 #include "ldpc/ldpc.h"
+
 
 #define TIME_PROF(log, exec, unit)                                                                                                             \
 	do                                                                                                                                         \

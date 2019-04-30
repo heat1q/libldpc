@@ -3,6 +3,10 @@
 // /usr/local/cuda-9.2/bin/nvcc -x cu -std=c++11 sim_cuda.cpp ldpc/ldpc.cpp ldpc/decoder.cpp device/kernel.cpp device/ldpcsimdevice.cpp  -o sim_cuda -arch sm_35 -rdc=true -O3 -w
 int main(int argc, char *argv[])
 {
+	//set GPU id
+	cudaSetDevice(GPU_ID);
+
+
 	bool abort = false;
 
 	std::string codeFile;
@@ -83,6 +87,7 @@ int main(int argc, char *argv[])
 		std::cout << "layerfile: " << layerFile << "\n";	
 	}
 	std::cout << "threads: " << numThreads << "\n";
+	std::cout << "Device ID: " << GPU_ID << "\n";
 	std::cout << "\nDFLAGS:\tSIM_NUM_BITS=" << SIM_NUM_BITS << ", DEC_MAX_DC=" << DEC_MAX_DC
 			  << ", NUMK_THREADS=" << NUMK_THREADS << "\n\t";
 #ifdef LOG_FRAME_TIME
