@@ -46,8 +46,26 @@ __global__ void cudakernel::sim::frame_proc(ldpc_sim_device *pSim, double pSigma
     //decode
     cudakernel::decoder::decode_layered<<<1, 1>>>(pSim->mLdpcDecoderVec[ix].get());
 
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
 }
+
+
+//measure the constant time for frame processing over pCount samples
+#ifdef LOG_TP
+__global__ void cudakernel::sim::frame_time(ldpc_sim_device *pSim, double pSigma2, std::size_t pCount)
+{
+    const labels_t ix = blockIdx.x;
+
+    for (std::size_t i = 0; i < pCount; ++i)
+    {
+        cudakernel::sim::encode_all0<<<get_num_size(pSim->mLdpcCode->nct(), NUMK_THREADS), NUMK_THREADS>>>(pSim, ix);
+        cudakernel::sim::map_c_to_x<<<get_num_size(pSim->n(), NUMK_THREADS), NUMK_THREADS>>>(pSim, ix);
+        cudakernel::sim::awgn<<<get_num_size(pSim->n(), NUMK_THREADS), NUMK_THREADS>>>(pSim, pSigma2, ix);
+        cudakernel::sim::calc_llrs<<<get_num_size(pSim->n(), NUMK_THREADS), NUMK_THREADS>>>(pSim, pSigma2, ix);
+        cudakernel::sim::calc_llrin<<<get_num_size(pSim->mLdpcCode->nc(), NUMK_THREADS), NUMK_THREADS>>>(pSim, ix);
+    }
+}
+#endif
 
 //encode the input to all zero
 __global__ void cudakernel::sim::encode_all0(ldpc_sim_device *pSim, labels_t pBlockID)
@@ -227,7 +245,7 @@ __global__ void cudakernel::decoder::decode_layered(ldpc_decoder_device *pDecMgd
     }
 
 break_here:
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
 
     pDecMgd->mIter = I;
 }

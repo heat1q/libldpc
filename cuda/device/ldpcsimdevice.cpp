@@ -235,7 +235,9 @@ __host__ void ldpc_sim_device::start_device()
     char resStr[128];
 
 #ifdef LOG_FRAME_TIME
-    printResStr[0].assign("snr fer ber frames avg_iter time");
+    printResStr[0].assign("snr fer ber frames avg_iter frame_time");
+#elif defined LOG_TP
+    printResStr[0].assign("snr fer ber frames avg_iter frame_time dec_time throughput");
 #else
     printResStr[0].assign("snr fer ber frames avg_iter");
 #endif
@@ -247,7 +249,11 @@ __host__ void ldpc_sim_device::start_device()
         frames = 0;
         iters = 0;
         sigma2 = pow(10, -mSnrs[i] / 10);
-        auto time_start = std::chrono::high_resolution_clock::now();
+        auto timeStart = std::chrono::high_resolution_clock::now();
+
+#ifdef LOG_TP
+        std::size_t tconst = frame_const_time(sigma2, 10);
+#endif
         do
         {
             //launch the frame processing kernel
@@ -263,10 +269,10 @@ __host__ void ldpc_sim_device::start_device()
                 } //prevent checking more frames than necessary
 
                 iters += mLdpcDecoderVec[k]->mIter;
-                frames++;
+                ++frames;
 
                 bec_tmp = 0;
-                for (std::size_t j = 0; j < mLdpcCode->nc(); j++)
+                for (std::size_t j = 0; j < mLdpcCode->nc(); ++j)
                 {
                     bec_tmp += (mLdpcDecoderVec[k]->mLLROut[j] <= 0);
                 }
@@ -274,33 +280,43 @@ __host__ void ldpc_sim_device::start_device()
                 if (bec_tmp > 0)
                 {
                     bec += bec_tmp;
-                    fec++;
+                    ++fec;
 
-                    auto time_now = std::chrono::high_resolution_clock::now();
-                    auto time_dur = time_now - time_start; //eliminate const time for printing etc
-                    std::size_t t = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(time_dur).count());
-
-#ifdef SHORT_LOG
+                    auto timeNow = std::chrono::high_resolution_clock::now();
+                    auto timeFrame = timeNow - timeStart; //eliminate const time for printing etc
+                    std::size_t tFrame = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(timeFrame).count());
+                    tFrame = tFrame / (frames + mThreads - k - 1);
+#ifdef LOG_TP
+                    printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %.3fms  |  %6us  |  %.2fMbits/s",
+                           fec, mMinFec, frames, mSnrs[i],
+                           (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
+                           (double)iters / frames,
+                           (double)tFrame * 1e-3,
+                           (double)tFrame - tconst, //decoding time
+                           (double)mLdpcCode->nc() / tFrame); //decoding throughput
+#else
                     printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %.3fms",
                            fec, mMinFec, frames, mSnrs[i],
                            (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
                            (double)iters / frames,
-                           (double)t / (frames + mThreads - k - 1) * 1e-3);
-                    fflush(stdout);
-#else
-                    printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e, AVGITERS=%.2f, TIME/FRAME=%.3fms\n",
-                           fec, mMinFec, frames, mSnrs[i],
-                           (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
-                           (double)iters / frames,
-                           (double)t / (frames + mThreads - k - 1) * 1e-3);
+                           (double)tFrame * 1e-3);
 #endif
+                    fflush(stdout);
 
 #ifdef LOG_FRAME_TIME
-                    sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames, (double)t / frames * 1e-6);
+                    sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f",
+                            mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()),
+                            frames, (double)iters / frames, (double)tFrame * 1e-6);
+#elif defined LOG_TP
+                    sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f %.6f %lu",
+                            mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()),
+                            frames, (double)iters / frames, (double)tFrame * 1e-6,
+                            (double)tFrame - tconst * 1e-6, (double)mLdpcCode->nc() / (tFrame * 1e-6));
 #else
-                    sprintf(resStr, "%lf %.3e %.3e %lu %.3e", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames);
+                    sprintf(resStr, "%lf %.3e %.3e %lu %.3e",
+                            mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()),
+                            frames, (double)iters / frames);
 #endif
-
                     printResStr[i + 1].assign(resStr);
 
                     try
@@ -320,13 +336,11 @@ __host__ void ldpc_sim_device::start_device()
 
                     log_error(frames, mSnrs[i], k);
 
-                    time_start += std::chrono::high_resolution_clock::now() - time_now; //dont measure time for printing files
+                    timeStart += std::chrono::high_resolution_clock::now() - timeNow; //dont measure time for printing files
                 }
             }
         } while (fec < mMinFec && frames < mMaxFrames); //end while
-#ifdef SHORT_LOG
         printf("\n");
-#endif
     } //end for
 }
 
@@ -357,7 +371,11 @@ __host__ void ldpc_sim_device::start()
         frames = 0;
         iters = 0;
         sigma2 = pow(10, -mSnrs[i] / 10);
-        auto time_start = std::chrono::high_resolution_clock::now();
+        auto timeStart = std::chrono::high_resolution_clock::now();
+
+#ifdef LOG_TP
+        std::size_t tconst = frame_const_time(sigma2, 10);
+#endif
         do
         {
             encode_all0();
@@ -381,17 +399,17 @@ __host__ void ldpc_sim_device::start()
 
             calc_llrs(sigma2);
 
-//decode
+            //decode
 #ifdef USE_LEGACY_DEC
             iters += mLdpcDecoderVec[0]->decode_legacy();
 #else
             iters += mLdpcDecoderVec[0]->decode_layered();
 #endif
 
-            frames++;
+            ++frames;
 
             bec_tmp = 0;
-            for (std::size_t j = 0; j < mLdpcCode->nc(); j++)
+            for (std::size_t j = 0; j < mLdpcCode->nc(); ++j)
             {
                 bec_tmp += (mLdpcDecoderVec[0]->mLLROut[j] <= 0);
             }
@@ -399,32 +417,43 @@ __host__ void ldpc_sim_device::start()
             if (bec_tmp > 0)
             {
                 bec += bec_tmp;
-                fec++;
+                ++fec;
 
-                auto time_now = std::chrono::high_resolution_clock::now();
-                auto time_dur = time_now - time_start; //eliminate const time for printing etc
-                std::size_t t = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(time_dur).count());
-#ifdef SHORT_LOG
+                auto timeNow = std::chrono::high_resolution_clock::now();
+                auto timeFrame = timeNow - timeStart; //eliminate const time for printing etc
+                std::size_t tFrame = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(timeFrame).count());
+                tFrame = tFrame / frames;
+#ifdef LOG_TP
+                printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %.3fms  |  %6us  |  %.2fMbits/s",
+                       fec, mMinFec, frames, mSnrs[i],
+                       (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
+                       (double)iters / frames,
+                       (double)tFrame * 1e-3,
+                       (double)tFrame - tconst, //decoding time
+                       (double)mLdpcCode->nc() / tFrame); //decoding throughput
+#else
                 printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %.3fms",
                        fec, mMinFec, frames, mSnrs[i],
                        (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
                        (double)iters / frames,
-                       (double)t / frames * 1e-3);
-                fflush(stdout);
-#else
-                printf("FRAME ERROR (%lu/%lu) in frame %lu @SNR = %.3f: BER=%.2e, FER=%.2e, AVGITERS=%.2f, TIME/FRAME=%.3fms\n",
-                       fec, mMinFec, frames, mSnrs[i],
-                       (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
-                       (double)iters / frames,
-                       (double)t / frames * 1e-3);
+                       (double)tFrame * 1e-3);
 #endif
+                fflush(stdout);
 
 #ifdef LOG_FRAME_TIME
-                sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames, (double)t / frames * 1e-6);
+                sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f",
+                        mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()),
+                        frames, (double)iters / frames, (double)tFrame * 1e-6);
+#elif defined LOG_TP
+                sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f %.6f %lu",
+                        mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()),
+                        frames, (double)iters / frames, (double)tFrame * 1e-6,
+                        (double)tFrame - tconst * 1e-6, (double)mLdpcCode->nc() / (tFrame * 1e-6));
 #else
-                sprintf(resStr, "%lf %.3e %.3e %lu %.3e", mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()), frames, (double)iters / frames);
+                sprintf(resStr, "%lf %.3e %.3e %lu %.3e",
+                        mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()),
+                        frames, (double)iters / frames);
 #endif
-
                 printResStr[i + 1].assign(resStr);
 
                 try
@@ -442,14 +471,12 @@ __host__ void ldpc_sim_device::start()
                               << "\n";
                 }
 
-                log_error(frames, mSnrs[i], 0);
+                log_error(frames, mSnrs[i], k);
 
-                time_start += std::chrono::high_resolution_clock::now() - time_now; //dont measure time for printing files
+                timeStart += std::chrono::high_resolution_clock::now() - timeNow; //dont measure time for printing files
             }
         } while (fec < mMinFec && frames < mMaxFrames); //end while
-#ifdef SHORT_LOG
         printf("\n");
-#endif
     } //end for
 }
 
@@ -727,3 +754,46 @@ __host__ void ldpc_sim_device::log_error(std::size_t pFrameNum, double pSNR, lab
     fclose(fp);
 }
 } // namespace ldpc
+
+
+//measure constant time w/o decoding with pCount samples
+//returns time in us
+#ifdef LOG_TP
+__host__ std::size_t ldpc_sim_device::frame_const_time(double pSigma2, std::size_t pCount)
+{
+#ifdef USE_LEGACY_DEC || defined USE_CPU_FRAME //for cpu frame proc.
+    auto tconstStart = std::chrono::high_resolution_clock::now();
+
+    for (std::size_t i = 0; i < pCount; ++i)
+    {
+        encode_all0();
+        simulate_awgn(sigma2);
+        calc_llrs(sigma2);
+
+        std::size_t tmo = 0;
+        for (std::size_t j = 0; j < mLdpcCode->nc(); ++j)
+        {
+            bec_tmp += (mLdpcDecoderVec[0]->mLLROut[j] <= 0);
+        }
+    }
+
+    auto tconstDiff = std::chrono::high_resolution_clock::now() - tconstStart;
+    std::size_t tconst = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(tconstDiff).count());
+
+    return tconst / pCount;
+#else
+    //call one time to reduce memory overhead
+    cudakernel::sim::frame_time<<<mThreads, 1>>>(this, sigma2, 1);
+    cudaDeviceSynchronize();
+
+    auto tconstStart = std::chrono::high_resolution_clock::now();
+
+    cudakernel::sim::frame_time<<<mThreads, 1>>>(this, sigma2, pCount);
+    cudaDeviceSynchronize();
+
+    auto tconstDiff = std::chrono::high_resolution_clock::now() - tconstStart;
+    std::size_t tconst = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(tconstDiff).count());
+
+    return tconst / pCount / mThreads;
+}
+#endif

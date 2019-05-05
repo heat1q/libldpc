@@ -157,6 +157,9 @@ namespace sim
 {
 __global__ void setup_rng(ldpc_sim_device *pSim);
 __global__ void frame_proc(ldpc_sim_device *pSim, double pSigma2);
+#ifdef LOG_TP
+__global__ void frame_time(ldpc_sim_device *pSim, double pSigma2, std::size_t pCount);
+#endif
 __global__ void encode_all0(ldpc_sim_device *pSim, labels_t pBlockID);
 __global__ void awgn(ldpc_sim_device *pSim, double pSigma2, labels_t pBlockID);
 __global__ void calc_llrs(ldpc_sim_device *pSim, double pSigma2, labels_t pBlockID);

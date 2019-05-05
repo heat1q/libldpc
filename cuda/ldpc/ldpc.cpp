@@ -235,7 +235,7 @@ __host__ __device__ double jacobian(double L1, double L2)
 {
 #ifdef CN_APPROX_LIN
 	return sign(L1) * sign(L2) * fmin(fabs(L1), fabs(L2)) + jacobian_lin_approx(L1 + L2) - jacobian_lin_approx(L1 - L2);
-#elif CN_APPROX_MINSUM
+#elif defined CN_APPROX_MINSUM
 	return sign(L1) * sign(L2) * fmin(fabs(L1), fabs(L2));
 #else
 	return sign(L1) * sign(L2) * fmin(fabs(L1), fabs(L2)) + log((1 + exp(-fabs(L1 + L2))) / (1 + exp(-fabs(L1 - L2))));

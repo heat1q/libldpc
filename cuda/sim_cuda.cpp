@@ -1,6 +1,6 @@
 #include "ldpcsim.h"
 
-// /usr/local/cuda-9.2/bin/nvcc -x cu -std=c++11 sim_cuda.cpp ldpc/ldpc.cpp ldpc/decoder.cpp device/kernel.cpp device/ldpcsimdevice.cpp  -o sim_cuda -arch sm_35 -rdc=true -O3 -w
+
 int main(int argc, char *argv[])
 {
 	//set GPU id
@@ -93,8 +93,8 @@ int main(int argc, char *argv[])
 #ifdef LOG_FRAME_TIME
 	std::cout << "LOG_FRAME_TIME ";
 #endif
-#ifdef SHORT_LOG
-	std::cout << "SHORT_LOG ";
+#ifdef LOG_TP
+	std::cout << "LOG_TP ";
 #endif
 #ifdef USE_LEGACY_DEC
 	std::cout << "USE_LEGACY_DEC ";
@@ -102,6 +102,13 @@ int main(int argc, char *argv[])
 #ifdef USE_CPU_FRAME
 	std::cout << "USE_CPU_FRAME ";
 #endif
+#ifdef CN_APPROX_LIN
+	std::cout << "CN_APPROX_LIN ";
+#endif
+#ifdef CN_APPROX_MINSUM
+	std::cout << "CN_APPROX_MINSUM ";
+#endif
+
 	std::cout << "\n";
 	if (abort)
 	{
@@ -149,8 +156,11 @@ int main(int argc, char *argv[])
 	std::cout << "========================================================================================" << std::endl;
 
 	//sim_dev->print();
-#ifdef SHORT_LOG
-	std::cout << "  FEC   |      FRAME     |   SNR   |    BER     |   FER      | AVGITERS  |  TIME/FRAME   \n";
+#ifdef LOG_TP
+	std::cout << "  FEC   |      FRAME     |   SNR   |    BER     |    FER     | AVGITERS  |  TIME/FRAME  |  TIME DEC  |  THROUGHPUT  \n";
+	std::cout << "========+================+=========+============+============+===========+==============+============+==============" << std::endl;
+#else
+	std::cout << "  FEC   |      FRAME     |   SNR   |    BER     |    FER     | AVGITERS  |  TIME/FRAME   \n";
 	std::cout << "========+================+=========+============+============+===========+==============" << std::endl;
 #endif
 

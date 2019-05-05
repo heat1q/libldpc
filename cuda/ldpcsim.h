@@ -118,6 +118,9 @@ class ldpc_sim_device
 
 	__host__ void print();
 	__host__ void log_error(std::size_t pFrameNum, double pSNR, labels_t pThreads);
+#ifdef LOG_TP
+	__host__ std::size_t frame_const_time(double pSigma2, std::size_t pCount);
+#endif
 
 	//changed with each frame
 	vec_ldpc_dec_t mLdpcDecoderVec;
