@@ -471,7 +471,7 @@ __host__ void ldpc_sim_device::start()
                               << "\n";
                 }
 
-                log_error(frames, mSnrs[i], k);
+                log_error(frames, mSnrs[i], 0);
 
                 timeStart += std::chrono::high_resolution_clock::now() - timeNow; //dont measure time for printing files
             }
@@ -753,7 +753,6 @@ __host__ void ldpc_sim_device::log_error(std::size_t pFrameNum, double pSNR, lab
     fprintf(fp, "\n");
     fclose(fp);
 }
-} // namespace ldpc
 
 
 //measure constant time w/o decoding with pCount samples
@@ -767,8 +766,8 @@ __host__ std::size_t ldpc_sim_device::frame_const_time(double pSigma2, std::size
     for (std::size_t i = 0; i < pCount; ++i)
     {
         encode_all0();
-        simulate_awgn(sigma2);
-        calc_llrs(sigma2);
+        simulate_awgn(pSigma2);
+        calc_llrs(pSigma2);
 
         std::size_t tmo = 0;
         for (std::size_t j = 0; j < mLdpcCode->nc(); ++j)
@@ -783,17 +782,19 @@ __host__ std::size_t ldpc_sim_device::frame_const_time(double pSigma2, std::size
     return tconst / pCount;
 #else
     //call one time to reduce memory overhead
-    cudakernel::sim::frame_time<<<mThreads, 1>>>(this, sigma2, 1);
+    cudakernel::sim::frame_time<<<mThreads, 1>>>(this, pSigma2, 1);
     cudaDeviceSynchronize();
 
     auto tconstStart = std::chrono::high_resolution_clock::now();
 
-    cudakernel::sim::frame_time<<<mThreads, 1>>>(this, sigma2, pCount);
+    cudakernel::sim::frame_time<<<mThreads, 1>>>(this, pSigma2, pCount);
     cudaDeviceSynchronize();
 
     auto tconstDiff = std::chrono::high_resolution_clock::now() - tconstStart;
     std::size_t tconst = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(tconstDiff).count());
 
     return tconst / pCount / mThreads;
+#endif
 }
 #endif
+} // namespace ldpc
