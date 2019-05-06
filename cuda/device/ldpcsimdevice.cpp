@@ -107,6 +107,11 @@ __host__ ldpc_sim_device::ldpc_sim_device(cuda_ptr<ldpc_code_device> &pCode, con
         fsSubStr = fsLine.substr(fsLine.find(":") + 2); //bp iter
         mBPIter = std::stoul(fsSubStr);
 
+        bool earlyTerm;
+        std::getline(fsSim, fsLine);
+        fsSubStr = fsLine.substr(fsLine.find(":") + 2); //early term
+        earlyTerm = static_cast<bits_t>(std::stoul(fsSubStr));
+
         if (mLdpcCode->nct() % mBits != 0)
         {
             throw std::runtime_error("Chosen setting m with n_c does not work. Please correct.");
@@ -169,7 +174,7 @@ __host__ ldpc_sim_device::ldpc_sim_device(cuda_ptr<ldpc_code_device> &pCode, con
         //set up decoder
         for (std::size_t i = 0; i < mThreads; i++)
         {
-            mLdpcDecoderVec.push_back(cuda_ptr<ldpc_decoder_device>(ldpc_decoder_device(mLdpcCode, mBPIter, true)));
+            mLdpcDecoderVec.push_back(cuda_ptr<ldpc_decoder_device>(ldpc_decoder_device(mLdpcCode, mBPIter, earlyTerm)));
         }
 
         //channel i/o
@@ -634,6 +639,7 @@ __host__ void ldpc_sim_device::print()
     printf("max frames: %lu\n", mMaxFrames);
     printf("min fec: %lu\n", mMinFec);
     printf("bp iter: %lu\n", mBPIter);
+    printf("early term: %u\n", mLdpcDecoderVec[0]->early_termination());
     printf("SE: %.4lf\n", mSE);
     //for (std::size_t i = 0; i < mBits; i++)
     //{
