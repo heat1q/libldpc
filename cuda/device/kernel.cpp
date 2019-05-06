@@ -63,6 +63,7 @@ __global__ void cudakernel::sim::frame_time(ldpc_sim_device *pSim, double pSigma
         cudakernel::sim::awgn<<<get_num_size(pSim->n(), NUMK_THREADS), NUMK_THREADS>>>(pSim, pSigma2, ix);
         cudakernel::sim::calc_llrs<<<get_num_size(pSim->n(), NUMK_THREADS), NUMK_THREADS>>>(pSim, pSigma2, ix);
         cudakernel::sim::calc_llrin<<<get_num_size(pSim->mLdpcCode->nc(), NUMK_THREADS), NUMK_THREADS>>>(pSim, ix);
+        cudaDeviceSynchronize();
     }
 }
 #endif

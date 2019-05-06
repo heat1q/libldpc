@@ -228,7 +228,7 @@ __host__ void ldpc_sim_device::start_device()
     std::size_t bec = 0;
     std::size_t fec = 0;
     std::size_t iters;
-    std::size_t bec_tmp;
+    std::vector<std::size_t> bec_tmp(mThreads);
 
     std::vector<std::string> printResStr(mSnrs.size() + 1, std::string());
     std::ofstream fp;
@@ -252,13 +252,24 @@ __host__ void ldpc_sim_device::start_device()
         auto timeStart = std::chrono::high_resolution_clock::now();
 
 #ifdef LOG_TP
-        std::size_t tconst = frame_const_time(sigma2, 10);
+        std::size_t tconst = frame_const_time(sigma2, 100);
+        tconst /= mThreads;
 #endif
         do
         {
             //launch the frame processing kernel
             cudakernel::sim::frame_proc<<<mThreads, 1>>>(this, sigma2);
             cudaDeviceSynchronize();
+
+            //check bec, runtime of this fct will be neglected later
+            for (labels_t k = 0; k < mThreads; ++k)
+            {
+                bec_tmp[k] = 0;
+                for (std::size_t j = 0; j < mLdpcCode->nc(); ++j)
+                {
+                    bec_tmp[k] += (mLdpcDecoderVec[k]->mLLROut[j] <= 0);
+                }
+            }
 
             //now check the processed frames
             for (labels_t k = 0; k < mThreads; ++k) //TODO adjust for parallel threads
@@ -271,15 +282,9 @@ __host__ void ldpc_sim_device::start_device()
                 iters += mLdpcDecoderVec[k]->mIter;
                 ++frames;
 
-                bec_tmp = 0;
-                for (std::size_t j = 0; j < mLdpcCode->nc(); ++j)
+                if (bec_tmp[k] > 0)
                 {
-                    bec_tmp += (mLdpcDecoderVec[k]->mLLROut[j] <= 0);
-                }
-
-                if (bec_tmp > 0)
-                {
-                    bec += bec_tmp;
+                    bec += bec_tmp[k];
                     ++fec;
 
                     auto timeNow = std::chrono::high_resolution_clock::now();
@@ -287,35 +292,37 @@ __host__ void ldpc_sim_device::start_device()
                     std::size_t tFrame = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(timeFrame).count());
                     tFrame = tFrame / (frames + mThreads - k - 1);
 #ifdef LOG_TP
-                    printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %.3fms  |  %6us  |  %.2fMbits/s",
+                    printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %7.3fms  |  %6luus  |  %.2fMbits/s",
                            fec, mMinFec, frames, mSnrs[i],
-                           (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
-                           (double)iters / frames,
-                           (double)tFrame * 1e-3,
-                           (double)tFrame - tconst, //decoding time
-                           (double)mLdpcCode->nc() / tFrame); //decoding throughput
+                           static_cast<double>(bec) / (frames * mLdpcCode->nc()),     //ber
+                           static_cast<double>(fec) / frames,                         //fer
+                           static_cast<double>(iters) / frames,                       //avg iters
+                           static_cast<double>(tFrame) * 1e-3,                        //frame time
+                           tFrame - tconst,                                           //decoding time
+                           static_cast<double>(mLdpcCode->nc()) / (tFrame - tconst)); //decoding throughput
 #else
                     printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %.3fms",
                            fec, mMinFec, frames, mSnrs[i],
-                           (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
-                           (double)iters / frames,
-                           (double)tFrame * 1e-3);
+                           static_cast<double>(bec) / (frames * mLdpcCode->nc()), //ber
+                           static_cast<double>(fec) / frames,                     //fer
+                           static_cast<double>(iters) / frames,                   //avg iters
+                           static_cast<double>(tFrame) * 1e-3);                   //frame time
 #endif
                     fflush(stdout);
 
 #ifdef LOG_FRAME_TIME
                     sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f",
-                            mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()),
-                            frames, (double)iters / frames, (double)tFrame * 1e-6);
+                            mSnrs[i], static_cast<double>(fec) / frames, static_cast<double>(bec) / (frames * mLdpcCode->nc()),
+                            frames, static_cast<double>(iters) / frames, static_cast<double>(tFrame) * 1e-6);
 #elif defined LOG_TP
                     sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f %.6f %lu",
-                            mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()),
-                            frames, (double)iters / frames, (double)tFrame * 1e-6,
-                            (double)tFrame - tconst * 1e-6, (double)mLdpcCode->nc() / (tFrame * 1e-6));
+                            mSnrs[i], static_cast<double>(fec) / frames, static_cast<double>(bec) / (frames * mLdpcCode->nc()),
+                            frames, static_cast<double>(iters) / frames, static_cast<double>(tFrame) * 1e-6,
+                            static_cast<double>(tFrame - tconst) * 1e-6, static_cast<std::size_t>(mLdpcCode->nc() / ((tFrame - tconst) * 1e-6)));
 #else
                     sprintf(resStr, "%lf %.3e %.3e %lu %.3e",
-                            mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()),
-                            frames, (double)iters / frames);
+                            mSnrs[i], static_cast<double>(fec) / frames, static_cast<double>(bec) / (frames * mLdpcCode->nc()),
+                            frames, static_cast<double>(iters) / frames);
 #endif
                     printResStr[i + 1].assign(resStr);
 
@@ -397,8 +404,6 @@ __host__ void ldpc_sim_device::start()
                 }
             }
 
-            calc_llrs(sigma2);
-
             //decode
 #ifdef USE_LEGACY_DEC
             iters += mLdpcDecoderVec[0]->decode_legacy();
@@ -424,35 +429,37 @@ __host__ void ldpc_sim_device::start()
                 std::size_t tFrame = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(timeFrame).count());
                 tFrame = tFrame / frames;
 #ifdef LOG_TP
-                printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %.3fms  |  %6us  |  %.2fMbits/s",
+                printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %7.3fms  |  %6luus  |  %.2fMbits/s",
                        fec, mMinFec, frames, mSnrs[i],
-                       (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
-                       (double)iters / frames,
-                       (double)tFrame * 1e-3,
-                       (double)tFrame - tconst, //decoding time
-                       (double)mLdpcCode->nc() / tFrame); //decoding throughput
+                       static_cast<double>(bec) / (frames * mLdpcCode->nc()),     //ber
+                       static_cast<double>(fec) / frames,                         //fer
+                       static_cast<double>(iters) / frames,                       //avg iters
+                       static_cast<double>(tFrame) * 1e-3,                        //frame time
+                       tFrame - tconst,                                           //decoding time
+                       static_cast<double>(mLdpcCode->nc()) / (tFrame - tconst)); //decoding throughput
 #else
                 printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %.3fms",
                        fec, mMinFec, frames, mSnrs[i],
-                       (double)bec / (frames * mLdpcCode->nc()), (double)fec / frames,
-                       (double)iters / frames,
-                       (double)tFrame * 1e-3);
+                       static_cast<double>(bec) / (frames * mLdpcCode->nc()), //ber
+                       static_cast<double>(fec) / frames,                     //fer
+                       static_cast<double>(iters) / frames,                   //avg iters
+                       static_cast<double>(tFrame) * 1e-3);                   //frame time
 #endif
                 fflush(stdout);
 
 #ifdef LOG_FRAME_TIME
                 sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f",
-                        mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()),
-                        frames, (double)iters / frames, (double)tFrame * 1e-6);
+                        mSnrs[i], static_cast<double>(fec) / frames, static_cast<double>(bec) / (frames * mLdpcCode->nc()),
+                        frames, static_cast<double>(iters) / frames, static_cast<double>(tFrame) * 1e-6);
 #elif defined LOG_TP
                 sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f %.6f %lu",
-                        mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()),
-                        frames, (double)iters / frames, (double)tFrame * 1e-6,
-                        (double)tFrame - tconst * 1e-6, (double)mLdpcCode->nc() / (tFrame * 1e-6));
+                        mSnrs[i], static_cast<double>(fec) / frames, static_cast<double>(bec) / (frames * mLdpcCode->nc()),
+                        frames, static_cast<double>(iters) / frames, static_cast<double>(tFrame) * 1e-6,
+                        static_cast<double>(tFrame - tconst) * 1e-6, static_cast<std::size_t>(mLdpcCode->nc() / ((tFrame - tconst) * 1e-6)));
 #else
                 sprintf(resStr, "%lf %.3e %.3e %lu %.3e",
-                        mSnrs[i], (double)fec / frames, (double)bec / (frames * mLdpcCode->nc()),
-                        frames, (double)iters / frames);
+                        mSnrs[i], static_cast<double>(fec) / frames, static_cast<double>(bec) / (frames * mLdpcCode->nc()),
+                        frames, static_cast<double>(iters) / frames);
 #endif
                 printResStr[i + 1].assign(resStr);
 
@@ -754,7 +761,6 @@ __host__ void ldpc_sim_device::log_error(std::size_t pFrameNum, double pSNR, lab
     fclose(fp);
 }
 
-
 //measure constant time w/o decoding with pCount samples
 //returns time in us
 #ifdef LOG_TP
@@ -769,17 +775,12 @@ __host__ std::size_t ldpc_sim_device::frame_const_time(double pSigma2, std::size
         simulate_awgn(pSigma2);
         calc_llrs(pSigma2);
 
-        std::size_t tmo = 0;
+        std::size_t tmp = 0;
         for (std::size_t j = 0; j < mLdpcCode->nc(); ++j)
         {
-            bec_tmp += (mLdpcDecoderVec[0]->mLLROut[j] <= 0);
+            tmp += (mLdpcDecoderVec[0]->mLLROut[j] <= 0);
         }
     }
-
-    auto tconstDiff = std::chrono::high_resolution_clock::now() - tconstStart;
-    std::size_t tconst = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(tconstDiff).count());
-
-    return tconst / pCount;
 #else
     //call one time to reduce memory overhead
     cudakernel::sim::frame_time<<<mThreads, 1>>>(this, pSigma2, 1);
@@ -790,11 +791,20 @@ __host__ std::size_t ldpc_sim_device::frame_const_time(double pSigma2, std::size
     cudakernel::sim::frame_time<<<mThreads, 1>>>(this, pSigma2, pCount);
     cudaDeviceSynchronize();
 
+    for (std::size_t i = 0; i < mThreads * pCount; ++i)
+    {
+        std::size_t tmp = 0;
+        for (std::size_t j = 0; j < mLdpcCode->nc(); ++j)
+        {
+            tmp += (mLdpcDecoderVec[0]->mLLROut[j] <= 0);
+        }
+    }
+#endif
+
     auto tconstDiff = std::chrono::high_resolution_clock::now() - tconstStart;
     std::size_t tconst = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(tconstDiff).count());
 
-    return tconst / pCount / mThreads;
-#endif
+    return tconst / pCount;
 }
 #endif
 } // namespace ldpc
