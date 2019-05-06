@@ -1,4 +1,4 @@
-#include "ldpcsim.h"
+#include "sim/ldpcsim.h"
 
 
 int main(int argc, char *argv[])

@@ -1,4 +1,4 @@
-#include "../ldpcsim.h"
+#include "../sim/ldpcsim.h"
 
 namespace ldpc
 {

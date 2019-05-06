@@ -11,7 +11,7 @@
 #define GPU_ID 0
 #endif
 
-#include "ldpc/ldpc.h"
+#include "../ldpc/ldpc.h"
 
 
 #define TIME_PROF(log, exec, unit)                                                                                                             \
@@ -104,7 +104,6 @@ class ldpc_sim_device
 {
   public:
 	__host__ ldpc_sim_device(cuda_ptr<ldpc_code_device> &pCode, const char *pSimFileName, const char *pMapFileName, labels_t pNumThreads);
-	__host__ void mem_prefetch();
 
 	__host__ void start_device();
 	__host__ void start();
