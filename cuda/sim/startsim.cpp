@@ -55,6 +55,8 @@ __host__ void ldpc_sim_device::start()
                 }
             }
 
+            calc_llrs(sigma2);
+
             //decode
 #ifdef USE_LEGACY_DEC
             iters += mLdpcDecoderVec[0]->decode_legacy();
