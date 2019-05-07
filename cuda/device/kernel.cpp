@@ -23,9 +23,14 @@ __global__ void cudakernel::sim::setup_rng(ldpc_sim_device *pSim)
     }
 }
 
+
 __global__ void cudakernel::sim::frame_proc(ldpc_sim_device *pSim, double pSigma2)
 {
+    std::size_t pI;
     const labels_t ix = blockIdx.x;
+    const std::size_t gridSizeNC = get_num_size(pDecMgd->mLdpcCode->nc(), NUMK_THREADS);
+    const std::size_t gridSizeNNZ = get_num_size(pDecMgd->mLdpcCode->nnz(), NUMK_THREADS);
+    ldpc_decoder_device *pDecMgd = pSim->mLdpcDecoderVec[ix].get();
 
     //encodeall0
     cudakernel::sim::encode_all0<<<get_num_size(pSim->mLdpcCode->nct(), NUMK_THREADS), NUMK_THREADS>>>(pSim, ix);
@@ -44,9 +49,38 @@ __global__ void cudakernel::sim::frame_proc(ldpc_sim_device *pSim, double pSigma
     cudakernel::sim::calc_llrin<<<get_num_size(pSim->mLdpcCode->nc(), NUMK_THREADS), NUMK_THREADS>>>(pSim, ix);
 
     //decode
-    cudakernel::decoder::decode_layered<<<1, 1>>>(pSim->mLdpcDecoderVec[ix].get());
+    //zero everything out
+    cudakernel::decoder::clean_decoder<<<gridSizeNNZ, NUMK_THREADS>>>(pDecMgd);
 
+    labels_t I = 0;
+    while (I < pDecMgd->max_iter())
+    {
+        for (std::size_t l = 0; l < pDecMgd->mLdpcCode->nl(); ++l)
+        {
+            pI = pDecMgd->mLdpcCode->nnz() * l;
+
+            //launching kernels
+            cudakernel::decoder::decode_lyr_vnupdate<<<gridSizeNC, NUMK_THREADS>>>(pDecMgd, pI);
+            cudakernel::decoder::decode_lyr_cnupdate<<<get_num_size(pDecMgd->mLdpcCode->lw()[l], NUMK_THREADS / 2), NUMK_THREADS / 2>>>(pDecMgd, pI, l);
+            cudakernel::decoder::decode_lyr_sumllr<<<gridSizeNNZ, NUMK_THREADS>>>(pDecMgd, pI);
+            cudakernel::decoder::decode_lyr_appcalc<<<gridSizeNC, NUMK_THREADS>>>(pDecMgd);
+
+            if (pDecMgd->early_termination())
+            {
+                if (pDecMgd->is_codeword()) //break
+                {
+                    goto break_here;
+                }
+            }
+        }
+
+        ++I;
+    }
+
+break_here:
     //cudaDeviceSynchronize();
+
+    pSim->mLdpcDecoderVec[ix]->mIter = I;
 }
 
 
