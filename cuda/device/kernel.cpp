@@ -28,9 +28,9 @@ __global__ void cudakernel::sim::frame_proc(ldpc_sim_device *pSim, double pSigma
 {
     std::size_t pI;
     const labels_t ix = blockIdx.x;
+    ldpc_decoder_device *pDecMgd = pSim->mLdpcDecoderVec[ix].get();    
     const std::size_t gridSizeNC = get_num_size(pDecMgd->mLdpcCode->nc(), NUMK_THREADS);
     const std::size_t gridSizeNNZ = get_num_size(pDecMgd->mLdpcCode->nnz(), NUMK_THREADS);
-    ldpc_decoder_device *pDecMgd = pSim->mLdpcDecoderVec[ix].get();
 
     //encodeall0
     cudakernel::sim::encode_all0<<<get_num_size(pSim->mLdpcCode->nct(), NUMK_THREADS), NUMK_THREADS>>>(pSim, ix);
