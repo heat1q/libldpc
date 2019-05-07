@@ -29,11 +29,10 @@ __host__ void ldpc_sim_device::start()
         frames = 0;
         iters = 0;
         sigma2 = pow(10, -mSnrs[i] / 10);
-        auto timeStart = std::chrono::high_resolution_clock::now();
-
 #ifdef LOG_TP
         std::size_t tconst = frame_const_time(sigma2, 10);
 #endif
+        auto timeStart = std::chrono::high_resolution_clock::now();
         do
         {
             encode_all0();

@@ -36,12 +36,11 @@ __host__ void ldpc_sim_device::start_device()
         frames = 0;
         iters = 0;
         sigma2 = pow(10, -mSnrs[i] / 10);
-        auto timeStart = std::chrono::high_resolution_clock::now();
-
 #ifdef LOG_TP
         std::size_t tconst = frame_const_time(sigma2, 100);
         tconst /= mThreads;
 #endif
+        auto timeStart = std::chrono::high_resolution_clock::now();
         do
         {
             //launch the frame processing kernel
