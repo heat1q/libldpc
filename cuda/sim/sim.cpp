@@ -489,7 +489,7 @@ __host__ std::size_t ldpc_sim_device::frame_const_time(double pSigma2, std::size
     for (std::size_t i = 0; i < pCount; ++i)
     {
         cudakernel::sim::frame_time<<<mThreads, 1>>>(this, pSigma2);//launch w/o decoding i.e zero iterations
-	cudaDeviceSynchronize();
+	    cudaDeviceSynchronize();
     }
 
     for (std::size_t i = 0; i < mThreads * pCount; ++i)

@@ -23,12 +23,11 @@ __global__ void cudakernel::sim::setup_rng(ldpc_sim_device *pSim)
     }
 }
 
-
 __global__ void cudakernel::sim::frame_proc(ldpc_sim_device *pSim, double pSigma2)
 {
     std::size_t pI;
     const labels_t ix = blockIdx.x;
-    ldpc_decoder_device *pDecMgd = pSim->mLdpcDecoderVec[ix].get();    
+    ldpc_decoder_device *pDecMgd = pSim->mLdpcDecoderVec[ix].get();
     const std::size_t gridSizeNC = get_num_size(pDecMgd->mLdpcCode->nc(), NUMK_THREADS);
     const std::size_t gridSizeNNZ = get_num_size(pDecMgd->mLdpcCode->nnz(), NUMK_THREADS);
 
@@ -78,11 +77,9 @@ __global__ void cudakernel::sim::frame_proc(ldpc_sim_device *pSim, double pSigma
     }
 
 break_here:
-    //cudaDeviceSynchronize();
 
     pSim->mLdpcDecoderVec[ix]->mIter = I;
 }
-
 
 //measure the constant time for frame processing over pCount samples
 #ifdef LOG_TP
@@ -90,7 +87,7 @@ __global__ void cudakernel::sim::frame_time(ldpc_sim_device *pSim, double pSigma
 {
     std::size_t pI;
     const labels_t ix = blockIdx.x;
-    ldpc_decoder_device *pDecMgd = pSim->mLdpcDecoderVec[ix].get();    
+    ldpc_decoder_device *pDecMgd = pSim->mLdpcDecoderVec[ix].get();
     const std::size_t gridSizeNC = get_num_size(pDecMgd->mLdpcCode->nc(), NUMK_THREADS);
     const std::size_t gridSizeNNZ = get_num_size(pDecMgd->mLdpcCode->nnz(), NUMK_THREADS);
 
@@ -102,7 +99,6 @@ __global__ void cudakernel::sim::frame_time(ldpc_sim_device *pSim, double pSigma
     cudakernel::decoder::clean_decoder<<<gridSizeNNZ, NUMK_THREADS>>>(pDecMgd);
 }
 #endif
-
 
 //encode the input to all zero
 __global__ void cudakernel::sim::encode_all0(ldpc_sim_device *pSim, labels_t pBlockID)
