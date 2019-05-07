@@ -30,7 +30,7 @@ __host__ void ldpc_sim_device::start()
         iters = 0;
         sigma2 = pow(10, -mSnrs[i] / 10);
 #ifdef LOG_TP
-        std::size_t tconst = frame_const_time(sigma2, 10);
+        std::size_t tconst = frame_const_time(sigma2, mMinFec);
 #endif
         auto timeStart = std::chrono::high_resolution_clock::now();
         do
@@ -81,14 +81,15 @@ __host__ void ldpc_sim_device::start()
                 std::size_t tFrame = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(timeFrame).count());
                 tFrame = tFrame / frames;
 #ifdef LOG_TP
+                std::size_t tDec = std::max(1, static_cast<int>(tFrame) - static_cast<int>(tconst));
                 printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %7.3fms  |  %6luus  |  %.2fMbits/s",
                        fec, mMinFec, frames, mSnrs[i],
                        static_cast<double>(bec) / (frames * mLdpcCode->nc()),     //ber
                        static_cast<double>(fec) / frames,                         //fer
                        static_cast<double>(iters) / frames,                       //avg iters
                        static_cast<double>(tFrame) * 1e-3,                        //frame time
-                       tFrame - tconst,                                           //decoding time
-                       static_cast<double>(mLdpcCode->nc()) / (tFrame - tconst)); //decoding throughput
+                       tDec,                                                      //decoding time
+                       static_cast<double>(mLdpcCode->nc()) / (tDec)); //decoding throughput
 #else
                 printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %.3fms",
                        fec, mMinFec, frames, mSnrs[i],
@@ -107,7 +108,7 @@ __host__ void ldpc_sim_device::start()
                 sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f %.6f %lu",
                         mSnrs[i], static_cast<double>(fec) / frames, static_cast<double>(bec) / (frames * mLdpcCode->nc()),
                         frames, static_cast<double>(iters) / frames, static_cast<double>(tFrame) * 1e-6,
-                        static_cast<double>(tFrame - tconst) * 1e-6, static_cast<std::size_t>(mLdpcCode->nc() / ((tFrame - tconst) * 1e-6)));
+                        static_cast<double>(tDec) * 1e-6, static_cast<std::size_t>(mLdpcCode->nc() / ((tFrame - tconst) * 1e-6)));
 #else
                 sprintf(resStr, "%lf %.3e %.3e %lu %.3e",
                         mSnrs[i], static_cast<double>(fec) / frames, static_cast<double>(bec) / (frames * mLdpcCode->nc()),
