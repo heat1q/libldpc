@@ -37,8 +37,9 @@ __host__ void ldpc_sim_device::start_device()
         iters = 0;
         sigma2 = pow(10, -mSnrs[i] / 10);
 #ifdef LOG_TP
-        std::size_t tconst = frame_const_time(sigma2, mMinFec);
-        tconst /= mThreads;
+        std::size_t tconst = frame_const_time(sigma2, mMinFec*5);
+        tconst = tconst / mThreads;
+	std::cout << "tconst: " << tconst << "\n";
 #endif
         auto timeStart = std::chrono::high_resolution_clock::now();
         do
