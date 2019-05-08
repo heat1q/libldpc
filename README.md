@@ -1,4 +1,4 @@
-# Nvidia Cuda LDPC Code Simulation
+# Cuda LDPC Code Simulation
 WIP
 
 ### Tools
