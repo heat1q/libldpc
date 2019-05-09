@@ -43,8 +43,10 @@ __host__ void ldpc_sim_device::start_device()
         frames = 0;
         iters = 0;
         sigma2 = pow(10, -mSnrs[i] / 10);
+#ifdef LOG_TP
         tDec = 0;
         tDecI = 0;
+#endif
 
         auto timeStart = std::chrono::high_resolution_clock::now();
         do

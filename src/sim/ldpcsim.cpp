@@ -489,7 +489,6 @@ __host__ std::size_t ldpc_sim_device::frame_const_time(double pSigma2, std::size
     for (std::size_t i = 0; i < pCount; ++i)
     {
         cudakernel::sim::frame_time<<<mThreads, 1>>>(this, pSigma2);//launch w/o decoding i.e zero iterations
-	    cudaDeviceSynchronize();
     }
 
     for (std::size_t i = 0; i < mThreads * pCount; ++i)
@@ -500,6 +499,8 @@ __host__ std::size_t ldpc_sim_device::frame_const_time(double pSigma2, std::size
             tmp += (mLdpcDecoderVec[0]->mLLROut[j] <= 0);
         }
     }
+
+	cudaDeviceSynchronize();
 #endif
     auto tconstDiff = std::chrono::high_resolution_clock::now() - tconstStart;
     std::size_t tconst = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(tconstDiff).count());

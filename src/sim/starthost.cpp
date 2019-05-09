@@ -17,7 +17,9 @@ __host__ void ldpc_sim_device::start()
     char resStr[128];
 
 #ifdef LOG_FRAME_TIME
-    printResStr[0].assign("snr fer ber frames avg_iter time_frame[ms]");
+    printResStr[0].assign("snr fer ber frames avg_iter frame_time");
+#elif defined LOG_TP
+    printResStr[0].assign("snr fer ber frames avg_iter frame_time dec_time throughput");
 #else
     printResStr[0].assign("snr fer ber frames avg_iter");
 #endif
