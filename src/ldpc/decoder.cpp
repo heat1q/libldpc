@@ -7,63 +7,17 @@ namespace ldpc
 */
 //Init constructor
 __host__ ldpc_decoder_device::ldpc_decoder_device(cuda_ptr<ldpc_code_device> &pCode, std::size_t pI, bool pEarlyTerm)
-    : mLdpcCode(pCode), mMaxIter(pI), mEarlyTerm(pEarlyTerm), mLv2c(pCode->layers().size() * pCode->nnz()), mLc2v(pCode->layers().size() * pCode->nnz()), mLc2vPre(pCode->layers().size() * pCode->nnz()), mLSum(pCode->nnz()), mF(pCode->max_dc()), mB(pCode->max_dc()), mLLRIn(pCode->nc()), mLLROut(pCode->nc()), mSynd(pCode->mc()), mCO(pCode->nc()), mIter(0), mIsCW(false), FBREF(nullptr)
+    : mLdpcCode(pCode), mMaxIter(pI), mEarlyTerm(pEarlyTerm), 
+    mLv2c(pCode->layers().size() * pCode->nnz()), mLc2v(pCode->layers().size() * pCode->nnz()), 
+    mLc2vPre(pCode->layers().size() * pCode->nnz()), mLSum(pCode->nnz()), 
+    mF(pCode->max_dc()), mB(pCode->max_dc()), 
+    mLLRIn(pCode->nc()), mLLROut(pCode->nc()), 
+    mSynd(pCode->mc()), mCO(pCode->nc()), 
+    mIter(0), mIsCW(false)
 {
-    cudaMallocManaged(&FBREF, mLdpcCode->max_dc());
-
-    cudaDeviceSynchronize();
-    int dev = -1;
-    cudaGetDevice(&dev);
-    cudaMemPrefetchAsync(FBREF, mLdpcCode->max_dc(), dev, NULL);
-
     //mem_prefetch();
 }
 
-//copy constructor
-__host__ ldpc_decoder_device::ldpc_decoder_device(const ldpc_decoder_device &pCopy)
-    : mLdpcCode(pCopy.mLdpcCode), mMaxIter(pCopy.mMaxIter), mEarlyTerm(pCopy.mEarlyTerm), mLv2c(pCopy.mLv2c), mLc2v(pCopy.mLc2v), mLSum(pCopy.mLSum), mLc2vPre(pCopy.mLc2vPre), mF(pCopy.mF), mB(pCopy.mB), mLLRIn(pCopy.mLLRIn), mLLROut(pCopy.mLLROut), mSynd(pCopy.mSynd), mCO(pCopy.mCO), mIter(0), mIsCW(false), FBREF(nullptr)
-{
-    cudaMallocManaged(&FBREF, mLdpcCode->max_dc());
-
-    cudaDeviceSynchronize();
-    int dev = -1;
-    cudaGetDevice(&dev);
-    cudaMemPrefetchAsync(FBREF, mLdpcCode->max_dc(), dev, NULL);
-
-    //mem_prefetch();
-}
-
-//destructor
-__host__ ldpc_decoder_device::~ldpc_decoder_device()
-{
-    if (FBREF != nullptr)
-    {
-        cudaFree(FBREF);
-    }
-}
-
-//copy/move assignment operator
-__host__ ldpc_decoder_device &ldpc_decoder_device::operator=(ldpc_decoder_device pCopy) noexcept
-{
-    swap(mLdpcCode, pCopy.mLdpcCode);
-    swap(mLv2c, pCopy.mLv2c);
-    swap(mLc2v, pCopy.mLc2v);
-    swap(mLSum, pCopy.mLSum);
-    swap(mLc2vPre, pCopy.mLc2vPre);
-    swap(mLLRIn, pCopy.mLLRIn);
-    swap(mLLROut, pCopy.mLLROut);
-    swap(mF, pCopy.mF);
-    swap(mB, pCopy.mB);
-    swap(mSynd, pCopy.mSynd);
-    swap(mCO, pCopy.mCO);
-    swap(mIter, pCopy.mIter);
-    swap(FBREF, pCopy.FBREF);
-    swap(mIsCW, pCopy.mIsCW);
-    swap(mMaxIter, pCopy.mMaxIter);
-    swap(mEarlyTerm, pCopy.mEarlyTerm);
-
-    return *this;
-}
 
 //prefetch memory
 __host__ void ldpc_decoder_device::mem_prefetch()

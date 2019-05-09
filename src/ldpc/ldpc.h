@@ -78,10 +78,6 @@ class ldpc_decoder_device
 {
   public:
 	__host__ ldpc_decoder_device(cuda_ptr<ldpc_code_device> &pCode, std::size_t pI, bool pEarlyTerm);
-	__host__ ldpc_decoder_device(const ldpc_decoder_device &pCopy);
-	//__host__ ldpc_decoder_device(ldpc_decoder_device&& pMove) noexcept;
-	__host__ ~ldpc_decoder_device();
-	__host__ ldpc_decoder_device &operator=(ldpc_decoder_device pCopy) noexcept;
 	__host__ void mem_prefetch();
 
 	__host__ __device__ bool is_codeword();
@@ -109,12 +105,11 @@ class ldpc_decoder_device
 	vec_bits_t mCO;
 
 	std::size_t mIter;
-	void *FBREF;
 
 	bool mIsCW;
 
-	std::size_t mMaxIter;
   private:
+	std::size_t mMaxIter;
 	bool mEarlyTerm;
 };
 
