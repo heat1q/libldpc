@@ -53,4 +53,5 @@ dkms.conf
 
 # Qt
 *.pro.user
-.vscode/
+.vscode/*
+codes/*
