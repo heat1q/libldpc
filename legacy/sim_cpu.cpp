@@ -8,8 +8,9 @@ int main(int argc, char *argv[])
 	std::string codeFile;
 	std::string simFile;
 	std::string mapFile;
+	std::string layerFile;
 
-	if (argc == 7)
+if (argc == 7 || argc == 9)
 	{
 		for (int i = 0; i < (argc - 1) / 2; ++i)
 		{
@@ -24,6 +25,10 @@ int main(int argc, char *argv[])
 			else if (strcmp(argv[2 * i + 1], "-map") == 0)
 			{
 				mapFile.assign(argv[2 * i + 2]);
+			}
+			else if (strcmp(argv[2 * i + 1], "-layer") == 0)
+			{
+				layerFile.assign(argv[2 * i + 2]);
 			}
 			else
 			{
@@ -42,6 +47,10 @@ int main(int argc, char *argv[])
 	std::cout << "codefile: " << codeFile << "\n";
 	std::cout << "simfile: " << simFile << "\n";
 	std::cout << "mappingfile: " << mapFile << "\n";
+	if (!layerFile.empty()) 
+	{ 
+		std::cout << "layerfile: " << layerFile << "\n";
+	}
 	
 	std::cout << "\nDFLAGS: \t";
 #ifdef LOG_FRAME_TIME
@@ -62,15 +71,17 @@ int main(int argc, char *argv[])
 	{
 		std::cout << "==================================== USAGE REMINDER ====================================\n";
 		std::cout << "                    ./Main  -code CodeFile -sim SimFile -map MappingFile                 \n";
+		std::cout << "                   Optinal: -layer LayerFile                                             \n";
 		std::cout << "                                                                                         \n";
 		std::cout << "                  CodeFile: Name of the code file                                        \n";
 		std::cout << "               CodeMapFile: Name of mapping file                                         \n";
 		std::cout << "                   SimFile: Name of simulation file                                      \n";
+		std::cout << "                 LayerFile: Name of layer file                                           \n";
 		std::cout << "========================================================================================" << std::endl;
 		exit(EXIT_FAILURE);
 	}
 
-	ldpc::ldpc_code code(codeFile.c_str());
+	ldpc::ldpc_code code(codeFile.c_str(), layerFile.c_str());
 	ldpc::ldpc_decoder decoder(&code, 0, true);
 
 	std::cout << "========================================================================================" << std::endl;

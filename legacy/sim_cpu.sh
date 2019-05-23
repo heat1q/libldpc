@@ -3,7 +3,8 @@
 codefile="$1"
 simfile="$2"
 mapfile="$3"
-defines="$4"
+layerfile="$4"
+defines="$5"
 
 if ! [ -e $codefile ] || [ "$codefile" = "" ]
 then
@@ -26,7 +27,7 @@ fi
 #read sim name
 while read -r -p "Enter name for simulation: " sim_name
 do
-    if [ -e "../results/sim_"$sim_name"_legacy" ] || [ "$sim_name" = "" ]
+    if [ -e "../results/sim_"$sim_name"_cpu" ] || [ "$sim_name" = "" ]
     then
         echo "Cannot use $sim_name. Simulation with this name already exists!"
     else
@@ -34,7 +35,7 @@ do
     fi
 done
 
-sim_name=""$sim_name"_legacy"
+sim_name=""$sim_name"_cpu"
 temp_dir="sim_$sim_name"
 if ! [ -e "../results" ]
 then
@@ -58,8 +59,13 @@ sed -i "1s/.*/name: res_$sim_name.txt/" sim.txt
 #make executable
 chmod +x $sim_name
 
-#run
-param="-code ../$codefile -sim sim.txt -map ../$mapfile $param2"
+#run#run
+if [ "$4" != "" ]
+then
+    param="-code ../$codefile -sim sim.txt -map ../$mapfile -layer ../$layerfile"
+else
+    param="-code ../$codefile -sim sim.txt -map ../$mapfile"
+fi
 
 echo "Running: ./$sim_name $param"
 ./$sim_name $param

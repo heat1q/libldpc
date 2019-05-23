@@ -7,7 +7,7 @@ namespace ldpc
 * Code device
 */
 //init constructor
-ldpc_code::ldpc_code(const char *pFileName)
+ldpc_code::ldpc_code(const char *pFileName, const char *pClFile)
 	: mMaxDC(0)
 {
 	try
@@ -16,6 +16,16 @@ ldpc_code::ldpc_code(const char *pFileName)
 		if (!fpCode)
 		{
 			throw std::runtime_error("can not open codefile for reading.");
+		}
+
+		FILE *fpLayer;
+		if (strcmp(pClFile, "") != 0)
+		{
+			fpLayer = fopen(pClFile, "r");
+			if (!fpLayer)
+			{
+				throw std::runtime_error("Can not open layer file");
+			}
 		}
 
 		fscanf(fpCode, "nc: %lu\n", &mN);
@@ -94,6 +104,34 @@ ldpc_code::ldpc_code(const char *pFileName)
 			if (mCW[i] > mMaxDC)
 			{
 				mMaxDC = mCW[i];
+			}
+		}
+
+		if (strcmp(pClFile, "") != 0)
+		{
+			//setup layers
+			fscanf(fpLayer, "nl: %lu\n", &mNL);
+
+			mLayers = mat_size_t(mNL, vec_size_t());
+
+			std::size_t tmp;
+			for (std::size_t i = 0; i < mNL; ++i)
+			{
+				fscanf(fpLayer, "cn[i]: %lu\n", &tmp);
+				mLayers[i] = vec_size_t(tmp);
+				for (std::size_t j = 0; j < tmp; ++j)
+					fscanf(fpLayer, "%lu\n", &(mLayers[i][j]));
+			}
+
+			fclose(fpLayer);
+		}
+		else
+		{
+			mNL = 1;
+			mLayers = mat_size_t(1, vec_size_t(mM));
+			for (std::size_t i = 0; i < mM; ++i)
+			{
+				mLayers[0][i] = i;
 			}
 		}
 

@@ -27,7 +27,7 @@ using mat_double_t = std::vector<std::vector<double>>;
 class ldpc_code
 {
 public:
-	ldpc_code(const char *pFileName);
+	ldpc_code(const char *pFileName, const char *pClFile);
 	void print();
 
 	//getter functions
@@ -49,6 +49,8 @@ public:
 	const vec_size_t &shorten() const { return mShorten; };
 	std::size_t num_shorten() const { return mNumShorten; };
 	std::size_t max_dc() const { return mMaxDC; };
+	std::size_t nl() const { return mNL; };
+	const mat_size_t &layers() const { return mLayers; };
 
 private:
 	std::size_t mN;
@@ -71,6 +73,8 @@ private:
 	std::size_t mKCT;			 /* number of transmitted information bits */
 	std::size_t mMCT;			 /* number of transmitted parity check bits */
 	std::size_t mMaxDC;
+	std::size_t mNL;
+	mat_size_t mLayers;
 };
 
 class ldpc_decoder
@@ -79,6 +83,7 @@ public:
 	ldpc_decoder(ldpc_code *pCode, std::size_t pI, bool pEarlyTerm);
 
 	std::size_t decode_legacy();
+	std::size_t decode_layered();
 	bool is_codeword_legacy();
 
 	std::size_t max_iter() const { return mMaxIter; }
@@ -90,6 +95,8 @@ public:
 	vec_double_t mLc2v;
 	vec_double_t mF;
 	vec_double_t mB;
+	vec_double_t mLSum;
+	vec_double_t mLc2vPre;
 
 	vec_double_t mLLRIn;
 	vec_double_t mLLROut;
