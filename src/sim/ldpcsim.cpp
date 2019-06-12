@@ -36,6 +36,11 @@ __host__ ldpc_sim_device::ldpc_sim_device(cuda_ptr<ldpc_code_device> &pCode, con
         std::string fsLine;
         std::string fsSubStr;
 
+        if (!fsSim || !fsMap)
+        {
+            throw std::runtime_error("cannot open simfile and/or mappingfile");
+        }
+
         char tmp[1000];
         double m;
         char *tokp;
