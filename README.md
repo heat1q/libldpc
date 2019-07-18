@@ -4,11 +4,12 @@
 * `/src` Simulator for decoding on GPU (decode in layers optional)
 
 ### Compiling
+*Compiling steps for `/legacy` are identical*
 `$sh src/make.sh NAME FLAGS`
 
 `NAME` is the name of the gernerated executable.
 
-`FLAGS` are compile time constants. Note that the prefix `-D` has to be added to flags, in order for the compiler to recoginze them. E.g. compiling with the `GPU_ID` and `LOG_TP` flag set to `1`, we write
+`FLAGS` are compile time constants. Note that the prefix `-D` has to be added to flags, in order for the compiler to recognize them. E.g. compiling with the `GPU_ID` and `LOG_TP` flag set to `1`, we write
 
 `$sh src/make.sh sim "-DGPU_ID=1 -DLOG_TP=1"`
 
