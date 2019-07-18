@@ -1,0 +1,10 @@
+GPU_ID=0  # sets the ID of the GPU to be used for decoding
+NUMK_THREADS=128 # number of threads launched for one CUDA kernel
+SIM_NUM_BITS=32 # number of bits, i.e. log2(M)=1 for BPSK, must be greater equal
+DEC_MAX_DC=64 # maximum check node degree of the code, must be greater equal
+USE_LEGACY_DEC=0 # deprecated
+USE_CPU_FRAME=0 # deprecated
+LOG_TP=0 # display and keep track on the thoughput of the decoding process, 1: true, 0:false
+LOG_FRAME_TIME=0 # display and keep track on the time it takes to process one frame, 1: true, 0:false
+CN_APPROX_LIN=0 # use linear approximation for check node update
+CN_APPROX_MINSUM=0 # use min sum approximation for check node update
