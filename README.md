@@ -5,6 +5,7 @@
 
 ### Compiling
 *Compiling steps for `/legacy` are identical*
+
 `$sh src/make.sh NAME FLAGS`
 
 `NAME` is the name of the gernerated executable.
