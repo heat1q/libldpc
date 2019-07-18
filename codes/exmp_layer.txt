@@ -1,0 +1,22 @@
+# THIS IS A COMMENT AND NOT TO BE INCLUDED
+# IN THE FINAL FILE
+nl: 3 #define number of layers
+cn[i]: 400 #define how many checknodes are in first layer
+0 # list the 400 CN, which can be chosen as desired from the set of all CN
+1
+2
+.
+.
+399
+cn[i]: 400 #define the next layer with 400 CN
+400
+401
+.
+.
+799
+cn[i]: 400 #define the last layer with 400 CN
+800
+801
+.
+.
+1199
