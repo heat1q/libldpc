@@ -8,10 +8,11 @@
 
 `NAME` is the name of the gernerated executable.
 
-`FLAGS` are compile time constants and are listed in src/flags.txt with their respective default value and short desciption.
-Note that the prefix `-D` has to be added to flags. E.g. compiling with the `GPU_ID` and `LOG_TP` flag set to `1`, we write
+`FLAGS` are compile time constants. Note that the prefix `-D` has to be added to flags, in order for the compiler to recoginze them. E.g. compiling with the `GPU_ID` and `LOG_TP` flag set to `1`, we write
 
 `$sh src/make.sh sim "-DGPU_ID=1 -DLOG_TP=1"`
+
+All possible flags are listed in src/flags.txt with their respective default value and short desciption.
 
 ### Running
 After successful build the simulator can be executed by 
