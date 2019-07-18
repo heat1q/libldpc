@@ -12,7 +12,7 @@
 
 `$sh src/make.sh sim "-DGPU_ID=1 -DLOG_TP=1"`
 
-All possible flags are listed in src/flags.txt with their respective default value and short desciption.
+All possible flags are listed in `flags.txt` with their respective default value and short desciption.
 
 ### Running
 After successful build the simulator can be executed by 
