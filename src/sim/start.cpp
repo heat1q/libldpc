@@ -4,7 +4,7 @@ namespace ldpc
 {
 //start simulation for parallel frame processing on gpu
 //specified with mThreads
-__host__ void ldpc_sim_device::start_device()
+__host__ void ldpc_sim_device::start()
 {
 #ifdef LOG_TP
     //prepare decoding time measure
@@ -84,12 +84,12 @@ __host__ void ldpc_sim_device::start_device()
                     std::size_t tDec = std::max(1, static_cast<int>(tFrame) - static_cast<int>(tconst));
                     printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %7.3fms  |  %6luus  |  %.2fMbits/s",
                            fec, mMinFec, frames, mSnrs[i],
-                           static_cast<double>(bec) / (frames * mLdpcCode->nc()),  //ber
-                           static_cast<double>(fec) / frames,                      //fer
-                           static_cast<double>(iters) / frames,                    //avg iters
-                           static_cast<double>(tFrame) * 1e-3,                     //frame time
-                           tDec,                                           //decoding time
-                           static_cast<double>(mLdpcCode->nc()) / (tDec)); //decoding throughput
+                           static_cast<double>(bec) / (frames * mLdpcCode->nc()), //ber
+                           static_cast<double>(fec) / frames,                     //fer
+                           static_cast<double>(iters) / frames,                   //avg iters
+                           static_cast<double>(tFrame) * 1e-3,                    //frame time
+                           tDec,                                                  //decoding time
+                           static_cast<double>(mLdpcCode->nc()) / (tDec));        //decoding throughput
 #else
                     printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %.3fms",
                            fec, mMinFec, frames, mSnrs[i],

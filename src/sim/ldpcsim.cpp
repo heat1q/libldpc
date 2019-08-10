@@ -176,7 +176,7 @@ __host__ ldpc_sim_device::ldpc_sim_device(cuda_ptr<ldpc_code_device> &pCode, con
         //set up decoder
         for (std::size_t i = 0; i < mThreads; i++)
         {
-            mLdpcDecoderVec.push_back(cuda_ptr<ldpc_decoder_device>(ldpc_decoder_device(mLdpcCode, mBPIter, earlyTerm)));
+            mLdpcDecoderVec.push_back(cuda_ptr<ldpc_decoder>(ldpc_decoder(mLdpcCode, mBPIter, earlyTerm)));
         }
 
         //channel i/o
@@ -196,7 +196,6 @@ __host__ ldpc_sim_device::ldpc_sim_device(cuda_ptr<ldpc_code_device> &pCode, con
         exit(EXIT_FAILURE);
     }
 }
-
 
 __host__ double ldpc_sim_device::randn()
 {
@@ -469,22 +468,6 @@ __host__ void ldpc_sim_device::log_error(std::size_t pFrameNum, double pSNR, lab
 #ifdef LOG_TP
 __host__ std::size_t ldpc_sim_device::frame_const_time(double pSigma2, std::size_t pCount)
 {
-#ifdef USE_LEGACY_DEC || defined USE_CPU_FRAME //for cpu frame proc.
-    auto tconstStart = std::chrono::high_resolution_clock::now();
-
-    for (std::size_t i = 0; i < pCount; ++i)
-    {
-        encode_all0();
-        simulate_awgn(pSigma2);
-        calc_llrs(pSigma2);
-
-        std::size_t tmp = 0;
-        for (std::size_t j = 0; j < mLdpcCode->nc(); ++j)
-        {
-            tmp += (mLdpcDecoderVec[0]->mLLROut[j] <= 0);
-        }
-    }
-#else
     //call one time to reduce memory overhead
     cudakernel::sim::frame_time<<<mThreads, 1>>>(this, pSigma2);
     cudaDeviceSynchronize();
@@ -493,7 +476,7 @@ __host__ std::size_t ldpc_sim_device::frame_const_time(double pSigma2, std::size
 
     for (std::size_t i = 0; i < pCount; ++i)
     {
-        cudakernel::sim::frame_time<<<mThreads, 1>>>(this, pSigma2);//launch w/o decoding i.e zero iterations
+        cudakernel::sim::frame_time<<<mThreads, 1>>>(this, pSigma2); //launch w/o decoding i.e zero iterations
     }
 
     for (std::size_t i = 0; i < mThreads * pCount; ++i)
@@ -505,8 +488,8 @@ __host__ std::size_t ldpc_sim_device::frame_const_time(double pSigma2, std::size
         }
     }
 
-	cudaDeviceSynchronize();
-#endif
+    cudaDeviceSynchronize();
+
     auto tconstDiff = std::chrono::high_resolution_clock::now() - tconstStart;
     std::size_t tconst = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(tconstDiff).count());
 
