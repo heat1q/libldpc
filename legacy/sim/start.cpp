@@ -58,14 +58,7 @@ void ldpc_sim::start()
 
             calc_llrs(sigma2);
             //decode
-            if (mLdpcCode->nl() > 1)
-            {
-                iters += mLdpcDecoder->decode_layered();
-            }
-            else
-            {
-                iters += mLdpcDecoder->decode_legacy();
-            }
+            iters += mLdpcDecoder->decode_layered();
 
             ++frames;
 

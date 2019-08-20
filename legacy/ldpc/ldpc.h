@@ -82,7 +82,6 @@ class ldpc_decoder
 public:
 	ldpc_decoder(ldpc_code *pCode, std::size_t pI, bool pEarlyTerm);
 
-	std::size_t decode_legacy();
 	std::size_t decode_layered();
 	bool is_codeword_legacy();
 
@@ -93,10 +92,7 @@ public:
 
 	vec_double_t mLv2c;
 	vec_double_t mLc2v;
-	vec_double_t mF;
-	vec_double_t mB;
-	vec_double_t mLSum;
-	vec_double_t mLc2vPre;
+	vec_double_t mExMsgCN;
 
 	vec_double_t mLLRIn;
 	vec_double_t mLLROut;
