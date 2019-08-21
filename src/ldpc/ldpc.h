@@ -89,10 +89,7 @@ public:
 
     vec_double_t mLv2c;
     vec_double_t mLc2v;
-    vec_double_t mLSum;
-    vec_double_t mLc2vPre;
-    vec_double_t mF;
-    vec_double_t mB;
+    vec_double_t mExMsgCN;
 
     vec_double_t mLLRIn;
     vec_double_t mLLROut;
@@ -126,10 +123,8 @@ namespace cudakernel
 {
 namespace decoder
 {
-__global__ void clean_decoder(ldpc_decoder *pDecMgd);
-__global__ void decode_lyr_vnupdate(ldpc_decoder *pDecMgd, std::size_t pI);
-__global__ void decode_lyr_cnupdate(ldpc_decoder *pDecMgd, std::size_t pI, std::size_t pL);
-__global__ void decode_lyr_sumllr(ldpc_decoder *pDecMgd, std::size_t pI);
+__global__ void init_decoder(ldpc_decoder *pDecMgd);
+__global__ void decode_lyr_cnupdate(ldpc_decoder *pDecMgd, std::size_t pL);
 __global__ void decode_lyr_appcalc(ldpc_decoder *pDecMgd);
 __global__ void calc_synd(ldpc_decoder *pDecMgd);
 } // namespace decoder

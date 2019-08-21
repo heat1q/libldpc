@@ -8,9 +8,8 @@ namespace ldpc
 //Init constructor
 __host__ ldpc_decoder::ldpc_decoder(cuda_ptr<ldpc_code_device> &pCode, std::size_t pI, bool pEarlyTerm)
     : mLdpcCode(pCode), mMaxIter(pI), mEarlyTerm(pEarlyTerm),
-      mLv2c(pCode->layers().size() * pCode->nnz()), mLc2v(pCode->layers().size() * pCode->nnz()),
-      mLc2vPre(pCode->layers().size() * pCode->nnz()), mLSum(pCode->nnz()),
-      mF(pCode->max_dc()), mB(pCode->max_dc()),
+      mLv2c(pCode->nnz()), mLc2v(pCode->nnz()),
+      mExMsgCN(pCode->max_dc()),
       mLLRIn(pCode->nc()), mLLROut(pCode->nc()),
       mSynd(pCode->mc()), mCO(pCode->nc()),
       mIter(0), mIsCW(false)
@@ -23,9 +22,8 @@ __host__ void ldpc_decoder::mem_prefetch()
 {
     mLc2v.mem_prefetch();
     mLv2c.mem_prefetch();
-    mLc2vPre.mem_prefetch();
 
-    mLSum.mem_prefetch();
+    mExMsgCN.mem_prefetch();
 
     mLLRIn.mem_prefetch();
     mLLROut.mem_prefetch();
