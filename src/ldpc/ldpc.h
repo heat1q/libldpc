@@ -143,5 +143,4 @@ __global__ void calc_llrin(ldpc_sim_device *pSim, labels_t pBlockID);
 __global__ void map_c_to_x(ldpc_sim_device *pSim, labels_t pBlockID);
 } // namespace sim
 } // namespace cudakernel
-
 } // namespace ldpc

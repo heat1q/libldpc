@@ -106,7 +106,8 @@ public:
 
     __host__ void start();
 
-    __host__ double randn();
+    __host__ static double randn();
+
     __host__ __device__ double simulate_awgn(double pSigma2);
     __host__ __device__ void encode() {}
     __host__ __device__ void encode_all0();

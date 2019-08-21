@@ -14,7 +14,6 @@ __host__ ldpc_decoder::ldpc_decoder(cuda_ptr<ldpc_code_device> &pCode, std::size
       mSynd(pCode->mc()), mCO(pCode->nc()),
       mIter(0), mIsCW(false)
 {
-    //mem_prefetch();
 }
 
 //prefetch memory

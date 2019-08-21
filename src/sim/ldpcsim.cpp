@@ -225,7 +225,7 @@ __host__ __device__ double ldpc_sim_device::simulate_awgn(double pSigma2)
 
     for (std::size_t i = 0; i < mN; i++)
     {
-        a = randn() * sqrt(pSigma2);
+        a = ldpc_sim_device::randn() * sqrt(pSigma2);
         Pn += a * a;
         Px += mConstellation.X()[mX[0][i]] * mConstellation.X()[mX[0][i]];
         mY[0][i] = mConstellation.X()[mX[0][i]] + a;
