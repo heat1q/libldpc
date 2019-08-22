@@ -134,6 +134,7 @@ public:
     __host__ __device__ const constellation &cstll() const { return mConstellation; }
     __host__ __device__ std::size_t n() const { return mN; }
     __host__ __device__ std::size_t bits() const { return mBits; }
+    __host__ __device__ labels_t threads() const { return mThreads; }
     __host__ __device__ const vec_labels_t &labels() const { return mLabels; }
     __host__ __device__ const vec_labels_t &labels_rev() const { return mLabelsRev; }
     __host__ __device__ const vec_size_t &bits_pos() const { return mBitPos; }

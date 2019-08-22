@@ -12,7 +12,7 @@ __host__ ldpc_decoder::ldpc_decoder(cuda_ptr<ldpc_code_device> &pCode, std::size
       mExMsgCN(pCode->max_dc()),
       mLLRIn(pCode->nc()), mLLROut(pCode->nc()),
       mSynd(pCode->mc()), mCO(pCode->nc()),
-      mIter(0), mIsCW(false)
+      mIter(pI), mIsCW(false)
 {
 }
 

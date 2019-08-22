@@ -14,12 +14,12 @@ __global__ void cudakernel::sim::setup_rng(ldpc_sim_device *pSim)
 
     for (std::size_t i = tx; i < pSim->n(); i += sx)
     {
-        curand_init(ix, i, 0, &(pSim->mCurandState[ix][i]));
+        curand_init(pSim->threads()*ix + i, i, 0, &(pSim->mCurandState[ix][i]));
     }
 
     for (std::size_t j = tx; j < pSim->mLdpcCode->nct(); j += sx)
     {
-        curand_init(ix, j, 0, &(pSim->mCurandStateEncoding[ix][j]));
+        curand_init(pSim->threads()*ix + j, j, 0, &(pSim->mCurandStateEncoding[ix][j]));
     }
 }
 
