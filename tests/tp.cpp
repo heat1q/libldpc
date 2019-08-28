@@ -75,100 +75,86 @@ std::size_t test_decode_layered_cpu(ldpc::cuda_ptr<ldpc::ldpc_decoder> &dec, std
     return I;
 }
 
-__global__ void test_kern_iter_tp(ldpc::ldpc_decoder *dec, int clk, double *time, double *tp)
+__global__ void test_kern_decode(ldpc::cuda_ptr<ldpc::ldpc_decoder> *dec_vec, ldpc::labels_t iter)
 {
-    printf("%u %u\n", dec->mLdpcCode->nc(), dec->max_iter());
+    ldpc::labels_t ix = threadIdx.x;
+    ldpc::ldpc_decoder *dec = dec_vec[ix].get();
 
-    for (std::size_t iter = 1; iter <= 200; ++iter)
+    ldpc::cudakernel::decoder::init_decoder<<<ldpc::get_num_size(dec->mLdpcCode->nc(), NUMK_THREADS), NUMK_THREADS>>>(dec);
+    ldpc::labels_t I = 0;
+    while (I < iter)
+    {
+        for (std::size_t l = 0; l < dec->mLdpcCode->nl(); ++l)
+        {
+            //launching kernels
+            ldpc::cudakernel::decoder::decode_lyr_cnupdate<<<ldpc::get_num_size(dec->mLdpcCode->lw()[l], NUMK_THREADS), NUMK_THREADS>>>(dec, l);
+            ldpc::cudakernel::decoder::decode_lyr_appcalc<<<ldpc::get_num_size(dec->mLdpcCode->nc(), NUMK_THREADS), NUMK_THREADS>>>(dec);
+
+            if (dec->early_termination())
+            {
+                printf("Should not go here!");
+            }
+        }
+
+        ++I;
+    }
+}
+
+__global__ void test_kern_iter_tp(ldpc::cuda_ptr<ldpc::ldpc_decoder> *dec_vec, std::size_t dec_len, int clk, double *time, double *tp)
+{
+
+    for (ldpc::labels_t iter = 1; iter <= 200; ++iter)
     {
         time[iter - 1] = 1e12;
-        for (std::size_t k = 0; k < 20; ++k)
+        for (std::size_t k = 0; k < 15; ++k)
         {
             double starttime = clock64();
             //decode
-            ldpc::cudakernel::decoder::init_decoder<<<ldpc::get_num_size(dec->mLdpcCode->nc(), NUMK_THREADS), NUMK_THREADS>>>(dec);
-            ldpc::labels_t I = 0;
-            while (I < iter)
-            {
-                for (std::size_t l = 0; l < dec->mLdpcCode->nl(); ++l)
-                {
-                    //launching kernels
-                    ldpc::cudakernel::decoder::decode_lyr_cnupdate<<<ldpc::get_num_size(dec->mLdpcCode->lw()[l], NUMK_THREADS), NUMK_THREADS>>>(dec, l);
-                    ldpc::cudakernel::decoder::decode_lyr_appcalc<<<ldpc::get_num_size(dec->mLdpcCode->nc(), NUMK_THREADS), NUMK_THREADS>>>(dec);
-
-                    if (dec->early_termination())
-                    {
-                        printf("Should not go here!");
-                    }
-                }
-
-                ++I;
-            }
-
+            test_kern_decode<<<1, dec_len>>>(dec_vec, iter);
             cudaDeviceSynchronize();
 
             double endtime = clock64();
-            time[iter - 1] = fmin(time[iter - 1], fabs((endtime - starttime) / clk));
-            tp[iter - 1] = 1e-3 * dec->mLdpcCode->nc() / time[iter - 1];
+            time[iter - 1] = fmin(time[iter - 1], fabs((endtime - starttime) / (clk * dec_len)));
+            tp[iter - 1] = 1e-3 * dec_vec[0]->mLdpcCode->nc() / time[iter - 1];
         }
-        printf("GPU: Code Length: %u -- Iterations: %lu -- Time: %.3f -- Throughput: %.2f Mbits/s\n", dec->mLdpcCode->nc(), iter, time[iter - 1], tp[iter - 1]);
+        printf("GPU: Code Length: %u -- Iterations: %lu -- Time: %.3f -- Throughput: %.2f Mbits/s\n", dec_vec[0]->mLdpcCode->nc(), iter, time[iter - 1], tp[iter - 1]);
     }
 }
 
-__global__ void test_kern_bl_tp(ldpc::ldpc_decoder *dec, int clk, double *time, double *tp)
+__global__ void test_kern_bl_tp(ldpc::cuda_ptr<ldpc::ldpc_decoder> *dec_vec, std::size_t dec_len, int clk, double *time, double *tp)
 {
     *time = 1e12;
-    for (std::size_t k = 0; k < 20; ++k)
+    for (std::size_t k = 0; k < 15; ++k)
     {
         double starttime = clock64();
         //decode
-        ldpc::cudakernel::decoder::init_decoder<<<ldpc::get_num_size(dec->mLdpcCode->nc(), NUMK_THREADS), NUMK_THREADS>>>(dec);
-        ldpc::labels_t I = 0;
-        while (I < dec->max_iter())
-        {
-            for (std::size_t l = 0; l < dec->mLdpcCode->nl(); ++l)
-            {
-                //launching kernels
-                ldpc::cudakernel::decoder::decode_lyr_cnupdate<<<ldpc::get_num_size(dec->mLdpcCode->lw()[l], NUMK_THREADS), NUMK_THREADS>>>(dec, l);
-                ldpc::cudakernel::decoder::decode_lyr_appcalc<<<ldpc::get_num_size(dec->mLdpcCode->nc(), NUMK_THREADS), NUMK_THREADS>>>(dec);
-
-                if (dec->early_termination())
-                {
-                    printf("Should not go here!");
-                }
-            }
-
-            ++I;
-        }
-
+        test_kern_decode<<<1, dec_len>>>(dec_vec, dec_vec[0]->max_iter());
         cudaDeviceSynchronize();
 
         double endtime = clock64();
-        *time = fmin(*time, fabs((endtime - starttime) / clk));
-        *tp = 1e-3 * dec->mLdpcCode->nc() / (*time);
+        *time = fmin(*time, fabs((endtime - starttime) / (clk * dec_len)));
+        *tp = 1e-3 * dec_vec[0]->mLdpcCode->nc() / (*time);
     }
-    printf("GPU: Code Length: %u -- Iterations: %lu -- Time: %.3f -- Throughput: %.2f Mbits/s\n", dec->mLdpcCode->nc(), dec->max_iter(), *time, *tp);
+    printf("GPU: Code Length: %u -- Iterations: %lu -- Time: %.3f -- Throughput: %.2f Mbits/s\n", dec_vec[0]->mLdpcCode->nc(), dec_vec[0]->max_iter(), *time, *tp);
 }
 
-void test_tp_iter(ldpc::cuda_ptr<ldpc::ldpc_decoder> &dec)
+void test_tp_iter(ldpc::cuda_vector<ldpc::cuda_ptr<ldpc::ldpc_decoder>> &dec_vec)
 {
     // create LLRs
-    for (auto &x : dec->mLLRIn)
+    for (auto &dec : dec_vec)
     {
-        x = ldpc::ldpc_sim_device::randn() * 2;
+        for (auto &x : dec->mLLRIn)
+        {
+            x = ldpc::ldpc_sim_device::randn() * 2;
+        }
     }
     ldpc::cuda_vector<double> time(200);
     ldpc::cuda_vector<double> tp(200);
 
-    dec->mLdpcCode->mem_prefetch();
-    dec->mLdpcCode.mem_prefetch();
-    dec->mem_prefetch();
-    dec.mem_prefetch();
-
     int peak_clk = 1;
     cudaDeviceGetAttribute(&peak_clk, cudaDevAttrClockRate, 0);
 
-    test_kern_iter_tp<<<1, 1>>>(dec.get(), peak_clk, time.get(), tp.get());
+    test_kern_iter_tp<<<1, 1>>>(dec_vec.get(), dec_vec.size(), peak_clk, time.get(), tp.get());
     cudaDeviceSynchronize();
 
     std::ofstream fp;
@@ -187,12 +173,12 @@ void test_tp_iter(ldpc::cuda_ptr<ldpc::ldpc_decoder> &dec)
         for (std::size_t k = 0; k < 20; ++k)
         {
             auto start = std::chrono::high_resolution_clock::now();
-            test_decode_layered_cpu(dec, iter);
+            test_decode_layered_cpu(dec_vec[0], iter);
             auto elapsed = std::chrono::high_resolution_clock::now() - start;
             time[iter - 1] = fmin(time[iter - 1], fabs(static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count()) * 1e-6));
-            tp[iter - 1] = 1e-3 * dec->mLdpcCode->nc() / time[iter - 1];
+            tp[iter - 1] = 1e-3 * dec_vec[0]->mLdpcCode->nc() / time[iter - 1];
         }
-        printf("CPU: Code Length: %u -- Iterations: %lu -- Time: %.3f -- Throughput: %.2f Mbits/s\n", dec->mLdpcCode->nc(), iter, time[iter - 1], tp[iter - 1]);
+        printf("CPU: Code Length: %u -- Iterations: %lu -- Time: %.3f -- Throughput: %.2f Mbits/s\n", dec_vec[0]->mLdpcCode->nc(), iter, time[iter - 1], tp[iter - 1]);
     }
 
     fp.open("res_tp_iter_cpu.txt");
@@ -203,20 +189,32 @@ void test_tp_iter(ldpc::cuda_ptr<ldpc::ldpc_decoder> &dec)
     }
     fp.close();
 }
-
+/*
+tp vs iter: (fixed n)
+    argv[1]: codefile
+    argv[2]: num frames in parallel
+tp vs n: (fixed iter)
+    argv[1]: iter
+    argv[2]: num samples
+    argv[3]: num frames in parallel
+ */
 int main(int argc, char *argv[])
 {
-    if (argc == 2)
+    if (argc == 3)
     {
         ldpc::cuda_ptr<ldpc::ldpc_code_device> code_dev(
             ldpc::ldpc_code_device(
                 argv[1], ""));
 
-        ldpc::cuda_ptr<ldpc::ldpc_decoder> dec(ldpc::ldpc_decoder(code_dev, 10, false));
+        ldpc::cuda_vector<ldpc::cuda_ptr<ldpc::ldpc_decoder>> dec_vec;
+        for (std::size_t i = 0; i < atoi(argv[2]); i++)
+        {
+            dec_vec.push_back(ldpc::cuda_ptr<ldpc::ldpc_decoder>(ldpc::ldpc_decoder(code_dev, 10, false)));
+        }
 
-        test_tp_iter(dec);
+        test_tp_iter(dec_vec);
     }
-    else if (argc == 3)
+    else if (argc == 4)
     {
         int samples = atoi(argv[2]);
 
@@ -234,22 +232,34 @@ int main(int argc, char *argv[])
         {
             sprintf(str, "dat/code_dv3_dc6_i=%u.txt", i);
             ldpc::cuda_ptr<ldpc::ldpc_code_device> code_dev(ldpc::ldpc_code_device(str, ""));
-            ldpc::cuda_ptr<ldpc::ldpc_decoder> dec(ldpc::ldpc_decoder(code_dev, atoi(argv[1]), false));
+            ldpc::cuda_vector<ldpc::cuda_ptr<ldpc::ldpc_decoder>> dec_vec;
+            for (std::size_t i = 0; i < atoi(argv[3]); i++)
+            {
+                dec_vec.push_back(ldpc::cuda_ptr<ldpc::ldpc_decoder>(ldpc::ldpc_decoder(code_dev, atoi(argv[1]), false)));
+            }
 
-            test_kern_bl_tp<<<1, 1>>>(dec.get(), peak_clk, time_gpu.get() + i, tp_gpu.get() + i);
+            for (auto &dec : dec_vec)
+            {
+                for (auto &x : dec->mLLRIn)
+                {
+                    x = ldpc::ldpc_sim_device::randn() * 2;
+                }
+            }
+
+            test_kern_bl_tp<<<1, 1>>>(dec_vec.get(), dec_vec.size(), peak_clk, time_gpu.get() + i, tp_gpu.get() + i);
             cudaDeviceSynchronize();
 
             //test cpu
             time_cpu[i] = 1e12;
-            for (std::size_t k = 0; k < 20; ++k)
+            for (std::size_t k = 0; k < 25; ++k)
             {
                 auto start = std::chrono::high_resolution_clock::now();
-                test_decode_layered_cpu(dec, dec->max_iter());
+                test_decode_layered_cpu(dec_vec[0], dec_vec[0]->max_iter());
                 auto elapsed = std::chrono::high_resolution_clock::now() - start;
                 time_cpu[i] = fmin(time_cpu[i], fabs(static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count()) * 1e-6));
-                tp_cpu[i] = 1e-3 * dec->mLdpcCode->nc() / time_cpu[i];
+                tp_cpu[i] = 1e-3 * dec_vec[0]->mLdpcCode->nc() / time_cpu[i];
             }
-            printf("CPU: Code Length: %u -- Iterations: %lu -- Time: %.3f -- Throughput: %.2f Mbits/s\n", dec->mLdpcCode->nc(), dec->max_iter(), time_cpu[i], tp_cpu[i]);
+            printf("CPU: Code Length: %u -- Iterations: %lu -- Time: %.3f -- Throughput: %.2f Mbits/s\n", dec_vec[0]->mLdpcCode->nc(), dec_vec[0]->max_iter(), time_cpu[i], tp_cpu[i]);
             blocklength[i] = code_dev->nc();
         }
 
