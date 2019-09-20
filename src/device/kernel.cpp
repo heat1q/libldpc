@@ -233,6 +233,7 @@ __global__ void cudakernel::decoder::init_decoder(ldpc_decoder *pDecMgd)
     }
 }
 
+
 __global__ void cudakernel::decoder::decode_lyr_cnupdate(ldpc_decoder *pDecMgd, std::size_t pL)
 {
     std::size_t *cn;
@@ -241,8 +242,7 @@ __global__ void cudakernel::decoder::decode_lyr_cnupdate(ldpc_decoder *pDecMgd, 
     const std::size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
     const std::size_t sx = blockDim.x * gridDim.x;
 
-    double f_tmp[DEC_MAX_DC];
-    double b_tmp[DEC_MAX_DC];
+    double tmp = 1;
 
     //CN processing
     for (std::size_t i = ix; i < pDecMgd->mLdpcCode->layers()[pL].size(); i += sx)
@@ -250,22 +250,15 @@ __global__ void cudakernel::decoder::decode_lyr_cnupdate(ldpc_decoder *pDecMgd, 
         cw = pDecMgd->mLdpcCode->cn()[pDecMgd->mLdpcCode->layers()[pL][i]].size();
         cn = pDecMgd->mLdpcCode->cn()[pDecMgd->mLdpcCode->layers()[pL][i]].get();
 
-        cw = pDecMgd->mLdpcCode->cn()[pDecMgd->mLdpcCode->layers()[pL][i]].size();
-        cn = pDecMgd->mLdpcCode->cn()[pDecMgd->mLdpcCode->layers()[pL][i]].get();
-        f_tmp[0] = pDecMgd->mLv2c[*cn];
-        b_tmp[cw - 1] = pDecMgd->mLv2c[*(cn + cw - 1)];
-        for (std::size_t j = 1; j < cw; j++)
+        for (std::size_t j = 0; j < cw; ++j)
         {
-            f_tmp[j] = jacobian(f_tmp[j - 1], pDecMgd->mLv2c[*(cn + j)]);
-            b_tmp[cw - 1 - j] = jacobian(b_tmp[cw - j], pDecMgd->mLv2c[*(cn + cw - j - 1)]);
+            pDecMgd->mExMsgCN[pDecMgd->mLdpcCode->layers()[pL][i]][j] = 1 - 2 / (exp(pDecMgd->mLv2c[cn[j]]) + 1); //tanh(mLv2c[cn[j]]);
+            tmp *= pDecMgd->mExMsgCN[pDecMgd->mLdpcCode->layers()[pL][i]][j];
         }
 
-        pDecMgd->mLc2v[*cn] = b_tmp[1];
-        pDecMgd->mLc2v[*(cn + cw - 1)] = f_tmp[cw - 2];
-
-        for (std::size_t j = 1; j < cw - 1; j++)
+        for (std::size_t j = 0; j < cw; ++j)
         {
-            pDecMgd->mLc2v[*(cn + j)] = jacobian(f_tmp[j - 1], b_tmp[j + 1]);
+            pDecMgd->mLc2v[cn[j]] = log((pDecMgd->mExMsgCN[pDecMgd->mLdpcCode->layers()[pL][i]][j] + tmp) / (pDecMgd->mExMsgCN[pDecMgd->mLdpcCode->layers()[pL][i]][j] - tmp)); //2*atanh(tmp/mExMsgCN[j]);
         }
     }
 }

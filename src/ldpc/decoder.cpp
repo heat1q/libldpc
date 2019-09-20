@@ -9,7 +9,7 @@ namespace ldpc
 __host__ ldpc_decoder::ldpc_decoder(cuda_ptr<ldpc_code_device> &pCode, std::size_t pI, bool pEarlyTerm)
     : mLdpcCode(pCode), mMaxIter(pI), mEarlyTerm(pEarlyTerm),
       mLv2c(pCode->nnz()), mLc2v(pCode->nnz()),
-      mExMsgCN(pCode->max_dc()),
+      mExMsgCN(pCode->mc(), vec_double_t(pCode->max_dc(), 0)),
       mLLRIn(pCode->nc()), mLLROut(pCode->nc()),
       mSynd(pCode->mc()), mCO(pCode->nc()),
       mIter(pI), mIsCW(false)

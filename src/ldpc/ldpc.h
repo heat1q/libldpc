@@ -89,7 +89,7 @@ public:
 
     vec_double_t mLv2c;
     vec_double_t mLc2v;
-    vec_double_t mExMsgCN;
+    mat_double_t mExMsgCN;
 
     vec_double_t mLLRIn;
     vec_double_t mLLROut;
