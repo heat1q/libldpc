@@ -3,7 +3,7 @@
 namespace ldpc
 {
 //start simulation on cpu
-void ldpc_sim::start()
+void ldpc_sim::start(std::uint8_t *stopFlag)
 {
     double sigma2;
     std::size_t frames;
@@ -32,7 +32,7 @@ void ldpc_sim::start()
 
         auto timeStart = std::chrono::high_resolution_clock::now();
 
-        #pragma omp parallel default(none) num_threads(mThreads) private(bec_tmp) firstprivate(sigma2, mLdpcCode, stdout) shared(timeStart, mX, mY, mC, mLdpcDecoder, fec, bec, frames, printResStr, fp, resStr, i, mMinFec, mMaxFrames) reduction(+:iters)
+        #pragma omp parallel default(none) num_threads(mThreads) private(bec_tmp) firstprivate(sigma2, mLdpcCode, stdout) shared(stopFlag, timeStart, mX, mY, mC, mLdpcDecoder, fec, bec, frames, printResStr, fp, resStr, i, mMinFec, mMaxFrames) reduction(+:iters)
         {
             int tid = omp_get_thread_num();
 
@@ -113,7 +113,7 @@ void ldpc_sim::start()
                         }
                     }
                 }
-            } while (fec < mMinFec && frames < mMaxFrames); //end while
+            } while (fec < mMinFec && frames < mMaxFrames && !*stopFlag); //end while
         }
         #ifndef LIB_SHARED
         printf("\n");

@@ -23,9 +23,9 @@ constellation::constellation(labels_t pM)
  * ldpc_sim
  */
 //init constructor
-ldpc_sim::ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, std::uint16_t numThreads)
+ldpc_sim::ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, std::uint16_t numThreads, std::size_t seed)
     : mLdpcCode(pCode), mLdpcDecoder(numThreads, ldpc_decoder(pCode, this, 0, true)), mThreads(numThreads),
-    mRNG(numThreads), mRandNormal(numThreads)
+    mRNG(numThreads), mRandNormal(numThreads), mRNGSeed(seed)
 {
     try
     {
@@ -178,7 +178,7 @@ ldpc_sim::ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapF
             //decoder
             mLdpcDecoder[i] = ldpc_decoder(mLdpcCode, this, mBPIter, true);
 
-            mRNG[i] = std::mt19937(i); // different seeds for threads
+            mRNG[i] = std::mt19937(mRNGSeed + i); // different seeds for threads
             mRandNormal[i] = std::normal_distribution<double>(0.0, 1.0);
         }
     }
@@ -257,7 +257,7 @@ void ldpc_sim::print()
     printf(" Thread ID | Seed\n");
     for (std::size_t i = 0; i < mThreads; i++)
     {
-        printf(" %3d       | %d\n",i,i);
+        printf(" %3d       | %d\n",i, mRNGSeed + i);
     }
 }
 

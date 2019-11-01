@@ -67,9 +67,9 @@ private:
 class ldpc_sim
 {
 public:
-    ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, std::uint16_t numThreads);
+    ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, std::uint16_t numThreads, std::size_t seed);
 
-    void start();
+    void start(std::uint8_t *stopFlag);
 
     void simulate_awgn(double pSigma2, std::uint16_t threadid);
     void encode();
@@ -113,6 +113,7 @@ private:
     mat_double_t mY;
     mat_bits_t mC;
 
+    std::size_t mRNGSeed;
     std::vector<std::mt19937> mRNG;
     std::vector<std::normal_distribution<double>> mRandNormal;
 };
