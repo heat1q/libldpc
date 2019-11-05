@@ -16,10 +16,22 @@ void ldpc_sim::start(std::uint8_t *stopFlag)
     std::ofstream fp;
     char resStr[128];
 
+    //allocate memory for results
+    if (mResults != nullptr)
+    {
+        mResults->fer = new double[mSnrs.size()]();
+        mResults->ber = new double[mSnrs.size()]();
+        mResults->avg_iter = new double[mSnrs.size()]();
+        mResults->time = new double[mSnrs.size()]();
+        mResults->frames = new std::size_t[mSnrs.size()]();
+    }
+
+    #ifndef LIB_SHARED
     #ifdef LOG_FRAME_TIME
     printResStr[0].assign("snr fer ber frames avg_iter frame_time");
     #else
     printResStr[0].assign("snr fer ber frames avg_iter");
+    #endif
     #endif
 
     for (std::size_t i = 0; i < mSnrs.size(); ++i)
@@ -78,7 +90,6 @@ void ldpc_sim::start(std::uint8_t *stopFlag)
                                    static_cast<double>(iters) / frames,                   //avg iters
                                    static_cast<double>(tFrame) * 1e-3);                        //frame time tFrame
                             fflush(stdout);
-                            #endif
 
                             #ifdef LOG_FRAME_TIME
                             sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f",
@@ -108,6 +119,17 @@ void ldpc_sim::start(std::uint8_t *stopFlag)
                             #ifdef LOG_CW
                             log_error(frames, mSnrs[i]);
                             #endif
+                            #endif
+
+                            //save to result struct
+                            if (mResults != nullptr)
+                            {
+                                mResults->fer[i] = static_cast<double>(fec) / frames;
+                                mResults->ber[i] = static_cast<double>(bec) / (frames * mLdpcCode->nc());
+                                mResults->avg_iter[i] = static_cast<double>(iters) / frames;
+                                mResults->time[i] = static_cast<double>(tFrame) * 1e-6;
+                                mResults->frames[i] = frames;
+                            }
 
                             timeStart += std::chrono::high_resolution_clock::now() - timeNow; //dont measure time for printing files
                         }
@@ -119,5 +141,15 @@ void ldpc_sim::start(std::uint8_t *stopFlag)
         printf("\n");
         #endif
     } //end for
+
+    //free memory for results
+    if (mResults != nullptr)
+    {
+        delete[] mResults->fer;
+        delete[] mResults->ber;
+        delete[] mResults->avg_iter;
+        delete[] mResults->time;
+        delete[] mResults->frames;
+    }
 }
 } // namespace ldpc

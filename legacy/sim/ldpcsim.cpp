@@ -22,16 +22,17 @@ constellation::constellation(labels_t pM)
 /*
  * ldpc_sim
  */
-//init constructor
+
 ldpc_sim::ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, std::uint16_t numThreads, std::size_t seed)
+    : ldpc_sim(pCode, pSimFileName, pMapFileName, numThreads, seed, nullptr) {}
+
+//init constructor
+ldpc_sim::ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, std::uint16_t numThreads, std::size_t seed, sim_results_t* results)
     : mLdpcCode(pCode), mLdpcDecoder(numThreads, ldpc_decoder(pCode, this, 0, true)), mThreads(numThreads),
-    mRNG(numThreads), mRandNormal(numThreads), mRNGSeed(seed)
+    mRNG(numThreads), mRandNormal(numThreads), mRNGSeed(seed), mResults(results)
 {
     try
     {
-        FILE *fpSim;
-        //FILE *fpMap;
-
         std::ifstream fsSim(pSimFileName);
         //std::ifstream fsMap(pMapFileName);
         std::string fsLine;

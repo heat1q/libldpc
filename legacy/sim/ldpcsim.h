@@ -46,6 +46,16 @@
 namespace ldpc
 {
 
+//struct where simulation results are saved
+typedef struct
+{
+    double* fer;
+    double* ber;
+    double* avg_iter;
+    double* time;
+    std::size_t* frames;
+} sim_results_t;
+
 class constellation
 {
 public:
@@ -68,6 +78,7 @@ class ldpc_sim
 {
 public:
     ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, std::uint16_t numThreads, std::size_t seed);
+    ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, std::uint16_t numThreads, std::size_t seed, sim_results_t* results);
 
     void start(std::uint8_t *stopFlag);
 
@@ -116,5 +127,7 @@ private:
     std::size_t mRNGSeed;
     std::vector<std::mt19937> mRNG;
     std::vector<std::normal_distribution<double>> mRandNormal;
+
+    sim_results_t* mResults;
 };
 } // namespace ldpc
