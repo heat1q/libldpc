@@ -53,6 +53,7 @@ typedef struct
     double* ber;
     double* avg_iter;
     double* time;
+    std::size_t* fec;
     std::size_t* frames;
 } sim_results_t;
 

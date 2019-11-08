@@ -23,6 +23,7 @@ void ldpc_sim::start(std::uint8_t *stopFlag)
         mResults->ber = new double[mSnrs.size()]();
         mResults->avg_iter = new double[mSnrs.size()]();
         mResults->time = new double[mSnrs.size()]();
+        mResults->fec = new std::size_t[mSnrs.size()]();
         mResults->frames = new std::size_t[mSnrs.size()]();
     }
 
@@ -128,6 +129,7 @@ void ldpc_sim::start(std::uint8_t *stopFlag)
                                 mResults->ber[i] = static_cast<double>(bec) / (frames * mLdpcCode->nc());
                                 mResults->avg_iter[i] = static_cast<double>(iters) / frames;
                                 mResults->time[i] = static_cast<double>(tFrame) * 1e-6;
+                                mResults->fec[i] = fec;
                                 mResults->frames[i] = frames;
                             }
 
@@ -149,6 +151,7 @@ void ldpc_sim::start(std::uint8_t *stopFlag)
         delete[] mResults->ber;
         delete[] mResults->avg_iter;
         delete[] mResults->time;
+        delete[] mResults->fec;
         delete[] mResults->frames;
     }
 }
