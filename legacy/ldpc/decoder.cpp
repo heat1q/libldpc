@@ -25,14 +25,14 @@ void ldpc_decoder::calc_llrs(const vec_double_t &y, double sigma2)
     {
         for (auto p: mLdpcCode->puncture())
         {
-            mLLRIn[p] = +99999.9;
+            mLLRIn[p] = 1e-9 * (1 - 2*(rand() % 2)); // set random signed low values, i.e. simulate erasure LLR=0
         }
     }
     if (mLdpcCode->shorten().size() != 0)
     {
         for (auto s: mLdpcCode->shorten())
         {
-            mLLRIn[s] = -99999.9;
+            mLLRIn[s] = 1e9; // simulate certain bit
         }
     }
 
@@ -59,7 +59,7 @@ std::int16_t ldpc_decoder::decode()
     std::size_t nnz = mLdpcCode->nnz();
 
     //initialize
-    for (std::size_t i = 0; i < nnz; ++i)
+    for (std::size_t i = 0; i < mLdpcCode->nnz(); ++i)
     {
         mLv2c[i] = mLLRIn[mLdpcCode->c()[i]];
         mLc2v[i] = 0.0;
@@ -88,7 +88,7 @@ std::int16_t ldpc_decoder::decode()
         }
 
         // VN processing and app calc
-        for (std::size_t i = 0; i < mLdpcCode->nc(); ++i)
+        for (std::size_t i = 0; i < mLdpcCode->nc(); ++i) // only transmitted bits
         {
             mLLROut[i] = mLLRIn[i];
             vw = mLdpcCode->vn()[i].size();                            // degree of VN

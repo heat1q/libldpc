@@ -44,8 +44,8 @@ public:
     std::size_t nnz() const { return mNNZ; };
     const mat_size_t &cn() const { return mCN; };
     const mat_size_t &vn() const { return mVN; };
-    const vec_size_t &r() const { return mR; };
-    const vec_size_t &c() const { return mC; };
+    const vec_size_t &r() const { return mEdgeCN; };
+    const vec_size_t &c() const { return mEdgeVN; };
     std::size_t nct() const { return mNCT; };
     std::size_t kct() const { return mKCT; };
     std::size_t mct() const { return mMCT; };
@@ -60,8 +60,8 @@ private:
     std::size_t mNNZ;
     mat_size_t mCN;       /* denotes the check neighbors, i.e. connected VN, for each check node as index in c/r; dimensions cn[mc][cw[i]] */
     mat_size_t mVN;       /* denotes the var neighbors, i.e., connected CN, for each variable node as index in c/r; dimensions vn[nc][vw[i]] */
-    vec_size_t mR;        /* non zero row indices; length nnz */
-    vec_size_t mC;        /* non zero check indices; length nnz */
+    vec_size_t mEdgeCN;        /* non zero row indices; length nnz */
+    vec_size_t mEdgeVN;        /* non zero check indices; length nnz */
     vec_size_t mPuncture; /* array pf punctured bit indices */
     vec_size_t mShorten;  /* array of shortened bit indices */
     std::size_t mNCT;     /* number of transmitted code bits */

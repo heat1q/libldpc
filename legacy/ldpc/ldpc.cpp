@@ -1,4 +1,6 @@
 #include "ldpc.h"
+#include <algorithm>
+#include <iterator>
 
 namespace ldpc
 {
@@ -51,17 +53,25 @@ ldpc_code::ldpc_code(const char *pFileName)
 
         vec_size_t cwTmp(mM);
         vec_size_t vwTmp(mN);
-        vec_size_t cw(mM);
-        vec_size_t vw(mN);
+        vec_size_t cw(mM, 0);
+        vec_size_t vw(mN, 0);
 
-        mR = vec_size_t(mNNZ);
-        mC = vec_size_t(mNNZ);
+        mEdgeCN = vec_size_t(mNNZ);
+        mEdgeVN = vec_size_t(mNNZ);
 
         for (std::size_t i = 0; i < mNNZ; i++)
         {
-            fscanf(fpCode, "%lu %lu\n", &(mR[i]), &(mC[i]));
-            cw[mR[i]]++;
-            vw[mC[i]]++;
+            fscanf(fpCode, "%lu %lu\n", &(mEdgeCN[i]), &(mEdgeVN[i]));
+
+            // if mEdgeCN[i] is in Shorten skipt both, i.e. the weight of this CN is 0
+            // if mEdgeVN[i] is in Puncture or Shorten skip both, i.e. the weight of this VN is 0
+            //if (std::find(mShorten.begin(), mShorten.end(), mEdgeCN[i]) == mShorten.end()
+            //    && std::find(mPuncture.begin(), mPuncture.end(), mEdgeVN[i]) == mPuncture.end() 
+            //    && std::find(mShorten.begin(), mShorten.end(), mEdgeVN[i]) == mShorten.end())
+            {
+                cw[mEdgeCN[i]]++;
+                vw[mEdgeVN[i]]++;
+            }
         }
 
         mCN = mat_size_t(mM, vec_size_t());
@@ -78,17 +88,12 @@ ldpc_code::ldpc_code(const char *pFileName)
 
         for (std::size_t i = 0; i < mNNZ; i++)
         {
-            mCN[mR[i]][cwTmp[mR[i]]++] = i;
-            mVN[mC[i]][vwTmp[mC[i]]++] = i;
+            mCN[mEdgeCN[i]][cwTmp[mEdgeCN[i]]++] = i;
+            mVN[mEdgeVN[i]][vwTmp[mEdgeVN[i]]++] = i;
         }
 
-        for (std::size_t i = 0; i < mM; i++)
-        {
-            if (cw[i] > mMaxDC)
-            {
-                mMaxDC = cw[i];
-            }
-        }
+        // maximum check node degree
+        mMaxDC = *(std::max_element(cw.begin(), cw.end()));
 
         fclose(fpCode);
     }
