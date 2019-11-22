@@ -23,16 +23,16 @@ void ldpc_decoder::calc_llrs(const vec_double_t &y, double sigma2)
     //puncturing & shortening
     if (mLdpcCode->puncture().size() != 0)
     {
-        for (std::size_t j = 0; j < mLdpcCode->puncture().size(); ++j)
+        for (auto p: mLdpcCode->puncture())
         {
-            mLLRIn[mLdpcCode->puncture()[j]] = 0;
+            mLLRIn[p] = +99999.9;
         }
     }
     if (mLdpcCode->shorten().size() != 0)
     {
-        for (std::size_t j = 0; j < mLdpcCode->shorten().size(); ++j)
+        for (auto s: mLdpcCode->shorten())
         {
-            mLLRIn[mLdpcCode->shorten()[j]] = 99999.9;
+            mLLRIn[s] = -99999.9;
         }
     }
 

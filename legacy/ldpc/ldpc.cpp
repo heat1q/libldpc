@@ -114,7 +114,18 @@ void ldpc_code::print()
     std::cout << "kct : " << mKCT << "\n";
     std::cout << "max dc : " << mMaxDC << "\n";
     std::cout << "num puncture: " << mPuncture.size() << "\n";
-    std::cout << "num shorten: " << mShorten.size() << "\n";
+    std::cout << "puncture: ";
+    for (auto x: mPuncture)
+    {
+        std::cout << x << " ";
+    }
+    std::cout << "\nnum shorten: " << mShorten.size() << "\n";
+    std::cout << "shorten: ";
+    for (auto x: mShorten)
+    {
+        std::cout << x << " ";
+    }
+    std::cout << "\n";
 }
 
 /**

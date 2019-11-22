@@ -8,8 +8,9 @@ int main(int argc, char *argv[])
     std::string simFile;
     std::string mapFile("");
     std::uint16_t numThreads = 1;
+    std::size_t seed = 0;
 
-    if (argc == 5 || argc == 7 || argc == 9)
+    if (argc == 5 || argc == 7 || argc == 9 || argc == 11)
     {
         for (int i = 0; i < (argc - 1) / 2; ++i)
         {
@@ -28,6 +29,10 @@ int main(int argc, char *argv[])
             else if (strcmp(argv[2 * i + 1], "-threads") == 0)
             {
                 numThreads = std::stoul(argv[2 * i + 2]);
+            }
+            else if (strcmp(argv[2 * i + 1], "-seed") == 0)
+            {
+                seed = std::stoul(argv[2 * i + 2]);
             }
             else
             {
@@ -65,11 +70,13 @@ int main(int argc, char *argv[])
         std::cout << "                    ./Main  -code CodeFile -sim SimFile -map MappingFile                 \n";
         std::cout << "                  optional: -map MappingFile=''                                          \n";
         std::cout << "                            -threads NumThreads=1                                        \n";
+        std::cout << "                            -seed Seed=0                                                 \n";
         std::cout << "                                                                                         \n";
         std::cout << "                  CodeFile: Name of the code file                                        \n";
         std::cout << "                   SimFile: Name of simulation file                                      \n";
         std::cout << "               MappingFile: Name of mapping file                                         \n";
         std::cout << "                NumThreads: Number of parallel threads                                   \n";
+        std::cout << "                      Seed: RNG Seed                                                     \n";
         std::cout << "========================================================================================" << std::endl;
         exit(EXIT_FAILURE);
     }
@@ -80,7 +87,7 @@ int main(int argc, char *argv[])
     code.print();
     std::cout << "========================================================================================" << std::endl;
 
-    ldpc::ldpc_sim sim(&code, simFile.c_str(), mapFile.c_str(), numThreads);
+    ldpc::ldpc_sim sim(&code, simFile.c_str(), mapFile.c_str(), numThreads, seed);
 
     sim.print();
 
@@ -88,7 +95,8 @@ int main(int argc, char *argv[])
     std::cout << "  FEC   |      FRAME     |   SNR   |    BER     |    FER     | AVGITERS  |  TIME/FRAME   \n";
     std::cout << "========+================+=========+============+============+===========+==============" << std::endl;
 
-    sim.start();
+    uint8_t stopFlag = 0;
+    sim.start(&stopFlag);
 
     return 0;
 }
