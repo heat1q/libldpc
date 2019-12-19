@@ -1,6 +1,6 @@
 #include "ldpcsim.h"
 
-namespace ldpc
+namespace pgd
 {
 //Init constructor
 constellation::constellation(labels_t pM)
@@ -27,9 +27,9 @@ ldpc_sim::ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapF
     : ldpc_sim(pCode, pSimFileName, pMapFileName, numThreads, seed, nullptr) {}
 
 //init constructor
-ldpc_sim::ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, std::uint16_t numThreads, std::size_t seed, sim_results_t* results)
+ldpc_sim::ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, std::uint16_t numThreads, std::size_t seed, sim_results_t *results)
     : mLdpcCode(pCode), mLdpcDecoder(numThreads, ldpc_decoder(pCode, this, 0, true)), mThreads(numThreads),
-    mRNG(numThreads), mRandNormal(numThreads), mRNGSeed(seed), mResults(results)
+      mRNG(numThreads), mRandNormal(numThreads), mRNGSeed(seed), mResults(results)
 {
     try
     {
@@ -128,7 +128,7 @@ ldpc_sim::ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapF
             }
         }
         */
-        
+
         // position of transmitted bits
         mBitPos = std::vector<std::size_t>(mLdpcCode->nct(), 0);
         bool found_p = false;
@@ -167,7 +167,7 @@ ldpc_sim::ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapF
 
         //channel i/o
         //for many threads we need independent vectors
-        mX = mat_double_t(mThreads, vec_double_t(mN, 1.0)); // all one for bpsk and all zero codeword 
+        mX = mat_double_t(mThreads, vec_double_t(mN, 1.0)); // all one for bpsk and all zero codeword
         mY = mat_double_t(mThreads, vec_double_t(mN));
         mC = mat_bits_t(mThreads, vec_bits_t(mLdpcCode->nc(), 0)); //all zero
 
@@ -189,7 +189,6 @@ ldpc_sim::ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapF
         exit(EXIT_FAILURE);
     }
 }
-
 
 void ldpc_sim::simulate_awgn(double pSigma2, std::uint16_t threadid)
 {
@@ -228,8 +227,6 @@ void ldpc_sim::map()
     */
 }
 
-
-
 void ldpc_sim::print()
 {
     std::cout << "logfile: " << mLogfile << "\n";
@@ -258,7 +255,7 @@ void ldpc_sim::print()
     printf(" Thread ID | Seed\n");
     for (std::size_t i = 0; i < mThreads; i++)
     {
-        printf(" %3d       | %d\n",i, mRNGSeed + i);
+        printf(" %3d       | %d\n", i, mRNGSeed + i);
     }
 }
 
@@ -403,4 +400,25 @@ RE);
     fclose(fp);
     */
 }
-} // namespace ldpc
+
+void ldpc_sim::allocate_results()
+{
+    mResults->fer = new double[mSnrs.size()]();
+    mResults->ber = new double[mSnrs.size()]();
+    mResults->avg_iter = new double[mSnrs.size()]();
+    mResults->time = new double[mSnrs.size()]();
+    mResults->fec = new std::size_t[mSnrs.size()]();
+    mResults->frames = new std::size_t[mSnrs.size()]();
+}
+
+void ldpc_sim::free_results()
+{
+    delete[] mResults->fer;
+    delete[] mResults->ber;
+    delete[] mResults->avg_iter;
+    delete[] mResults->time;
+    delete[] mResults->fec;
+    delete[] mResults->frames;
+}
+
+} // namespace pgd

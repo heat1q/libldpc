@@ -1,6 +1,6 @@
 #include "ldpcsim.h"
 
-namespace ldpc
+namespace pgd
 {
 //start simulation on cpu
 void ldpc_sim::start(std::uint8_t *stopFlag)
@@ -15,17 +15,6 @@ void ldpc_sim::start(std::uint8_t *stopFlag)
     std::vector<std::string> printResStr(mSnrs.size() + 1, std::string());
     std::ofstream fp;
     char resStr[128];
-
-    //allocate memory for results
-    if (mResults != nullptr)
-    {
-        mResults->fer = new double[mSnrs.size()]();
-        mResults->ber = new double[mSnrs.size()]();
-        mResults->avg_iter = new double[mSnrs.size()]();
-        mResults->time = new double[mSnrs.size()]();
-        mResults->fec = new std::size_t[mSnrs.size()]();
-        mResults->frames = new std::size_t[mSnrs.size()]();
-    }
 
     #ifndef LIB_SHARED
     #ifdef LOG_FRAME_TIME
@@ -143,16 +132,5 @@ void ldpc_sim::start(std::uint8_t *stopFlag)
         printf("\n");
         #endif
     } //end for
-
-    //free memory for results
-    if (mResults != nullptr)
-    {
-        delete[] mResults->fer;
-        delete[] mResults->ber;
-        delete[] mResults->avg_iter;
-        delete[] mResults->time;
-        delete[] mResults->fec;
-        delete[] mResults->frames;
-    }
 }
-} // namespace ldpc
+} // namespace pgd

@@ -81,13 +81,13 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    ldpc::ldpc_code code(codeFile.c_str());
+    pgd::ldpc_code code(codeFile.c_str());
 
     std::cout << "========================================================================================" << std::endl;
     code.print();
     std::cout << "========================================================================================" << std::endl;
 
-    ldpc::ldpc_sim sim(&code, simFile.c_str(), mapFile.c_str(), numThreads, seed);
+    pgd::ldpc_sim sim(&code, simFile.c_str(), mapFile.c_str(), numThreads, seed);
 
     sim.print();
 

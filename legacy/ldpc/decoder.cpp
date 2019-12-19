@@ -1,6 +1,7 @@
+#include "decoder.h"
 #include "../sim/ldpcsim.h"
 
-namespace ldpc
+namespace pgd
 {
 /**
  * @brief Construct a new ldpc decoder::ldpc decoder object
@@ -143,4 +144,4 @@ bool ldpc_decoder::is_codeword_legacy()
 
     return true;
 }
-} // namespace ldpc
+} // namespace pgd

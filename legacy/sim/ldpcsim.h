@@ -1,39 +1,7 @@
 #pragma once
 
 #include "../ldpc/ldpc.h"
-
-#define TIME_PROF(log, exec, unit)                                                                                                             \
-    do                                                                                                                                         \
-    {                                                                                                                                          \
-        std::string str_unit = std::string(unit);                                                                                              \
-        float a = 1;                                                                                                                           \
-        if (str_unit == std::string("s"))                                                                                                      \
-        {                                                                                                                                      \
-            a = 1e-9;                                                                                                                          \
-        }                                                                                                                                      \
-        else if (str_unit == std::string("ms"))                                                                                                \
-        {                                                                                                                                      \
-            a = 1e-6;                                                                                                                          \
-        }                                                                                                                                      \
-        else if (str_unit == std::string("us"))                                                                                                \
-        {                                                                                                                                      \
-            a = 1e-3;                                                                                                                          \
-        }                                                                                                                                      \
-        else if (str_unit == std::string("ns"))                                                                                                \
-        {                                                                                                                                      \
-            a = 1;                                                                                                                             \
-        }                                                                                                                                      \
-        else                                                                                                                                   \
-        {                                                                                                                                      \
-            a = 1;                                                                                                                             \
-            str_unit = std::string("ns");                                                                                                      \
-        }                                                                                                                                      \
-        auto start = std::chrono::high_resolution_clock::now();                                                                                \
-        exec;                                                                                                                                  \
-        auto elapsed = std::chrono::high_resolution_clock::now() - start;                                                                      \
-        printf("[TIMEPROF]: " log ": ");                                                                                                       \
-        printf("%.3f %s\n", static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count()) * a, str_unit.c_str()); \
-    } while (0);
+#include "../ldpc/decoder.h"
 
 #define MAX_FILENAME_LEN 256
 #define MAX_LLR 9999.9
@@ -43,7 +11,7 @@
 #define M_PI 3.14159265358979323846264338327
 #endif
 
-namespace ldpc
+namespace pgd
 {
 
 //struct where simulation results are saved
@@ -91,6 +59,9 @@ public:
     void log_error(std::size_t pFrameNum, double pSNR);
     void print_file_header(const char *binaryFile, const char *codeFile, const char *simFile, const char *mapFile);
 
+    void allocate_results();
+    void free_results();
+
     std::vector<ldpc_decoder> mLdpcDecoder;
     ldpc_code *mLdpcCode;
 
@@ -131,4 +102,4 @@ private:
 
     sim_results_t* mResults;
 };
-} // namespace ldpc
+} // namespace pgd
