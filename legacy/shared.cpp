@@ -26,4 +26,10 @@ extern "C"
         delete[] res->fec;
         delete[] res->frames;
     }
+
+    std::size_t calculate_rank(char *codeFile)
+    {
+        pgd::ldpc_code code(codeFile);
+        return code.calc_rank();
+    }
 }

@@ -16,29 +16,40 @@ class sim_results_t(ctypes.Structure):
                 ("frames", ctypes.POINTER(ctypes.c_ulong))]
 
 
-stop = ctypes.c_ubyte(0)
-res = sim_results_t()
+def test_sim():
+    stop = ctypes.c_ubyte(0)
+    res = sim_results_t()
 
 
-def sim():
+    def sim():
+        lib = ctypes.cdll.LoadLibrary("../sim_ldpc.so")
+        #lib.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_ubyte, ctypes.c_int)
+        lib.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_ubyte, ctypes.c_int, sim_results_t)
+        lib.simulate("code.txt".encode("utf-8"), "sim.txt".encode("utf-8"), ctypes.c_int(1), ctypes.byref(stop), ctypes.c_int(0), ctypes.byref(res))
+        lib.free_results(ctypes.byref(res))
+
+
+    thread = threading.Thread(target=sim)
+    thread.start()
+    print("Thread launched with simulation")
+    time.sleep(10)
+    print("Stopped after 10 seconds")
+
+    print("Results:")
+    for i in range(10):
+        print(f"FER: {res.fer[i]} - BER: {res.ber[i]} - Avg_iter: {res.avg_iter[i]} - Time: {res.time[i]}s - Frames: {res.frames[i]}")
+
+    stop.value = 1
+    thread.join()
+
+    print("Complete")
+
+def test_rank():
     lib = ctypes.cdll.LoadLibrary("../sim_ldpc.so")
-    #lib.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_ubyte, ctypes.c_int)
-    lib.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_ubyte, ctypes.c_int, sim_results_t)
-    lib.simulate("code.txt".encode("utf-8"), "sim.txt".encode("utf-8"), ctypes.c_int(1), ctypes.byref(stop), ctypes.c_int(0), ctypes.byref(res))
-    lib.free_results(ctypes.byref(res))
+    lib.argtypes = (ctypes.c_char_p, )
+    rank = lib.calculate_rank("code.txt".encode("utf-8"))
+    print(f"Rank of matrix: {rank}")
 
 
-thread = threading.Thread(target=sim)
-thread.start()
-print("Thread launched with simulation")
-time.sleep(10)
-print("Stopped after 10 seconds")
-
-print("Results:")
-for i in range(10):
-    print(f"FER: {res.fer[i]} - BER: {res.ber[i]} - Avg_iter: {res.avg_iter[i]} - Time: {res.time[i]}s - Frames: {res.frames[i]}")
-
-stop.value = 1
-thread.join()
-
-print("Complete")
+if __name__ == "__main__":
+    test_rank()
