@@ -401,16 +401,6 @@ RE);
     */
 }
 
-void ldpc_sim::allocate_results()
-{
-    mResults->fer = new double[mSnrs.size()]();
-    mResults->ber = new double[mSnrs.size()]();
-    mResults->avg_iter = new double[mSnrs.size()]();
-    mResults->time = new double[mSnrs.size()]();
-    mResults->fec = new std::size_t[mSnrs.size()]();
-    mResults->frames = new std::size_t[mSnrs.size()]();
-}
-
 void ldpc_sim::free_results()
 {
     delete[] mResults->fer;

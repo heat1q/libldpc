@@ -59,7 +59,6 @@ public:
     void log_error(std::size_t pFrameNum, double pSNR);
     void print_file_header(const char *binaryFile, const char *codeFile, const char *simFile, const char *mapFile);
 
-    void allocate_results();
     void free_results();
 
     std::vector<ldpc_decoder> mLdpcDecoder;

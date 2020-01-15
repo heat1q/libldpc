@@ -9,12 +9,20 @@ extern "C"
 
         //setup sim
         pgd::ldpc_sim sim(&code, simFile, "", numThreads, seed, res);
-        sim.allocate_results();
         sim.print();
 
         //sim.print_file_header("", codeFile, simFile, "");
         sim.start(stopFlag);
-        //sim.free_results();
+    }
+
+    void allocate_results(pgd::sim_results_t *res, std::size_t len)
+    {
+        res->fer = new double[len]();
+        res->ber = new double[len]();
+        res->avg_iter = new double[len]();
+        res->time = new double[len]();
+        res->fec = new std::size_t[len]();
+        res->frames = new std::size_t[len]();
     }
 
     void free_results(pgd::sim_results_t *res)
