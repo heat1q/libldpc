@@ -1,4 +1,5 @@
 #include "ldpcsim.h"
+#include "../core/functions.h"
 
 namespace pgd
 {

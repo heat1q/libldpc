@@ -1,24 +1,26 @@
-# Cuda LDPC Code Simulation
+# LDPC Code Simulation
 ### Structure
+* `/gpu` Simulator for decoding on GPU (Not maintained currently)
 * `/src` Simulator for decoding on CPU
-* `/gpu` Simulator for decoding on GPU
 
 ### Compiling
-*Compiling steps for `/legacy` are identical*
 
-`$sh src/make.sh NAME FLAGS`
-
-`NAME` is the name of the gernerated executable.  
-`FLAGS` are compile time constants. Note that the prefix `-D` has to be added to flags, in order for the compiler to recognize them. E.g. compiling with the `GPU_ID` and `LOG_TP` flag set to `1`, we write
-
-`$sh src/make.sh sim "-DGPU_ID=1 -DLOG_TP=1"`
+`$ cmake . [-DSIM_FLAGS="[FLAGS]"]`
+ 
+`FLAGS` are compile time constants. Multiple flags are to be separated by space and explicitly set to a value if used. E.g. `$ cmake . -DSIM_FLAGS="CN_APPROX_MINSUM=1 LOG_TP=1"`
 
 All possible flags are listed in `flags.txt` with their respective default value and short desciption.
 
-### Running
-After successful build the simulator can be executed by  
-`$./src/NAME -code CODEFILE -sim SIMFILE -map MAPPINGFILE -layer LAYERFILE -threads NUMTHREADS`  
+`$ make ldpc_sim` produces an executeable containing the simulator, which is used by e.g. the commandline.
 
-The arguments `-layer` and `-threads` are optional.  
-`LAYERFILE` defines the subsets of check nodes that form a layer. A template can be found in `codes/exmp_layer.txt`
-`NUMTHREADS` defines the number of frames processed in parallel (Not available for CPU decoding!)
+`$ make ldpc` produces a shared library containing the simulator for external usage.
+
+### Running the Executable
+After successful build the simulator can be executed by  
+`$./ldpc_sim -code [CODEFILE] -sim [SIMFILE] [-threads [NUMTHREADS] -seed [SEED]]`  
+
+The arguments `-threads` and `-seed` are optional.  
+`CODEFILE` Example codefile can be found in `doc/example_codefile.txt`
+`SIMFILE` Example simfile can be found in `doc/example_simfile.txt` 
+`SEED` Random Number Generator (RNG) starting seed
+`NUMTHREADS` Number of frames processed in parallel
