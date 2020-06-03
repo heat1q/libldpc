@@ -1,7 +1,7 @@
 # Cuda LDPC Code Simulation
 ### Structure
-* `/legacy` Simulator for decoding on CPU (decode in layers optional)
-* `/src` Simulator for decoding on GPU (decode in layers optional)
+* `/src` Simulator for decoding on CPU
+* `/gpu` Simulator for decoding on GPU
 
 ### Compiling
 *Compiling steps for `/legacy` are identical*
