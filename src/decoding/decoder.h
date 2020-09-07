@@ -1,8 +1,8 @@
 #pragma once
 
-#include "ldpc.h"
+#include "../core/ldpc.h"
 
-namespace pgd
+namespace ldpc
 {
 class ldpc_sim;
 
@@ -13,15 +13,15 @@ class ldpc_sim;
 class ldpc_decoder
 {
 public:
-    ldpc_decoder(ldpc_code *pCode, ldpc_sim *pSim, std::int16_t pI, bool pEarlyTerm);
+    ldpc_decoder(ldpc_code *pCode, ldpc_sim *pSim, unsigned pI, bool pEarlyTerm);
 
     void calc_llrs(const vec_double_t &y, double sigma2);
 
-    std::int16_t decode();
+    unsigned decode();
     bool is_codeword_legacy();
 
     //getter functions
-    std::size_t max_iter() const { return mMaxIter; }
+    u64 max_iter() const { return mMaxIter; }
     bool early_termination() const { return mEarlyTerm; }
 
     ldpc_code *ldpc() const { return mLdpcCode; }
@@ -47,7 +47,7 @@ private:
     vec_bits_t mSynd;
     vec_bits_t mCO;
 
-    std::int16_t mMaxIter;
+    unsigned mMaxIter;
     bool mEarlyTerm;
 };
-} // namespace pgd
+} // namespace ldpc

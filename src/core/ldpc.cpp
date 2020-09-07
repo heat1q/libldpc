@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <iterator>
 
-namespace pgd
+namespace ldpc
 {
 /**
  * @brief Construct a new ldpc code::ldpc code object
@@ -28,14 +28,14 @@ ldpc_code::ldpc_code(const char *pFileName)
         mK = mN - mM;
         mKCT = mNCT - mMCT;
 
-        std::size_t numPuncture = 0;
-        std::size_t numShorten = 0;
+        u64 numPuncture = 0;
+        u64 numShorten = 0;
 
         fscanf(fpCode, "puncture [%lu]: ", &numPuncture);
         if (numPuncture != 0)
         {
-            mPuncture = vec_size_t(numPuncture);
-            for (std::size_t i = 0; i < numPuncture; i++)
+            mPuncture = vec_u64(numPuncture);
+            for (u64 i = 0; i < numPuncture; i++)
             {
                 fscanf(fpCode, " %lu ", &(mPuncture[i]));
             }
@@ -44,33 +44,33 @@ ldpc_code::ldpc_code(const char *pFileName)
         fscanf(fpCode, "shorten [%lu]: ", &numShorten);
         if (numShorten != 0)
         {
-            mShorten = vec_size_t(numShorten);
-            for (std::size_t i = 0; i < numShorten; i++)
+            mShorten = vec_u64(numShorten);
+            for (u64 i = 0; i < numShorten; i++)
             {
                 fscanf(fpCode, " %lu ", &(mShorten[i]));
             }
         }
 
-        vec_size_t cwTmp(mM);
-        vec_size_t vwTmp(mN);
-        vec_size_t cw(mM, 0);
-        vec_size_t vw(mN, 0);
+        vec_u64 cwTmp(mM);
+        vec_u64 vwTmp(mN);
+        vec_u64 cw(mM, 0);
+        vec_u64 vw(mN, 0);
 
-        mEdgeCN = vec_size_t(mNNZ);
-        mEdgeVN = vec_size_t(mNNZ);
+        mEdgeCN = vec_u64(mNNZ);
+        mEdgeVN = vec_u64(mNNZ);
 
-        mCheckNodeN = mat_size_t(mM);
-        mVarNodeN = mat_size_t(mN);
+        mCheckNodeN = mat_u64(mM);
+        mVarNodeN = mat_u64(mN);
         for (auto &row : mCheckNodeN)
         {
-            row = vec_size_t();
+            row = vec_u64();
         }
         for (auto &col : mVarNodeN)
         {
-            col = vec_size_t();
+            col = vec_u64();
         }
 
-        for (std::size_t i = 0; i < mNNZ; i++)
+        for (u64 i = 0; i < mNNZ; i++)
         {
             fscanf(fpCode, "%lu %lu\n", &(mEdgeCN[i]), &(mEdgeVN[i]));
 
@@ -86,19 +86,19 @@ ldpc_code::ldpc_code(const char *pFileName)
             mVarNodeN[mEdgeVN[i]].push_back(mEdgeCN[i]);
         }
 
-        mCN = mat_size_t(mM, vec_size_t());
-        for (std::size_t i = 0; i < mM; i++)
+        mCN = mat_u64(mM, vec_u64());
+        for (u64 i = 0; i < mM; i++)
         {
-            mCN[i] = vec_size_t(cw[i]);
+            mCN[i] = vec_u64(cw[i]);
         }
 
-        mVN = mat_size_t(mN, vec_size_t());
-        for (std::size_t i = 0; i < mN; i++)
+        mVN = mat_u64(mN, vec_u64());
+        for (u64 i = 0; i < mN; i++)
         {
-            mVN[i] = vec_size_t(vw[i]);
+            mVN[i] = vec_u64(vw[i]);
         }
 
-        for (std::size_t i = 0; i < mNNZ; i++)
+        for (u64 i = 0; i < mNNZ; i++)
         {
             mCN[mEdgeCN[i]][cwTmp[mEdgeCN[i]]++] = i;
             mVN[mEdgeVN[i]][vwTmp[mEdgeVN[i]]++] = i;
@@ -145,13 +145,13 @@ void ldpc_code::print()
     std::cout << "\n";
 }
 
-std::size_t ldpc_code::calc_rank()
+u64 ldpc_code::calc_rank()
 {
-    std::size_t rank = mN;
-    mat_size_t checkNodeN = mCheckNodeN;
-    mat_size_t varNodeN = mVarNodeN;
+    u64 rank = mN;
+    mat_u64 checkNodeN = mCheckNodeN;
+    mat_u64 varNodeN = mVarNodeN;
 
-    for (std::size_t row = 0; row < rank; ++row)
+    for (u64 row = 0; row < rank; ++row)
     {
         //std::cout << "Row value: " << row << "\n";
 
@@ -160,8 +160,8 @@ std::size_t ldpc_code::calc_rank()
         if (it != varNodeN[row].end()) // values is non-zero
         {
             // now add current row to all rows where a non-zero entry is in the current col, to remove 1
-            vec_size_t tmp = varNodeN[row];
-            for (std::size_t j = 0; j < tmp.size(); ++j)
+            vec_u64 tmp = varNodeN[row];
+            for (u64 j = 0; j < tmp.size(); ++j)
             {
                 //std::cout << "Check: " << tmp[j] << "\n";
                 if (tmp[j] > row)
@@ -176,7 +176,7 @@ std::size_t ldpc_code::calc_rank()
             // if there is a row below it with non-zero entry in same col, swap current rows
             bool isZero = true;
             // find first row with non-zero entry
-            for (std::size_t j = 0; j < varNodeN[row].size(); ++j)
+            for (u64 j = 0; j < varNodeN[row].size(); ++j)
             {
                 if (varNodeN[row][j] > row)
                 {
@@ -202,13 +202,13 @@ std::size_t ldpc_code::calc_rank()
         std::cout << "CN Perspective:\n";
         for (const auto &vn : checkNodeN)
         {
-            pgd::vec_size_t row(this->nc());
+            ldpc::vec_u64 row(this->nc());
             for (auto vn_i : vn)
             {
                 row[vn_i] = 1;
             }
 
-            for (std::size_t n = 0; n < this->nc(); ++n)
+            for (u64 n = 0; n < this->nc(); ++n)
             {
                 std::cout << row[n] << " ";
             }
@@ -221,10 +221,10 @@ std::size_t ldpc_code::calc_rank()
     return rank;
 }
 
-void ldpc_code::swap_rows(mat_size_t &checkNodeN, mat_size_t &varNodeN, std::size_t first, std::size_t second)
+void ldpc_code::swap_rows(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 first, u64 second)
 {
-    vec_size_t first_tmp = checkNodeN[first];
-    vec_size_t second_tmp = checkNodeN[second];
+    vec_u64 first_tmp = checkNodeN[first];
+    vec_u64 second_tmp = checkNodeN[second];
 
     ldpc_code::zero_row(checkNodeN, varNodeN, first);
     ldpc_code::zero_row(checkNodeN, varNodeN, second);
@@ -233,10 +233,10 @@ void ldpc_code::swap_rows(mat_size_t &checkNodeN, mat_size_t &varNodeN, std::siz
     ldpc_code::add_rows(checkNodeN, varNodeN, second, first_tmp);
 }
 
-void ldpc_code::swap_cols(mat_size_t &checkNodeN, mat_size_t &varNodeN, std::size_t first, std::size_t second)
+void ldpc_code::swap_cols(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 first, u64 second)
 {
-    vec_size_t first_tmp = varNodeN[first];
-    vec_size_t second_tmp = varNodeN[second];
+    vec_u64 first_tmp = varNodeN[first];
+    vec_u64 second_tmp = varNodeN[second];
 
     ldpc_code::zero_col(checkNodeN, varNodeN, first);
     ldpc_code::zero_col(checkNodeN, varNodeN, second);
@@ -245,9 +245,9 @@ void ldpc_code::swap_cols(mat_size_t &checkNodeN, mat_size_t &varNodeN, std::siz
     ldpc_code::add_cols(checkNodeN, varNodeN, second, first_tmp);
 }
 
-void ldpc_code::add_rows(mat_size_t &checkNodeN, mat_size_t &varNodeN, std::size_t dest, const vec_size_t &src)
+void ldpc_code::add_rows(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 dest, const vec_u64 &src)
 {
-    vec_size_t new_row = checkNodeN[dest];
+    vec_u64 new_row = checkNodeN[dest];
     for (auto vn : src) // append new vn and check if already in
     {
         auto it = std::find(new_row.begin(), new_row.end(), vn);
@@ -272,9 +272,9 @@ void ldpc_code::add_rows(mat_size_t &checkNodeN, mat_size_t &varNodeN, std::size
     }
 }
 
-void ldpc_code::add_cols(mat_size_t &checkNodeN, mat_size_t &varNodeN, std::size_t dest, const vec_size_t &src)
+void ldpc_code::add_cols(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 dest, const vec_u64 &src)
 {
-    vec_size_t new_col = varNodeN[dest];
+    vec_u64 new_col = varNodeN[dest];
     for (auto cn : src) // append new cn and check if already in
     {
         auto it = std::find(new_col.begin(), new_col.end(), cn);
@@ -299,22 +299,22 @@ void ldpc_code::add_cols(mat_size_t &checkNodeN, mat_size_t &varNodeN, std::size
     }
 }
 
-void ldpc_code::zero_row(mat_size_t &checkNodeN, mat_size_t &varNodeN, std::size_t m)
+void ldpc_code::zero_row(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 m)
 {
     for (auto vn : checkNodeN[m]) // from selected row, for each vn index, remove m from vn
     {
         varNodeN[vn].erase(std::remove(varNodeN[vn].begin(), varNodeN[vn].end(), m), varNodeN[vn].end());
     }
-    checkNodeN[m] = vec_size_t();
+    checkNodeN[m] = vec_u64();
 }
 
-void ldpc_code::zero_col(mat_size_t &checkNodeN, mat_size_t &varNodeN, std::size_t n)
+void ldpc_code::zero_col(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 n)
 {
     for (auto cn : varNodeN[n]) // from selected col, for each cn index, remove n from cn
     {
         checkNodeN[cn].erase(std::remove(checkNodeN[cn].begin(), checkNodeN[cn].end(), n), checkNodeN[cn].end());
     }
-    varNodeN[n] = vec_size_t();
+    varNodeN[n] = vec_u64();
 }
 
-} // namespace pgd
+} // namespace ldpc

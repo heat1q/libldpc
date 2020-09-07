@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../ldpc/ldpc.h"
-#include "../ldpc/decoder.h"
+#include "../core/ldpc.h"
+#include "../decoding/decoder.h"
 
 #define MAX_FILENAME_LEN 256
 #define MAX_LLR 9999.9
@@ -11,7 +11,7 @@
 #define M_PI 3.14159265358979323846264338327
 #endif
 
-namespace pgd
+namespace ldpc
 {
 
 //struct where simulation results are saved
@@ -21,8 +21,8 @@ typedef struct
     double* ber;
     double* avg_iter;
     double* time;
-    std::size_t* fec;
-    std::size_t* frames;
+    u64* fec;
+    u64* frames;
 } sim_results_t;
 
 class constellation
@@ -46,17 +46,17 @@ private:
 class ldpc_sim
 {
 public:
-    ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, std::uint16_t numThreads, std::size_t seed);
-    ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, std::uint16_t numThreads, std::size_t seed, sim_results_t* results);
+    ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, unsigned numThreads, u64 seed);
+    ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, unsigned numThreads, u64 seed, sim_results_t* results);
 
-    void start(std::uint8_t *stopFlag);
+    void start(bool *stopFlag);
 
-    void simulate_awgn(double pSigma2, std::uint16_t threadid);
+    void simulate_awgn(double pSigma2, unsigned threadid);
     void encode();
     void map();
 
     void print();
-    void log_error(std::size_t pFrameNum, double pSNR);
+    void log_error(u64 pFrameNum, double pSNR);
     void print_file_header(const char *binaryFile, const char *codeFile, const char *simFile, const char *mapFile);
 
     void free_results();
@@ -65,22 +65,22 @@ public:
     ldpc_code *mLdpcCode;
 
     const constellation &cstll() const { return mConstellation; }
-    std::size_t n() const { return mN; }
-    std::size_t bits() const { return mBits; }
+    u64 n() const { return mN; }
+    u64 bits() const { return mBits; }
     const vec_labels_t &labels() const { return mLabels; }
     const vec_labels_t &labels_rev() const { return mLabelsRev; }
-    const vec_size_t &bits_pos() const { return mBitPos; }
-    const mat_size_t &bit_mapper() const { return mBitMapper; }
+    const vec_u64 &bits_pos() const { return mBitPos; }
+    const mat_u64 &bit_mapper() const { return mBitMapper; }
 
 private:
     constellation mConstellation;
-    std::uint16_t mThreads;
+    unsigned mThreads;
 
-    std::size_t mN;
-    std::size_t mBits;
-    std::size_t mMaxFrames;
-    std::size_t mMinFec;
-    std::size_t mBPIter;
+    u64 mN;
+    u64 mBits;
+    u64 mMaxFrames;
+    u64 mMinFec;
+    u64 mBPIter;
 
     std::string mLogfile;
     double mSE;
@@ -88,17 +88,17 @@ private:
     vec_double_t mSnrs;
     vec_labels_t mLabels;
     vec_labels_t mLabelsRev;
-    vec_size_t mBitPos;
-    mat_size_t mBitMapper;
+    vec_u64 mBitPos;
+    mat_u64 mBitMapper;
 
     mat_double_t mX;
     mat_double_t mY;
     mat_bits_t mC;
 
-    std::size_t mRNGSeed;
+    u64 mRNGSeed;
     std::vector<std::mt19937> mRNG;
     std::vector<std::normal_distribution<double>> mRandNormal;
 
     sim_results_t* mResults;
 };
-} // namespace pgd
+} // namespace ldpc

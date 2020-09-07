@@ -7,8 +7,8 @@ int main(int argc, char *argv[])
     std::string codeFile;
     std::string simFile;
     std::string mapFile("");
-    std::uint16_t numThreads = 1;
-    std::size_t seed = 0;
+    unsigned numThreads = 1;
+    ldpc::u64 seed = 0;
 
     if (argc == 5 || argc == 7 || argc == 9 || argc == 11)
     {
@@ -81,13 +81,13 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    pgd::ldpc_code code(codeFile.c_str());
+    ldpc::ldpc_code code(codeFile.c_str());
 
     std::cout << "========================================================================================" << std::endl;
     code.print();
     std::cout << "========================================================================================" << std::endl;
 
-    pgd::ldpc_sim sim(&code, simFile.c_str(), mapFile.c_str(), numThreads, seed);
+    ldpc::ldpc_sim sim(&code, simFile.c_str(), mapFile.c_str(), numThreads, seed);
 
     sim.print();
 
@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
     std::cout << "  FEC   |      FRAME     |   SNR   |    BER     |    FER     | AVGITERS  |  TIME/FRAME   \n";
     std::cout << "========+================+=========+============+============+===========+==============" << std::endl;
 
-    uint8_t stopFlag = 0;
+    bool stopFlag = 0;
     sim.start(&stopFlag);
 
     return 0;

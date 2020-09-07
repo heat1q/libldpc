@@ -1,7 +1,7 @@
 #include "decoder.h"
 #include "../sim/ldpcsim.h"
 
-namespace pgd
+namespace ldpc
 {
 /**
  * @brief Construct a new ldpc decoder::ldpc decoder object
@@ -10,12 +10,13 @@ namespace pgd
  * @param pI 
  * @param pEarlyTerm 
  */
-ldpc_decoder::ldpc_decoder(ldpc_code *pCode, ldpc_sim *pSim, std::int16_t pI, bool pEarlyTerm)
-    : mLdpcCode(pCode), mSim(pSim), mMaxIter(pI), mEarlyTerm(pEarlyTerm),
+ldpc_decoder::ldpc_decoder(ldpc_code *pCode, ldpc_sim *pSim, unsigned pI, bool pEarlyTerm)
+    : mLdpcCode(pCode), mSim(pSim), 
       mLv2c(pCode->nnz()), mLc2v(pCode->nnz()),
       mExMsgCN(pCode->max_dc()),
       mLLRIn(pCode->nc()), mLLROut(pCode->nc()),
-      mSynd(pCode->mc()), mCO(pCode->nc())
+      mSynd(pCode->mc()), mCO(pCode->nc()),
+      mMaxIter(pI), mEarlyTerm(pEarlyTerm)
 {
 }
 
@@ -38,7 +39,7 @@ void ldpc_decoder::calc_llrs(const vec_double_t &y, double sigma2)
     }
 
     //bpsk
-    for (std::size_t i = 0; i < mLdpcCode->nct(); ++i)
+    for (u64 i = 0; i < mLdpcCode->nct(); ++i)
     {
         mLLRIn[mSim->bits_pos()[i]] = 2 * y[i] / sigma2;
     }
@@ -47,53 +48,53 @@ void ldpc_decoder::calc_llrs(const vec_double_t &y, double sigma2)
 /**
  * @brief Standard BP LDPC decoding
  * 
- * @return std::size_t 
+ * @return u64 
  */
-std::int16_t ldpc_decoder::decode()
+unsigned ldpc_decoder::decode()
 {
-    std::size_t *vn;
-    std::size_t *cn;
+    u64 *vn;
+    u64 *cn;
 
-    std::size_t vw;
-    std::size_t cw;
+    u64 vw;
+    u64 cw;
 
-    std::size_t nnz = mLdpcCode->nnz();
+    //u64 nnz = mLdpcCode->nnz();
 
     //initialize
-    for (std::size_t i = 0; i < mLdpcCode->nnz(); ++i)
+    for (u64 i = 0; i < mLdpcCode->nnz(); ++i)
     {
         mLv2c[i] = mLLRIn[mLdpcCode->c()[i]];
         mLc2v[i] = 0.0;
     }
 
-    std::int16_t I = 0;
+    unsigned I = 0;
     while (I < mMaxIter)
     {
         // CN processing
-        for (std::size_t i = 0; i < mLdpcCode->mc(); ++i)
+        for (u64 i = 0; i < mLdpcCode->mc(); ++i)
         {
             cw = mLdpcCode->cn()[i].size();
-            cn = const_cast<std::size_t *>(mLdpcCode->cn()[i].data());
+            cn = const_cast<u64 *>(mLdpcCode->cn()[i].data());
 
             double tmp = 1;
-            for (std::size_t j = 0; j < cw; ++j)
+            for (u64 j = 0; j < cw; ++j)
             {
                 mExMsgCN[j] = 1 - 2 / (exp(mLv2c[cn[j]]) + 1); //tanh(mLv2c[cn[j]]);
                 tmp *= mExMsgCN[j];
             }
 
-            for (std::size_t j = 0; j < cw; ++j)
+            for (u64 j = 0; j < cw; ++j)
             {
                 mLc2v[cn[j]] = log((mExMsgCN[j] + tmp) / (mExMsgCN[j] - tmp)); //2*atanh(tmp/mExMsgCN[j]);
             }
         }
 
         // VN processing and app calc
-        for (std::size_t i = 0; i < mLdpcCode->nc(); ++i) // only transmitted bits
+        for (u64 i = 0; i < mLdpcCode->nc(); ++i) // only transmitted bits
         {
             mLLROut[i] = mLLRIn[i];
             vw = mLdpcCode->vn()[i].size();                            // degree of VN
-            vn = const_cast<std::size_t *>(mLdpcCode->vn()[i].data()); //neighbours of VN
+            vn = const_cast<u64 *>(mLdpcCode->vn()[i].data()); //neighbours of VN
             while (vw--)
             {
                 mLLROut[i] += mLc2v[*vn++];
@@ -102,7 +103,7 @@ std::int16_t ldpc_decoder::decode()
             mCO[i] = (mLLROut[i] <= 0); // approx decision on ith bits
 
             vw = mLdpcCode->vn()[i].size();                            // degree of VN
-            vn = const_cast<std::size_t *>(mLdpcCode->vn()[i].data()); //neighbours of VN
+            vn = const_cast<u64 *>(mLdpcCode->vn()[i].data()); //neighbours of VN
             while (vw--)
             {
                 mLv2c[*vn] = mLLROut[i] - mLc2v[*vn];
@@ -128,10 +129,10 @@ bool ldpc_decoder::is_codeword_legacy()
 {
     //calc syndrome
     bits_t s;
-    for (std::size_t i = 0; i < mLdpcCode->mc(); i++)
+    for (u64 i = 0; i < mLdpcCode->mc(); i++)
     {
         s = 0;
-        for (std::size_t j = 0; j < mLdpcCode->cn()[i].size(); j++)
+        for (u64 j = 0; j < mLdpcCode->cn()[i].size(); j++)
         {
             s ^= mCO[mLdpcCode->c()[mLdpcCode->cn()[i][j]]];
         }
@@ -144,4 +145,4 @@ bool ldpc_decoder::is_codeword_legacy()
 
     return true;
 }
-} // namespace pgd
+} // namespace ldpc

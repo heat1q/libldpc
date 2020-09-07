@@ -2,17 +2,17 @@
 
 #include <omp.h>
 
-namespace pgd
+namespace ldpc
 {
 //start simulation on cpu
-void ldpc_sim::start(std::uint8_t *stopFlag)
+void ldpc_sim::start(bool *stopFlag)
 {
     double sigma2;
-    std::size_t frames;
-    std::size_t bec = 0;
-    std::size_t fec = 0;
-    std::size_t iters;
-    std::size_t bec_tmp;
+    u64 frames;
+    u64 bec = 0;
+    u64 fec = 0;
+    u64 iters;
+    u64 bec_tmp;
 
     std::vector<std::string> printResStr(mSnrs.size() + 1, std::string());
     std::ofstream fp;
@@ -26,7 +26,7 @@ void ldpc_sim::start(std::uint8_t *stopFlag)
     #endif
     #endif
 
-    for (std::size_t i = 0; i < mSnrs.size(); ++i)
+    for (u64 i = 0; i < mSnrs.size(); ++i)
     {
         bec = 0;
         fec = 0;
@@ -38,7 +38,7 @@ void ldpc_sim::start(std::uint8_t *stopFlag)
 
         #pragma omp parallel default(none) num_threads(mThreads) private(bec_tmp) firstprivate(sigma2, mLdpcCode, stdout) shared(stopFlag, timeStart, mX, mY, mC, mLdpcDecoder, fec, bec, frames, printResStr, fp, resStr, i, mMinFec, mMaxFrames) reduction(+:iters)
         {
-            int tid = omp_get_thread_num();
+            unsigned tid = omp_get_thread_num();
 
             do
             {
@@ -58,7 +58,7 @@ void ldpc_sim::start(std::uint8_t *stopFlag)
                     ++frames;
 
                     bec_tmp = 0;
-                    for (std::size_t j = 0; j < mLdpcCode->nc(); ++j)
+                    for (u64 j = 0; j < mLdpcCode->nc(); ++j)
                     {
                         bec_tmp += (mLdpcDecoder[tid].llr_out()[j] <= 0);
                     }
@@ -67,7 +67,7 @@ void ldpc_sim::start(std::uint8_t *stopFlag)
                     {
                         auto timeNow = std::chrono::high_resolution_clock::now();
                         auto timeFrame = timeNow - timeStart; //eliminate const time for printing etc
-                        std::size_t tFrame = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::microseconds>(timeFrame).count());
+                        u64 tFrame = static_cast<u64>(std::chrono::duration_cast<std::chrono::microseconds>(timeFrame).count());
                         tFrame = tFrame / frames;
                         #pragma omp critical
                         {
@@ -105,7 +105,7 @@ void ldpc_sim::start(std::uint8_t *stopFlag)
                             }
                             catch (...)
                             {
-                                printf("Warning: can not open logfile %s for writing", mLogfile);
+                                printf("Warning: can not open logfile %s for writing", mLogfile.c_str());
                             }
 
                             #ifdef LOG_CW
@@ -134,5 +134,7 @@ void ldpc_sim::start(std::uint8_t *stopFlag)
         printf("\n");
         #endif
     } //end for
+
+    *resStr = 0;
 }
-} // namespace pgd
+} // namespace ldpc

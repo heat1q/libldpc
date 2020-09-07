@@ -43,23 +43,26 @@
         printf("%.3f %s\n", static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count()) * a, str_unit.c_str()); \
     } while (0);
 
-namespace pgd
+namespace ldpc
 {
-using bits_t = std::uint8_t;
-using labels_t = std::uint16_t;
-using symbols_t = std::uint16_t;
+using bits_t = unsigned char;
+using labels_t = unsigned int;
+using symbols_t = unsigned int;
+using u64 = unsigned long;
+using u32 = unsigned int;
 
 using vec_bits_t = std::vector<bits_t>;
 using vec_labels_t = std::vector<labels_t>;
 using vec_symbols_t = std::vector<symbols_t>;
-using vec_size_t = std::vector<std::size_t>;
+using vec_u64 = std::vector<u64>;
 using vec_double_t = std::vector<double>;
 
 using mat_bits_t = std::vector<std::vector<bits_t>>;
-using mat_size_t = std::vector<std::vector<std::size_t>>;
+using mat_u64 = std::vector<std::vector<u64>>;
 using mat_double_t = std::vector<std::vector<double>>;
 
-void dec2bin(std::size_t val, uint8_t m);
+
+void dec2bin(u64 val, uint8_t m);
 int sign(double a);
 
-} // namespace pgd
+} // namespace ldpc
