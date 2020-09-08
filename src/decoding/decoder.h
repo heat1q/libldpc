@@ -13,7 +13,8 @@ class ldpc_sim;
 class ldpc_decoder
 {
 public:
-    ldpc_decoder(ldpc_code *pCode, ldpc_sim *pSim, unsigned pI, bool pEarlyTerm);
+    ldpc_decoder() = default;
+    ldpc_decoder(const ldpc_code *code, ldpc_sim *sim, const unsigned iter, const bool earlyTerm);
 
     void calc_llrs(const vec_double_t &y, double sigma2);
 
@@ -21,10 +22,10 @@ public:
     bool is_codeword_legacy();
 
     //getter functions
-    u64 max_iter() const { return mMaxIter; }
-    bool early_termination() const { return mEarlyTerm; }
+    const u64 max_iter() const { return mMaxIter; }
+    const bool early_termination() const { return mEarlyTerm; }
 
-    ldpc_code *ldpc() const { return mLdpcCode; }
+    const ldpc_code *ldpc() const { return mLdpcCode; }
     const vec_double_t &lv2c() const { return mLv2c; }
     const vec_double_t &lc2v() const { return mLc2v; }
     const vec_double_t &llr_in() const { return mLLRIn; }
@@ -34,7 +35,7 @@ public:
     const vec_bits_t &estm_cw() const { return mCO; }
 
 private:
-    ldpc_code *mLdpcCode;
+    const ldpc_code *mLdpcCode;
     ldpc_sim *mSim;
 
     vec_double_t mLv2c;
@@ -47,7 +48,7 @@ private:
     vec_bits_t mSynd;
     vec_bits_t mCO;
 
-    unsigned mMaxIter;
-    bool mEarlyTerm;
+    const unsigned mMaxIter;
+    const bool mEarlyTerm;
 };
 } // namespace ldpc

@@ -9,6 +9,7 @@
 #include <chrono>
 #include <fstream>
 #include <random>
+#include <algorithm>
 
 #define TIME_PROF(log, exec, unit)                                                                                                             \
     do                                                                                                                                         \

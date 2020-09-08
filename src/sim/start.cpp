@@ -26,6 +26,10 @@ void ldpc_sim::start(bool *stopFlag)
     #endif
     #endif
 
+    std::cout << "========================================================================================" << std::endl;
+    std::cout << "  FEC   |      FRAME     |   SNR   |    BER     |    FER     | AVGITERS  |  TIME/FRAME   \n";
+    std::cout << "========+================+=========+============+============+===========+==============" << std::endl;
+
     for (u64 i = 0; i < mSnrs.size(); ++i)
     {
         bec = 0;
@@ -42,9 +46,6 @@ void ldpc_sim::start(bool *stopFlag)
 
             do
             {
-                encode();
-                map();
-
                 simulate_awgn(sigma2, tid);
 
                 mLdpcDecoder[tid].calc_llrs(mY[tid], sigma2);

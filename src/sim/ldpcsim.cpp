@@ -3,173 +3,57 @@
 
 namespace ldpc
 {
-//Init constructor
-constellation::constellation(labels_t pM)
-    : mPX(pM, 1.0 / pM), mX(pM, 0.0), mM(pM), mLog2M(log2(pM))
-{
-    double m = 0;
-    for (u64 j = 0; j < mM; ++j)
-    {
-        mX[j] = (double)-mM + 1 + 2 * j;
-        m += mX[j] * mX[j] * mPX[j];
-    }
 
-    for (u64 j = 0; j < mM; ++j)
-    {
-        mX[j] = mX[j] / sqrt(m);
-    }
-}
 
-/*
- * ldpc_sim
- */
-
-ldpc_sim::ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, unsigned numThreads, u64 seed)
-    : ldpc_sim(pCode, pSimFileName, pMapFileName, numThreads, seed, nullptr) {}
+ldpc_sim::ldpc_sim(const ldpc_code *code,
+                   const std::string &outFile,
+                   const vec_double_t &snrRange,
+                   const unsigned numThreads,
+                   const u64 seed,
+                   const enum channel_type channel,
+                   const unsigned iters,
+                   const u64 maxFrames,
+                   const u64 fec,
+                   const bool earlyTerm)
+    : ldpc_sim(code, outFile, snrRange, numThreads, seed, channel, iters, maxFrames, fec, earlyTerm, nullptr) {}
 
 //init constructor
-ldpc_sim::ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapFileName, unsigned numThreads, u64 seed, sim_results_t *results)
-    : mLdpcDecoder(numThreads, ldpc_decoder(pCode, this, 0, true)), mLdpcCode(pCode), mThreads(numThreads), 
-      mRNGSeed(seed), mRNG(numThreads), mRandNormal(numThreads), mResults(results)
+ldpc_sim::ldpc_sim(const ldpc_code *code,
+             const std::string &outFile,
+             const vec_double_t &snrRange,
+             const unsigned numThreads,
+             const u64 seed,
+             const enum channel_type channel,
+             const unsigned iters,
+             const u64 maxFrames,
+             const u64 fec,
+             const bool earlyTerm,
+             sim_results_t *results)
+    : mLdpcCode(code), mLogfile(outFile), mThreads(numThreads), 
+      mBPIter(iters), mMaxFrames(maxFrames), mMinFec(fec), mChannel(channel),
+      mX(numThreads, vec_double_t(code->nct(), 1.0)), mY(numThreads, vec_double_t(code->nct())), //for many threads we need independent vectors
+      mC(numThreads, vec_bits_t(code->nc())), mRNGSeed(seed), mResults(results)
 {
     try
     {
-        std::ifstream fsSim(pSimFileName);
-        //std::ifstream fsMap(pMapFileName);
-        std::string fsLine;
-        std::string fsSubStr;
-
-        char tmp[1000];
-        char *tokp;
-
-        std::getline(fsSim, fsLine);
-        mLogfile = fsLine.substr(fsLine.find(":") + 2); //name
-
-        labels_t M;
-        std::getline(fsSim, fsLine);
-        fsSubStr = fsLine.substr(fsLine.find(":") + 2); //M
-        M = static_cast<labels_t>(std::stoul(fsSubStr));
-
-        //setup constellation
-        mConstellation = constellation(M);
-
-        std::getline(fsSim, fsLine);
-        fsSubStr = fsLine.substr(fsLine.find(":") + 2); //bits
-        mBits = static_cast<labels_t>(std::stoul(fsSubStr));
-
-        if (mBits != 1 || M != 2)
+        // initialize snr vector
+        double val = snrRange[0];
+        while (val < snrRange[1])
         {
-            throw std::runtime_error("error parsing simfile: the simulation currently only supports BPSK");
+            mSnrs.push_back(val);
+            val += snrRange[2];
         }
-
-        mLabels = std::vector<labels_t>();
-        std::getline(fsSim, fsLine);
-        fsSubStr = fsLine.substr(fsLine.find(":") + 2); //labels
-        strcpy(tmp, fsSubStr.c_str());
-        tokp = strtok(tmp, ", ");
-        u64 i = 0;
-        while (tokp != nullptr)
-        {
-            mLabels.push_back(static_cast<labels_t>(atoi(tokp)));
-            tokp = strtok(nullptr, ", ");
-            i++;
-        }
-        if (i != M)
-        {
-            throw std::runtime_error("error parsing simfile: number of constellation points does not match label size");
-        }
-
-        mSnrs = std::vector<double>();
-        std::getline(fsSim, fsLine);
-        fsSubStr = fsLine.substr(fsLine.find(":") + 2); //snrs
-        strcpy(tmp, fsSubStr.c_str());
-        tokp = strtok(tmp, ",");
-        i = 0;
-        while (tokp != nullptr)
-        {
-            mSnrs.push_back(static_cast<double>(atof(tokp)));
-            tokp = strtok(nullptr, ",");
-            i++;
-        }
-
-        std::getline(fsSim, fsLine);
-        fsSubStr = fsLine.substr(fsLine.find(":") + 2); //max frames
-        mMaxFrames = std::stoul(fsSubStr);
-
-        std::getline(fsSim, fsLine);
-        fsSubStr = fsLine.substr(fsLine.find(":") + 2); //min fec
-        mMinFec = std::stoul(fsSubStr);
-
-        std::getline(fsSim, fsLine);
-        fsSubStr = fsLine.substr(fsLine.find(":") + 2); //bp iter
-        mBPIter = std::stoul(fsSubStr);
-
-        if (mLdpcCode->nct() % mBits != 0)
-        {
-            throw std::runtime_error("Chosen setting m with n_c does not work. Please correct.");
-        }
-
-        mN = mLdpcCode->nct() / mBits;
-        mSE = (((double)mLdpcCode->kct()) / mLdpcCode->nct()) * mBits;
-
-        //setup bitmapper
-        /*
-        mBitMapper = std::vector<std::vector<u64>>(mBits, std::vector<u64>(mN, 0));
-        std::getline(fsMap, fsLine);
-        u64 pos = 0;
-        for (auto &ibm : mBitMapper)
-        {
-            for (auto &jbm : ibm)
-            {
-                pos = fsLine.find(",");
-                fsSubStr = fsLine.substr(0, pos);
-                jbm = std::stoul(fsSubStr);
-                fsLine.erase(0, pos + 2); //+2 for comma & space
-            }
-        }
-        */
 
         // position of transmitted bits
-        mBitPos = std::vector<u64>(mLdpcCode->nct(), 0);
-        bool found_p = false;
-        bool found_s = false;
-
-        u64 idx = 0;
         for (u64 i = 0; i < mLdpcCode->nc(); i++)
         {
-            for (auto s : mLdpcCode->shorten())
-            {
-                if (s == i)
-                {
-                    found_s = true;
-                    break;
-                }
-            }
-            for (auto p : mLdpcCode->puncture())
-            {
-                if (p == i)
-                {
-                    found_p = true;
-                    break;
-                }
-            }
-            if ((!found_s) && (!found_p))
-            {
-                mBitPos[idx] = i;
-                idx++;
-            }
-            else
-            {
-                found_p = false;
-                found_s = false;
-            }
-        }
+            auto tmp = std::find(mLdpcCode->shorten().cbegin(), mLdpcCode->shorten().cend(), i);
+            if (tmp != mLdpcCode->shorten().cend()) continue; // skip if current index shortened
+            tmp = std::find(mLdpcCode->puncture().cbegin(), mLdpcCode->puncture().cend(), i);
+            if (tmp != mLdpcCode->puncture().cend()) continue; // skip if current index punctured
 
-        //channel i/o
-        //for many threads we need independent vectors
-        mX = mat_double_t(mThreads, vec_double_t(mN, 1.0)); // all one for bpsk and all zero codeword
-        mY = mat_double_t(mThreads, vec_double_t(mN));
-        mC = mat_bits_t(mThreads, vec_bits_t(mLdpcCode->nc(), 0)); //all zero
+            mBitPos.push_back(i);
+        }
 
         // RNG setup
         //std::random_device rd;
@@ -177,10 +61,9 @@ ldpc_sim::ldpc_sim(ldpc_code *pCode, const char *pSimFileName, const char *pMapF
         for (unsigned i = 0; i < mThreads; ++i)
         {
             //decoder
-            mLdpcDecoder[i] = ldpc_decoder(mLdpcCode, this, mBPIter, true);
-
-            mRNG[i] = std::mt19937(mRNGSeed + i); // different seeds for threads
-            mRandNormal[i] = std::normal_distribution<double>(0.0, 1.0);
+            mLdpcDecoder.push_back(ldpc_decoder(mLdpcCode, this, mBPIter, earlyTerm));
+            mRNG.push_back(std::mt19937(mRNGSeed + i)); // different seeds for threads
+            mRandNormal.push_back(std::normal_distribution<double>(0.0, 1.0));
         }
     }
     catch (std::exception &e)
@@ -196,7 +79,7 @@ void ldpc_sim::simulate_awgn(double pSigma2, unsigned threadid)
     //double Pn = 0;
     //double Px = 0;
 
-    for (u64 i = 0; i < mN; i++)
+    for (u64 i = 0; i < mLdpcCode->nct(); i++)
     {
         //Pn += a * a;
         //Px += mConstellation.X()[mX[i]] * mConstellation.X()[mX[i]];
@@ -204,66 +87,30 @@ void ldpc_sim::simulate_awgn(double pSigma2, unsigned threadid)
     }
 }
 
-void ldpc_sim::encode()
+
+std::ostream &operator<<(std::ostream &os, const ldpc_sim &sim)
 {
-    /*
-    //encode all zero
-    for (u64 i = 0; i < mLdpcDecoder->nc(); ++i)
+    os << "result output file: " << sim.mLogfile << "\n";
+    os << "threads: " << sim.mThreads << "\n";
+    os << "snrs: ";
+    for (auto x: sim.mSnrs) os << x << ", ";
+    os << "\n";
+    os << "max frames: " << sim.mMaxFrames << "\n";
+    os << "min fec: " << sim.mMinFec << "\n";
+    os << "iterations: " << sim.mBPIter <<"\n";
+    os << "RNG: mt19937\n";
+    os << " Thread ID | Seed\n";
+    for (unsigned i = 0; i < sim.mThreads; i++)
     {
-        mC[i] = 0;
+        os << " " << i << "         | " << sim. mRNGSeed + i<< "\n";
     }
-    */
+    return os;
 }
 
-void ldpc_sim::map()
-{
-    //for higher order modulation we require a bitmapper
-    /*
-    //for bpsk we have the mapping x_i = 1 - 2*c_i
-    for (u64 i = 0; i < mN; ++i)
-    {
-        mX[i] = 1 - 2*mC[mBitPos[i]];
-    }
-    */
-}
 
-void ldpc_sim::print()
-{
-    /*
-    std::cout << "logfile: " << mLogfile << "\n";
-    printf("n: %lu\n", mN);
-    printf("M: %hu\n", mConstellation.M());
-    printf("bits: %hu\n", mBits);
-    printf("SNRs: ");
-    for (const auto &i : mSnrs)
-    {
-        printf("%lf ", i);
-    }
-    printf("\n");
-    printf("labels:\n");
-    for (u64 i = 0; i < mConstellation.M(); i++)
-    {
-        printf("\t%lu: ", i);
-        dec2bin(mLabels[i], mBits);
-        printf("\n");
-    }
-    printf("max frames: %lu\n", mMaxFrames);
-    printf("min fec: %lu\n", mMinFec);
-    printf("bp iter: %lu\n", mLdpcDecoder[0].max_iter());
-    printf("early term: %u\n", mLdpcDecoder[0].early_termination());
-    printf("SE: %.4lf\n", mSE);
-    printf("RNG: mt19937\n");
-    printf(" Thread ID | Seed\n");
-    for (unsigned i = 0; i < mThreads; i++)
-    {
-        printf(" %3d       | %d\n", i, mRNGSeed + i);
-    }
-    */
-}
-
+/*
 void ldpc_sim::print_file_header(const char *binaryFile, const char *codeFile, const char *simFile, const char *mapFile)
 {
-    /*
     FILE *fp = fopen(mLogfile, "a+");
     fprintf(fp, "%% binary: %s (Version: %s, Built: %s)\n", binaryFile, VERSION, BUILD_DATE);
     fprintf(fp, "%% sim file: %s\n", simFile);
@@ -275,12 +122,12 @@ void ldpc_sim::print_file_header(const char *binaryFile, const char *codeFile, c
     fprintf(fp, "%% min fec: %lu\n", mMinFec);
     fprintf(fp, "%% BP early terminate: %hu\n", 1);
     fprintf(fp, "%% num threads: %d\n", 1);
-    */
 }
-
+*/
+/*
 void ldpc_sim::log_error(u64 pFrameNum, double pSNR)
 {
-    /*
+
     char errors_file[MAX_FILENAME_LEN];
     snprintf(errors_file, MAX_FILENAME_LEN, "errors_%s", mLogfile.c_str());
 
@@ -400,17 +247,7 @@ RE);
     }
     fprintf(fp, "\n");
     fclose(fp);
-    */
 }
-
-void ldpc_sim::free_results()
-{
-    delete[] mResults->fer;
-    delete[] mResults->ber;
-    delete[] mResults->avg_iter;
-    delete[] mResults->time;
-    delete[] mResults->fec;
-    delete[] mResults->frames;
-}
+*/
 
 } // namespace ldpc

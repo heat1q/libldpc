@@ -10,13 +10,13 @@ namespace ldpc
  * @param pI 
  * @param pEarlyTerm 
  */
-ldpc_decoder::ldpc_decoder(ldpc_code *pCode, ldpc_sim *pSim, unsigned pI, bool pEarlyTerm)
-    : mLdpcCode(pCode), mSim(pSim), 
-      mLv2c(pCode->nnz()), mLc2v(pCode->nnz()),
-      mExMsgCN(pCode->max_dc()),
-      mLLRIn(pCode->nc()), mLLROut(pCode->nc()),
-      mSynd(pCode->mc()), mCO(pCode->nc()),
-      mMaxIter(pI), mEarlyTerm(pEarlyTerm)
+ldpc_decoder::ldpc_decoder(const ldpc_code *code, ldpc_sim *sim, const unsigned iter, const bool earlyTerm)
+    : mLdpcCode(code), mSim(sim), 
+      mLv2c(code->nnz()), mLc2v(code->nnz()),
+      mExMsgCN(code->max_dc()),
+      mLLRIn(code->nc()), mLLROut(code->nc()),
+      mSynd(code->mc()), mCO(code->nc()),
+      mMaxIter(iter), mEarlyTerm(earlyTerm)
 {
 }
 
@@ -41,7 +41,7 @@ void ldpc_decoder::calc_llrs(const vec_double_t &y, double sigma2)
     //bpsk
     for (u64 i = 0; i < mLdpcCode->nct(); ++i)
     {
-        mLLRIn[mSim->bits_pos()[i]] = 2 * y[i] / sigma2;
+        mLLRIn[mSim->bit_pos()[i]] = 2 * y[i] / sigma2;
     }
 }
 

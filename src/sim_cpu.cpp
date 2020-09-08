@@ -1,102 +1,65 @@
 #include "sim/ldpcsim.h"
+#include "../include/argparse/argparse.hpp"
+
 
 int main(int argc, char *argv[])
 {
-    bool abort = false;
+    argparse::ArgumentParser parser("ldpc_sim");
+    parser.add_argument("codefile").help("LDPC codefile containing all non-zero entries, column major ordering.");
+    parser.add_argument("output-file").help("Results output file.");
+    parser.add_argument("snr-range").help("{MIN} {MAX} {STEP}").nargs(3).action([](const std::string &s) { return std::stod(s); });
 
-    std::string codeFile;
-    std::string simFile;
-    std::string mapFile("");
-    unsigned numThreads = 1;
-    ldpc::u64 seed = 0;
+    parser.add_argument("-i", "--num-iterations").help("Number of iterations for decoding. (Default: 50)").default_value(unsigned(50)).action([](const std::string &s) { return static_cast<unsigned>(std::stoul(s)); });
+    parser.add_argument("-s", "--seed").help("RNG seed. (Default: 0)").default_value(ldpc::u64(0)).action([](const std::string &s) { return std::stoull(s); });
+    parser.add_argument("-t", "--num-threads").help("Number of frames to be decoded in parallel. (Default: 1)").default_value(unsigned(1)).action([](const std::string &s) { return std::stoul(s); });
 
-    if (argc == 5 || argc == 7 || argc == 9 || argc == 11)
+    parser.add_argument("--channel").help("Specifies channel {AWGN, BSC, BEC}").default_value(std::string("AWGN"));
+    parser.add_argument("--decoding").help("Specifies decoding algorithm {BP,HD}").default_value(std::string("BP"));
+    parser.add_argument("--max-frames").help("Limit number of decoded frames.").default_value(UINT64_MAX).action([](const std::string &s) { return std::stoull(s); });
+    parser.add_argument("--frame-error-count").help("Maximum frame errors for given simulation point.").default_value(ldpc::u64(50)).action([](const std::string &s) { return std::stoul(s); });
+    parser.add_argument("--no-early-term").help("Disable early termination for decoding.").default_value(false).implicit_value(true);
+
+    try
     {
-        for (int i = 0; i < (argc - 1) / 2; ++i)
-        {
-            if (strcmp(argv[2 * i + 1], "-code") == 0)
-            {
-                codeFile.assign(argv[2 * i + 2]);
-            }
-            else if (strcmp(argv[2 * i + 1], "-sim") == 0)
-            {
-                simFile.assign(argv[2 * i + 2]);
-            }
-            else if (strcmp(argv[2 * i + 1], "-map") == 0)
-            {
-                mapFile.assign(argv[2 * i + 2]);
-            }
-            else if (strcmp(argv[2 * i + 1], "-threads") == 0)
-            {
-                numThreads = std::stoul(argv[2 * i + 2]);
-            }
-            else if (strcmp(argv[2 * i + 1], "-seed") == 0)
-            {
-                seed = std::stoul(argv[2 * i + 2]);
-            }
-            else
-            {
-                abort = true;
-            }
-        }
-    }
-    else
-    {
-        abort = true;
-    }
+        parser.parse_args(argc, argv);
 
-    //some blabla
-    std::cout << "==================================== LDPC Simulation ===================================\n";
-    std::cout << "codefile: " << codeFile << "\n";
-    std::cout << "simfile: " << simFile << "\n";
-    std::cout << "mappingfile: " << mapFile << "\n";
-    std::cout << "threads: " << numThreads << "\n";
+        auto snr = parser.get<ldpc::vec_double_t>("snr-range");
+        if (snr[0] > snr[1]) throw std::runtime_error("snr min > snr max");
 
-    std::cout << "\nDFLAGS: \t";
-#ifdef LOG_FRAME_TIME
-    std::cout << "LOG_FRAME_TIME ";
-#endif
-#ifdef CN_APPROX_MINSUM
-    std::cout << "CN_APPROX_MINSUM ";
-#endif
-#ifdef LOG_CW
-    std::cout << "LOG_CW ";
-#endif
-
-    std::cout << "\n";
-    if (abort)
-    {
-        std::cout << "==================================== USAGE REMINDER ====================================\n";
-        std::cout << "                    ./Main  -code CodeFile -sim SimFile -map MappingFile                 \n";
-        std::cout << "                  optional: -map MappingFile=''                                          \n";
-        std::cout << "                            -threads NumThreads=1                                        \n";
-        std::cout << "                            -seed Seed=0                                                 \n";
-        std::cout << "                                                                                         \n";
-        std::cout << "                  CodeFile: Name of the code file                                        \n";
-        std::cout << "                   SimFile: Name of simulation file                                      \n";
-        std::cout << "               MappingFile: Name of mapping file                                         \n";
-        std::cout << "                NumThreads: Number of parallel threads                                   \n";
-        std::cout << "                      Seed: RNG Seed                                                     \n";
+        enum ldpc::channel_type channel = ldpc::AWGN;
+        if (parser.get<std::string>("--channel") == std::string("BSC")) channel = ldpc::BSC;
+        else if (parser.get<std::string>("--channel") == std::string("BEC")) channel = ldpc::BEC;
+                
+        ldpc::ldpc_code code(parser.get<std::string>("codefile"));
         std::cout << "========================================================================================" << std::endl;
+        std::cout << "codefile: " << parser.get<std::string>("codefile") << std::endl;
+        std::cout << code << std::endl;
+        std::cout << "========================================================================================" << std::endl;
+
+        ldpc::ldpc_sim sim(
+            &code,
+            parser.get<std::string>("output-file"),
+            snr,
+            parser.get<unsigned>("--num-threads"),
+            parser.get<ldpc::u64>("--seed"),
+            channel,
+            parser.get<unsigned>("--num-iterations"),
+            parser.get<ldpc::u64>("--max-frames"),
+            parser.get<ldpc::u64>("--frame-error-count"),
+            !parser.get<bool>("--no-early-term")
+        );
+        std::cout << sim << std::endl;
+        std::cout << "========================================================================================" << std::endl;
+
+        bool stop = false;
+        sim.start(&stop);
+    }
+    catch (const std::runtime_error &e)
+    {
+        std::cout << e.what() << std::endl;
+        std::cout << parser;
         exit(EXIT_FAILURE);
     }
-
-    ldpc::ldpc_code code(codeFile.c_str());
-
-    std::cout << "========================================================================================" << std::endl;
-    code.print();
-    std::cout << "========================================================================================" << std::endl;
-
-    ldpc::ldpc_sim sim(&code, simFile.c_str(), mapFile.c_str(), numThreads, seed);
-
-    sim.print();
-
-    std::cout << "========================================================================================" << std::endl;
-    std::cout << "  FEC   |      FRAME     |   SNR   |    BER     |    FER     | AVGITERS  |  TIME/FRAME   \n";
-    std::cout << "========+================+=========+============+============+===========+==============" << std::endl;
-
-    bool stopFlag = 0;
-    sim.start(&stopFlag);
 
     return 0;
 }
