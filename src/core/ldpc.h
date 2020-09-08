@@ -12,10 +12,11 @@ namespace ldpc
 class ldpc_code
 {
 public:
-    ldpc_code(const char *pFileName);
-    void print();
+    ldpc_code(const std::string &pFileName);
 
     u64 calc_rank();
+
+    friend std::ostream &operator<<(std::ostream &os, const ldpc_code &code);
 
     //getter functions
     u64 nc() const { return mN; };
@@ -50,8 +51,8 @@ private:
     u64 mNNZ;
     mat_u64 mCN;       /* denotes the check neighbors, i.e. connected VN, for each check node as index in c/r; dimensions cn[mc][cw[i]] */
     mat_u64 mVN;       /* denotes the var neighbors, i.e., connected CN, for each variable node as index in c/r; dimensions vn[nc][vw[i]] */
-    vec_u64 mEdgeCN;   /* non zero row indices; length nnz */
-    vec_u64 mEdgeVN;   /* non zero check indices; length nnz */
+    vec_u64 mEdgeCN;   /* edge oriented non zero row indices; length nnz */
+    vec_u64 mEdgeVN;   /* edge oriented non zero column indices; length nnz */
     vec_u64 mPuncture; /* array pf punctured bit indices */
     vec_u64 mShorten;  /* array of shortened bit indices */
     u64 mNCT;     /* number of transmitted code bits */

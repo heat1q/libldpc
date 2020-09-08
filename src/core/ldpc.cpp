@@ -9,12 +9,12 @@ namespace ldpc
  * 
  * @param pFileName 
  */
-ldpc_code::ldpc_code(const char *pFileName)
+ldpc_code::ldpc_code(const std::string &pFileName)
     : mMaxDC(0)
 {
     try
     {
-        FILE *fpCode = fopen(pFileName, "r");
+        FILE *fpCode = fopen(pFileName.c_str(), "r");
         if (!fpCode)
         {
             throw std::runtime_error("can not open codefile for reading.");
@@ -51,61 +51,25 @@ ldpc_code::ldpc_code(const char *pFileName)
             }
         }
 
-        vec_u64 cwTmp(mM);
-        vec_u64 vwTmp(mN);
-        vec_u64 cw(mM, 0);
-        vec_u64 vw(mN, 0);
-
         mEdgeCN = vec_u64(mNNZ);
         mEdgeVN = vec_u64(mNNZ);
 
-        mCheckNodeN = mat_u64(mM);
-        mVarNodeN = mat_u64(mN);
-        for (auto &row : mCheckNodeN)
-        {
-            row = vec_u64();
-        }
-        for (auto &col : mVarNodeN)
-        {
-            col = vec_u64();
-        }
+        mCN = mat_u64(mM, vec_u64());
+        mVN = mat_u64(mN, vec_u64());
 
         for (u64 i = 0; i < mNNZ; i++)
         {
+            // read the non-zero entries, i.e. edges
             fscanf(fpCode, "%lu %lu\n", &(mEdgeCN[i]), &(mEdgeVN[i]));
 
-            // if mEdgeCN[i] is in Shorten skipt both, i.e. the weight of this CN is 0
-            // if mEdgeVN[i] is in Puncture or Shorten skip both, i.e. the weight of this VN is 0
-            //if (std::find(mShorten.begin(), mShorten.end(), mEdgeCN[i]) == mShorten.end()
-            //    && std::find(mPuncture.begin(), mPuncture.end(), mEdgeVN[i]) == mPuncture.end()
-            //    && std::find(mShorten.begin(), mShorten.end(), mEdgeVN[i]) == mShorten.end())
-            cw[mEdgeCN[i]]++;
-            vw[mEdgeVN[i]]++;
-
-            mCheckNodeN[mEdgeCN[i]].push_back(mEdgeVN[i]);
-            mVarNodeN[mEdgeVN[i]].push_back(mEdgeCN[i]);
-        }
-
-        mCN = mat_u64(mM, vec_u64());
-        for (u64 i = 0; i < mM; i++)
-        {
-            mCN[i] = vec_u64(cw[i]);
-        }
-
-        mVN = mat_u64(mN, vec_u64());
-        for (u64 i = 0; i < mN; i++)
-        {
-            mVN[i] = vec_u64(vw[i]);
-        }
-
-        for (u64 i = 0; i < mNNZ; i++)
-        {
-            mCN[mEdgeCN[i]][cwTmp[mEdgeCN[i]]++] = i;
-            mVN[mEdgeVN[i]][vwTmp[mEdgeVN[i]]++] = i;
+            // save edge index to coressponding CN & VN
+            mCN[mEdgeCN[i]].push_back(i);
+            mVN[mEdgeVN[i]].push_back(i);
         }
 
         // maximum check node degree
-        mMaxDC = *(std::max_element(cw.begin(), cw.end()));
+        auto tmp = std::max_element(mCN.begin(), mCN.end(), [](const vec_u64 &a, const vec_u64 &b) { return (a.size() < b.size()); });
+        mMaxDC = tmp->size();
 
         fclose(fpCode);
     }
@@ -116,34 +80,6 @@ ldpc_code::ldpc_code(const char *pFileName)
     }
 }
 
-/**
- * @brief Prints parameters of LDPC code
- * 
- */
-void ldpc_code::print()
-{
-    std::cout << "nc : " << mN << "\n";
-    std::cout << "mc : " << mM << "\n";
-    std::cout << "kc : " << mK << "\n";
-    std::cout << "nnz : " << mNNZ << "\n";
-    std::cout << "nct :" << mNCT << "\n";
-    std::cout << "mct : " << mMCT << "\n";
-    std::cout << "kct : " << mKCT << "\n";
-    std::cout << "max dc : " << mMaxDC << "\n";
-    std::cout << "num puncture: " << mPuncture.size() << "\n";
-    std::cout << "puncture: ";
-    for (auto x : mPuncture)
-    {
-        std::cout << x << " ";
-    }
-    std::cout << "\nnum shorten: " << mShorten.size() << "\n";
-    std::cout << "shorten: ";
-    for (auto x : mShorten)
-    {
-        std::cout << x << " ";
-    }
-    std::cout << "\n";
-}
 
 u64 ldpc_code::calc_rank()
 {
@@ -315,6 +251,36 @@ void ldpc_code::zero_col(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 n)
         checkNodeN[cn].erase(std::remove(checkNodeN[cn].begin(), checkNodeN[cn].end(), n), checkNodeN[cn].end());
     }
     varNodeN[n] = vec_u64();
+}
+
+
+/**
+ * @brief Prints parameters of LDPC code
+ * 
+ */
+std::ostream &operator<<(std::ostream &os, const ldpc_code &code)
+{
+    std::cout << "nc : " << code.mN << "\n";
+    std::cout << "mc : " << code.mM << "\n";
+    std::cout << "kc : " << code.mK << "\n";
+    std::cout << "nnz : " << code.mNNZ << "\n";
+    std::cout << "nct :" << code.mNCT << "\n";
+    std::cout << "mct : " << code.mMCT << "\n";
+    std::cout << "kct : " << code.mKCT << "\n";
+    std::cout << "max dc : " << code.mMaxDC << "\n";
+    std::cout << "num puncture: " << code.mPuncture.size() << "\n";
+    std::cout << "puncture: ";
+    for (auto x : code.mPuncture)
+    {
+        std::cout << x << " ";
+    }
+    std::cout << "\nnum shorten: " << code.mShorten.size() << "\n";
+    std::cout << "shorten: ";
+    for (auto x : code.mShorten)
+    {
+        std::cout << x << " ";
+    }
+    return os;
 }
 
 } // namespace ldpc
