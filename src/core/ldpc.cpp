@@ -263,34 +263,26 @@ void ldpc_code::zero_col(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 n)
     varNodeN[n] = vec_u64();
 }
 
-
 /**
  * @brief Prints parameters of LDPC code
  * 
  */
 std::ostream &operator<<(std::ostream &os, const ldpc_code &code)
 {
-    std::cout << "nc : " << code.mN << "\n";
-    std::cout << "mc : " << code.mM << "\n";
-    std::cout << "kc : " << code.mK << "\n";
-    std::cout << "nnz : " << code.mNNZ << "\n";
-    std::cout << "nct :" << code.mNCT << "\n";
-    std::cout << "mct : " << code.mMCT << "\n";
-    std::cout << "kct : " << code.mKCT << "\n";
-    std::cout << "max dc : " << code.mMaxDC << "\n";
-    std::cout << "num puncture: " << code.mPuncture.size() << "\n";
-    std::cout << "puncture: ";
-    for (auto x : code.mPuncture)
-    {
-        std::cout << x << " ";
-    }
-    std::cout << "\nnum shorten: " << code.mShorten.size() << "\n";
-    std::cout << "shorten: ";
-    for (auto x : code.mShorten)
-    {
-        std::cout << x << " ";
-    }
+    os << "nc : " << code.nc() << "\n";
+    os << "mc : " << code.mc() << "\n";
+    os << "kc : " << code.kc() << "\n";
+    os << "nnz : " << code.nnz() << "\n";
+    os << "nct :" << code.nct() << "\n";
+    os << "mct : " << code.mct() << "\n";
+    os << "kct : " << code.kct() << "\n";
+    os << "max dc : " << code.max_dc() << "\n";
+    os << "puncture[" << code.puncture().size() << "]: " << code.puncture() << "\n";
+    os << "shorten[" << code.shorten().size() << "]: " << code.shorten();
     return os;
 }
 
 } // namespace ldpc
+
+
+

@@ -4,231 +4,266 @@
 
 namespace ldpc
 {
-
-
-ldpc_sim::ldpc_sim(const ldpc_code *code,
-                   const std::string &outFile,
-                   const vec_double_t &channelParamsRange,
-                   const unsigned numThreads,
-                   const u64 seed,
-                   const enum channel_type channelType,
-                   const unsigned iters,
-                   const u64 maxFrames,
-                   const u64 fec,
-                   const bool earlyTerm)
-    : ldpc_sim(code, outFile, channelParamsRange, numThreads, seed, channelType, iters, maxFrames, fec, earlyTerm, nullptr) {}
-
-//init constructor
-ldpc_sim::ldpc_sim(const ldpc_code *code,
-             const std::string &outFile,
-             const vec_double_t &channelParamsRange,
-             const unsigned numThreads,
-             const u64 seed,
-             const enum channel_type channelType,
-             const unsigned iters,
-             const u64 maxFrames,
-             const u64 fec,
-             const bool earlyTerm,
-             sim_results_t *results)
-    : mLdpcCode(code), mLogfile(outFile), mThreads(numThreads), 
-      mBPIter(iters), mMaxFrames(maxFrames), mMinFec(fec),
-      mResults(results)
-{
-    try
+    ldpc_sim::ldpc_sim(const ldpc_code *code,
+                       const param_map &decoderParams,
+                       const param_map &channelParams,
+                       const param_map &simulationParams)
+        : ldpc_sim(code, decoderParams, channelParams, simulationParams, nullptr)
     {
-        //results may vary with same seed, since some threads are executed more than others
-        for (unsigned i = 0; i < mThreads; ++i)
+    }
+
+    ldpc_sim::ldpc_sim(const ldpc_code *code,
+                       const param_map &decoderParams,
+                       const param_map &channelParams,
+                       const param_map &simulationParams,
+                       sim_results_t *results)
+        : mLdpcCode(code),
+          mDecoderParams(decoderParams),
+          mChannelParams(channelParams),
+          mSimulationParams(simulationParams),
+          mResults(results)
+    {
+        try
         {
-            //decoder
-            mLdpcDecoder.push_back(std::make_shared<ldpc_decoder>(ldpc_decoder(mLdpcCode, mBPIter, earlyTerm)));
-            
-            // initialize the correct channel
-            switch (channelType)
+            auto channelType = std::get<std::string>(mChannelParams["type"]);
+
+            //results may vary with same seed, since some threads are executed more than others
+            for (u32 i = 0; i < std::get<u32>(mSimulationParams["threads"]); ++i)
             {
-            case AWGN:
-                mChannel.push_back(std::make_shared<channel_awgn>(channel_awgn(mLdpcCode, mLdpcDecoder.back(), seed + i, 1.)));
-                break;
-            
-            case BSC:
-                mChannel.push_back(std::make_shared<channel_bsc>(channel_bsc(mLdpcCode, mLdpcDecoder.back(), seed + i, 0.)));
-                break;
-            
-            default:
-                throw std::runtime_error("No channel selected.");
-                break;
+                //decoder
+                mLdpcDecoder.push_back(
+                    std::make_shared<ldpc_decoder>(
+                        ldpc_decoder(
+                            mLdpcCode,
+                            std::get<u32>(mDecoderParams["iterations"]),
+                            std::get<bool>(mDecoderParams["early_termination"])
+                        )
+                    )
+                );
+
+                // initialize the correct channel
+                if (channelType == std::string("AWGN"))
+                {
+                    mChannel.push_back(
+                        std::make_shared<channel_awgn>(
+                            channel_awgn(
+                                mLdpcCode,
+                                mLdpcDecoder.back(),
+                                std::get<u64>(mChannelParams["seed"]) + i,
+                                1.
+                            )
+                        )
+                    );
+                }
+                else if (channelType == std::string("BSC"))
+                {
+                    // reverse the epsilon values, since we should start at the worst
+                    // crossover probability increase to the best
+                    auto tmp = std::get<vec_double_t>(mChannelParams["x_vals"]);
+                    std::reverse(tmp.begin(), tmp.end());
+                    mChannelParams["x_vals"] = tmp;
+
+                    mChannel.push_back(
+                        std::make_shared<channel_bsc>(
+                            channel_bsc(
+                                mLdpcCode,
+                                mLdpcDecoder.back(),
+                                std::get<u64>(mChannelParams["seed"]) + i,
+                                0.
+                            )
+                        )
+                    );
+                }
+                else
+                {
+                    throw std::runtime_error("No channel selected.");
+                }
             }
         }
-
-        // initialize snr vector
-        double val = channelParamsRange[0];
-        while (val < channelParamsRange[1])
+        catch (std::exception &e)
         {
-            mChannelParams.push_back(val);
-            val += channelParamsRange[2];
+            std::cout << "Error: ldpc_sim::ldpc_sim() " << e.what() << "\n";
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    std::ostream &operator<<(std::ostream &os, const ldpc_sim &sim)
+    {
+        auto printVariant = [&os](const auto &val) { os << val << "\n"; };
+
+        os << "== Decoder Parameters\n";
+        for (auto it = sim.mDecoderParams.cbegin(); it != sim.mDecoderParams.cend(); ++it)
+        {
+            os << " " << it->first << ": ";
+            std::visit(printVariant, it->second);
         }
 
-    }
-    catch (std::exception &e)
-    {
-        std::cout << "Error: ldpc_sim::ldpc_sim() " << e.what() << "\n";
-        exit(EXIT_FAILURE);
-    }
-}
-
-
-std::ostream &operator<<(std::ostream &os, const ldpc_sim &sim)
-{
-    os << "result output file: " << sim.mLogfile << "\n";
-    os << "threads: " << sim.mThreads << "\n";
-    os << "snrs: ";
-    for (auto x: sim.mChannelParams) os << x << ", ";
-    os << "\n";
-    os << "max frames: " << sim.mMaxFrames << "\n";
-    os << "min fec: " << sim.mMinFec << "\n";
-    os << "iterations: " << sim.mBPIter <<"\n";
-    os << "RNG: mt19937\n";
-    return os;
-}
-
-
-void ldpc_sim::start(bool *stopFlag)
-{
-    u64 frames;
-    u64 bec = 0;
-    u64 fec = 0;
-    u64 iters;
-    u64 bec_tmp;
-
-    std::vector<std::string> printResStr(mChannelParams.size() + 1, std::string());
-    std::ofstream fp;
-    char resStr[128];
-
-    #ifndef LIB_SHARED
-    #ifdef LOG_FRAME_TIME
-    printResStr[0].assign("snr fer ber frames avg_iter frame_time");
-    #else
-    printResStr[0].assign("snr fer ber frames avg_iter");
-    #endif
-    #endif
-
-    std::cout << "========================================================================================" << std::endl;
-    std::cout << "  FEC   |      FRAME     |   SNR   |    BER     |    FER     | AVGITERS  |  TIME/FRAME   \n";
-    std::cout << "========+================+=========+============+============+===========+==============" << std::endl;
-
-    for (u64 i = 0; i < mChannelParams.size(); ++i)
-    {
-        bec = 0;
-        fec = 0;
-        frames = 0;
-        iters = 0;
-
-        auto timeStart = std::chrono::high_resolution_clock::now();
-
-        #pragma omp parallel default(none) num_threads(mThreads) private(bec_tmp) firstprivate(mLdpcCode, stdout) shared(stopFlag, timeStart, mLdpcDecoder, mChannel, fec, bec, frames, printResStr, fp, resStr, i, mMinFec, mMaxFrames) reduction(+:iters)
+        os << "== Channel Parameters\n";
+        for (auto it = sim.mChannelParams.cbegin(); it != sim.mChannelParams.cend(); ++it)
         {
-            unsigned tid = omp_get_thread_num();
+            os << " " << it->first << ": ";
+            std::visit(printVariant, it->second);
+        }
 
-            // reconfigure channel to match parameter
-            mChannel[tid]->set_channel_param(mChannelParams[i]);
+        os << "== Simulation Parameters\n";
+        for (auto it = sim.mSimulationParams.cbegin(); it != sim.mSimulationParams.cend(); ++it)
+        {
+            os << " " << it->first << ": ";
+            std::visit(printVariant, it->second);
+        }
+        return os;
+    }
 
-            do
+    void ldpc_sim::start(bool *stopFlag)
+    {
+        u64 frames;
+        u64 bec = 0;
+        u64 fec = 0;
+        u64 iters;
+        u64 bec_tmp;
+
+        auto xVals = std::get<vec_double_t>(mChannelParams["x_vals"]);
+        auto minFec = std::get<u64>(mSimulationParams["fec"]);
+        auto maxFrames = std::get<u64>(mSimulationParams["max_frames"]);
+        auto threads = std::get<u32>(mSimulationParams["threads"]);
+
+        std::vector<std::string> printResStr(xVals.size() + 1, std::string());
+        std::ofstream fp;
+        char resStr[128];
+
+        #ifndef LIB_SHARED
+        #ifdef LOG_FRAME_TIME
+        printResStr[0].assign("snr fer ber frames avg_iter frame_time");
+        #else
+        printResStr[0].assign("snr fer ber frames avg_iter");
+        #endif
+        #endif
+
+        std::string xValType = "SNR";
+        if (std::get<std::string>(mChannelParams["type"]) == std::string("BSC")) xValType = "EPS";
+
+        std::cout << "=============================" <<           "===========================================================" << std::endl;
+        std::cout << "  FEC   |      FRAME     |   " <<  xValType << "   |    BER     |    FER     | AVGITERS  |  TIME/FRAME   \n";
+        std::cout << "========+================+===" <<           "======+============+============+===========+==============" << std::endl;
+
+        for (u64 i = 0; i < xVals.size(); ++i)
+        {
+            bec = 0;
+            fec = 0;
+            frames = 0;
+            iters = 0;
+
+            auto timeStart = std::chrono::high_resolution_clock::now();
+
+            #pragma omp parallel default(none)                                                                                       \
+                num_threads(threads) private(bec_tmp)                                                                                \
+                firstprivate(xVals, mLdpcCode, stdout)                                                                               \
+                shared(stopFlag, timeStart, mLdpcDecoder, mChannel, fec, bec, frames, printResStr, fp, resStr, i, minFec, maxFrames) \
+                reduction(+: iters)
             {
-                // calculate the channel transitions
-                mChannel[tid]->simulate();
+                unsigned tid = omp_get_thread_num();
 
-                // calculate the corresponding LLRs, depending on the channel
-                mChannel[tid]->calculate_llrs();
+                // reconfigure channel to match parameter
+                mChannel[tid]->set_channel_param(xVals[i]);
 
-                //decode
-                iters += mLdpcDecoder[tid]->decode();
-
-                if (fec < mMinFec)
+                do
                 {
-                    #pragma omp atomic update
-                    ++frames;
+                    // calculate the channel transitions
+                    mChannel[tid]->simulate();
 
-                    bec_tmp = 0;
-                    for (u64 j = 0; j < mLdpcCode->nc(); ++j)
-                    {
-                        bec_tmp += (mLdpcDecoder[tid]->llr_out()[j] <= 0);
-                    }
+                    // calculate the corresponding LLRs, depending on the channel
+                    mChannel[tid]->calculate_llrs();
 
-                    if (bec_tmp > 0)
+                    //decode
+                    iters += mLdpcDecoder[tid]->decode();
+
+                    if (fec < minFec)
                     {
-                        auto timeNow = std::chrono::high_resolution_clock::now();
-                        auto timeFrame = timeNow - timeStart; //eliminate const time for printing etc
-                        u64 tFrame = static_cast<u64>(std::chrono::duration_cast<std::chrono::microseconds>(timeFrame).count());
-                        tFrame = tFrame / frames;
-                        #pragma omp critical
+                        #pragma omp atomic update
+                        ++frames;
+
+                        bec_tmp = 0;
+                        for (u64 j = 0; j < mLdpcCode->nc(); ++j)
                         {
-                            bec += bec_tmp;
-                            ++fec;
+                            bec_tmp += (mLdpcDecoder[tid]->llr_out()[j] <= 0);
+                        }
 
-                            #ifndef LIB_SHARED
-                            printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %.3fms",
-                                   fec, mMinFec, frames, mChannelParams[i],
-                                   static_cast<double>(bec) / (frames * mLdpcCode->nc()), //ber
-                                   static_cast<double>(fec) / frames,                     //fer
-                                   static_cast<double>(iters) / frames,                   //avg iters
-                                   static_cast<double>(tFrame) * 1e-3);                        //frame time tFrame
-                            fflush(stdout);
-
-                            #ifdef LOG_FRAME_TIME
-                            sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f",
-                                    mChannelParams[i], static_cast<double>(fec) / frames, static_cast<double>(bec) / (frames * mLdpcCode->nc()),
-                                    frames, static_cast<double>(iters) / frames, static_cast<double>(tFrame) * 1e-6);
-                            #else
-                            sprintf(resStr, "%lf %.3e %.3e %lu %.3e",
-                                    mChannelParams[i], static_cast<double>(fec) / frames, static_cast<double>(bec) / (frames * mLdpcCode->nc()),
-                                    frames, static_cast<double>(iters) / frames);
-                            #endif
-                            printResStr[i + 1].assign(resStr);
-
-                            try
+                        if (bec_tmp > 0)
+                        {
+                            auto timeNow = std::chrono::high_resolution_clock::now();
+                            auto timeFrame = timeNow - timeStart; //eliminate const time for printing etc
+                            u64 tFrame = static_cast<u64>(std::chrono::duration_cast<std::chrono::microseconds>(timeFrame).count());
+                            tFrame = tFrame / frames;
+                            #pragma omp critical
                             {
-                                fp.open(mLogfile);
-                                for (const auto &x : printResStr)
+                                bec += bec_tmp;
+                                ++fec;
+
+                                #ifndef LIB_SHARED
+                                printf("\r %2lu/%2lu  |  %12lu  |  %.3f  |  %.2e  |  %.2e  |  %.1e  |  %.3fms",
+                                       fec, minFec, frames, xVals[i],
+                                       static_cast<double>(bec) / (frames * mLdpcCode->nc()), //ber
+                                       static_cast<double>(fec) / frames,                     //fer
+                                       static_cast<double>(iters) / frames,                   //avg iters
+                                       static_cast<double>(tFrame) * 1e-3);                   //frame time tFrame
+                                fflush(stdout);
+
+                                #ifdef LOG_FRAME_TIME
+                                sprintf(resStr, "%lf %.3e %.3e %lu %.3e %.6f",
+                                        xVals[i], static_cast<double>(fec) / frames, static_cast<double>(bec) / (frames * mLdpcCode->nc()),
+                                        frames, static_cast<double>(iters) / frames, static_cast<double>(tFrame) * 1e-6);
+                                #else
+                                sprintf(resStr, "%lf %.3e %.3e %lu %.3e",
+                                        xVals[i], static_cast<double>(fec) / frames, static_cast<double>(bec) / (frames * mLdpcCode->nc()),
+                                        frames, static_cast<double>(iters) / frames);
+                                #endif
+                                printResStr[i + 1].assign(resStr);
+
+                                try
                                 {
-                                    fp << x << "\n";
+                                    fp.open(std::get<std::string>(mSimulationParams["result_file"]));
+                                    for (const auto &x : printResStr)
+                                    {
+                                        fp << x << "\n";
+                                    }
+                                    fp.close();
                                 }
-                                fp.close();
-                            }
-                            catch (...)
-                            {
-                                printf("Warning: can not open logfile %s for writing", mLogfile.c_str());
-                            }
+                                catch (...)
+                                {
+                                    printf("Warning: can not open logfile for writing\n");
+                                }
 
-                            #ifdef LOG_CW
-                            //log_error(frames, mChannelParams[i]);
-                            #endif
-                            #endif
+                                #ifdef LOG_CW
+                                //log_error(frames, xVals[i]);
+                                #endif
+                                #endif
 
-                            //save to result struct
-                            if (mResults != nullptr)
-                            {
-                                mResults->fer[i] = static_cast<double>(fec) / frames;
-                                mResults->ber[i] = static_cast<double>(bec) / (frames * mLdpcCode->nc());
-                                mResults->avg_iter[i] = static_cast<double>(iters) / frames;
-                                mResults->time[i] = static_cast<double>(tFrame) * 1e-6;
-                                mResults->fec[i] = fec;
-                                mResults->frames[i] = frames;
+                                //save to result struct
+                                if (mResults != nullptr)
+                                {
+                                    mResults->fer[i] = static_cast<double>(fec) / frames;
+                                    mResults->ber[i] = static_cast<double>(bec) / (frames * mLdpcCode->nc());
+                                    mResults->avg_iter[i] = static_cast<double>(iters) / frames;
+                                    mResults->time[i] = static_cast<double>(tFrame) * 1e-6;
+                                    mResults->fec[i] = fec;
+                                    mResults->frames[i] = frames;
+                                }
+
+                                timeStart += std::chrono::high_resolution_clock::now() - timeNow; //dont measure time for printing files
                             }
-
-                            timeStart += std::chrono::high_resolution_clock::now() - timeNow; //dont measure time for printing files
                         }
                     }
-                }
-            } while (fec < mMinFec && frames < mMaxFrames && !*stopFlag); //end while
-        }
-        #ifndef LIB_SHARED
-        printf("\n");
-        #endif
-    } //end for
+                } while (fec < minFec && frames < maxFrames && !*stopFlag); //end while
+            }
+            #ifndef LIB_SHARED
+            printf("\n");
+            #endif
+        } //end for
 
-    *resStr = 0;
-}
+        *resStr = 0;
+    }
 
-/*
+    /*
 void ldpc_sim::print_file_header(const char *binaryFile, const char *codeFile, const char *simFile, const char *mapFile)
 {
     FILE *fp = fopen(mLogfile, "a+");
@@ -244,7 +279,7 @@ void ldpc_sim::print_file_header(const char *binaryFile, const char *codeFile, c
     fprintf(fp, "%% num threads: %d\n", 1);
 }
 */
-/*
+    /*
 void ldpc_sim::log_error(u64 pFrameNum, double pSNR)
 {
 

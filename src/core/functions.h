@@ -10,6 +10,8 @@
 #include <fstream>
 #include <random>
 #include <algorithm>
+#include <unordered_map>
+#include <variant>
 
 #define TIME_PROF(log, exec, unit)                                                                                                             \
     do                                                                                                                                         \
@@ -46,24 +48,53 @@
 
 namespace ldpc
 {
-using bits_t = unsigned char;
-using labels_t = unsigned int;
-using symbols_t = unsigned int;
-using u64 = unsigned long;
-using u32 = unsigned int;
+    /**
+    * @brief Define outstream operator for vector to ease debugging.
+    * 
+    * @tparam T 
+    * @param os 
+    * @param v 
+    * @return std::ostream& 
+    */
+    template <class T>
+    std::ostream &operator<<(std::ostream &os, const std::vector<T> &v)
+    {
+        os << "[";
+        typename std::vector<T>::const_iterator it = v.begin();
+        for (; it != v.end(); ++it)
+        {
+            if (it == v.end() - 1)
+            {
+                os << *it << "]";
+                break;
+            }
+            else
+            {
+                os << *it << ", ";
+            }
+        }
+        return os;
+    }
 
-using vec_bits_t = std::vector<bits_t>;
-using vec_labels_t = std::vector<labels_t>;
-using vec_symbols_t = std::vector<symbols_t>;
-using vec_u64 = std::vector<u64>;
-using vec_double_t = std::vector<double>;
+    using bits_t = unsigned char;
+    using labels_t = unsigned int;
+    using symbols_t = unsigned int;
+    using u64 = unsigned long;
+    using u32 = unsigned int;
 
-using mat_bits_t = std::vector<std::vector<bits_t>>;
-using mat_u64 = std::vector<std::vector<u64>>;
-using mat_double_t = std::vector<std::vector<double>>;
+    using vec_bits_t = std::vector<bits_t>;
+    using vec_labels_t = std::vector<labels_t>;
+    using vec_symbols_t = std::vector<symbols_t>;
+    using vec_u64 = std::vector<u64>;
+    using vec_double_t = std::vector<double>;
 
+    using mat_bits_t = std::vector<std::vector<bits_t>>;
+    using mat_u64 = std::vector<std::vector<u64>>;
+    using mat_double_t = std::vector<std::vector<double>>;
 
-void dec2bin(u64 val, uint8_t m);
-int sign(double a);
+    using param_map = std::unordered_map<std::string, std::variant<bool, u32, u64, double, std::string, vec_double_t>>;
+
+    void dec2bin(u64 val, uint8_t m);
+    int sign(double a);
 
 } // namespace ldpc

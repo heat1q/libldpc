@@ -35,25 +35,13 @@ namespace ldpc
     public:
         ldpc_sim() = default;
         ldpc_sim(const ldpc_code *code,
-                 const std::string &outFile,
-                 const vec_double_t &channelParamsRange,
-                 const unsigned numThreads,
-                 const u64 seed,
-                 const enum channel_type channelType,
-                 const unsigned iters,
-                 const u64 maxFrames,
-                 const u64 fec,
-                 const bool earlyTerm);
+                 const param_map &decoderParams,
+                 const param_map &channelParams,
+                 const param_map &simulationParams);
         ldpc_sim(const ldpc_code *code,
-                 const std::string &outFile,
-                 const vec_double_t &channelParamsRange,
-                 const unsigned numThreads,
-                 const u64 seed,
-                 const enum channel_type channelType,
-                 const unsigned iters,
-                 const u64 maxFrames,
-                 const u64 fec,
-                 const bool earlyTerm,
+                 const param_map &decoderParams,
+                 const param_map &channelParams,
+                 const param_map &simulationParams,
                  sim_results_t *results);
 
         void start(bool *stopFlag);
@@ -68,15 +56,9 @@ namespace ldpc
         std::vector<std::shared_ptr<ldpc_decoder>> mLdpcDecoder;
         std::vector<std::shared_ptr<channel>> mChannel;
 
-        const std::string mLogfile;
-
-        const unsigned mThreads;
-
-        const unsigned mBPIter;
-        const u64 mMaxFrames;
-        const u64 mMinFec;
-
-        vec_double_t mChannelParams; // snr for AWGN, epsilon for BSC
+        param_map mDecoderParams;
+        param_map mChannelParams;
+        param_map mSimulationParams;
 
         sim_results_t *mResults;
     };

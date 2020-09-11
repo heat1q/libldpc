@@ -25,10 +25,6 @@ int main(int argc, char *argv[])
 
         auto snr = parser.get<ldpc::vec_double_t>("snr-range");
         if (snr[0] > snr[1]) throw std::runtime_error("snr min > snr max");
-
-        enum ldpc::channel_type channel = ldpc::AWGN;
-        if (parser.get<std::string>("--channel") == std::string("BSC")) channel = ldpc::BSC;
-        else if (parser.get<std::string>("--channel") == std::string("BEC")) channel = ldpc::BEC;
                 
         ldpc::ldpc_code code(parser.get<std::string>("codefile"));
         std::cout << "========================================================================================" << std::endl;
@@ -36,17 +32,39 @@ int main(int argc, char *argv[])
         std::cout << code << std::endl;
         std::cout << "========================================================================================" << std::endl;
 
+        // decoder parameters
+        ldpc::param_map decoderParams;
+        decoderParams["iterations"] = parser.get<ldpc::u32>("--num-iterations");
+        decoderParams["type"] = parser.get<std::string>("--decoding");
+        decoderParams["early_termination"] = !parser.get<bool>("--no-early-term");
+
+        // channel parameters
+        ldpc::param_map channelParams;
+        channelParams["type"] = parser.get<std::string>("--channel");
+        channelParams["seed"] = parser.get<ldpc::u64>("--seed");
+        channelParams["x_range"] = snr;
+
+        ldpc::vec_double_t x;
+        double val = snr[0];
+        while (val < snr[1])
+        {
+            x.push_back(val);
+            val += snr[2];
+        }
+        channelParams["x_vals"] = x;
+
+        // simulation parameters
+        ldpc::param_map simulationParams;
+        simulationParams["result_file"] = parser.get<std::string>("output-file");
+        simulationParams["threads"] = parser.get<ldpc::u32>("--num-threads");
+        simulationParams["fec"] = parser.get<ldpc::u64>("--frame-error-count");
+        simulationParams["max_frames"] = parser.get<ldpc::u64>("--max-frames");
+
         ldpc::ldpc_sim sim(
             &code,
-            parser.get<std::string>("output-file"),
-            snr,
-            parser.get<unsigned>("--num-threads"),
-            parser.get<ldpc::u64>("--seed"),
-            channel,
-            parser.get<unsigned>("--num-iterations"),
-            parser.get<ldpc::u64>("--max-frames"),
-            parser.get<ldpc::u64>("--frame-error-count"),
-            !parser.get<bool>("--no-early-term")
+            decoderParams,
+            channelParams,
+            simulationParams
         );
         std::cout << sim << std::endl;
         std::cout << "========================================================================================" << std::endl;
