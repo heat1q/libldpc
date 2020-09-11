@@ -1,5 +1,4 @@
 #include "decoder.h"
-#include "../sim/ldpcsim.h"
 
 namespace ldpc
 {
@@ -10,8 +9,8 @@ namespace ldpc
  * @param pI 
  * @param pEarlyTerm 
  */
-ldpc_decoder::ldpc_decoder(const ldpc_code *code, ldpc_sim *sim, const unsigned iter, const bool earlyTerm)
-    : mLdpcCode(code), mSim(sim), 
+ldpc_decoder::ldpc_decoder(const ldpc_code *code, const unsigned iter, const bool earlyTerm)
+    : mLdpcCode(code), 
       mLv2c(code->nnz()), mLc2v(code->nnz()),
       mExMsgCN(code->max_dc()),
       mLLRIn(code->nc()), mLLROut(code->nc()),
@@ -20,30 +19,6 @@ ldpc_decoder::ldpc_decoder(const ldpc_code *code, ldpc_sim *sim, const unsigned 
 {
 }
 
-void ldpc_decoder::calc_llrs(const vec_double_t &y, double sigma2)
-{
-    //puncturing & shortening
-    if (mLdpcCode->puncture().size() != 0)
-    {
-        for (auto p: mLdpcCode->puncture())
-        {
-            mLLRIn[p] = 1e-9 * (1 - 2*(rand() % 2)); // set random signed low values, i.e. simulate erasure LLR=0
-        }
-    }
-    if (mLdpcCode->shorten().size() != 0)
-    {
-        for (auto s: mLdpcCode->shorten())
-        {
-            mLLRIn[s] = 1e9; // simulate certain bit
-        }
-    }
-
-    //bpsk
-    for (u64 i = 0; i < mLdpcCode->nct(); ++i)
-    {
-        mLLRIn[mSim->bit_pos()[i]] = 2 * y[i] / sigma2;
-    }
-}
 
 /**
  * @brief Standard BP LDPC decoding
@@ -59,6 +34,7 @@ unsigned ldpc_decoder::decode()
     u64 cw;
 
     //u64 nnz = mLdpcCode->nnz();
+    
 
     //initialize
     for (u64 i = 0; i < mLdpcCode->nnz(); ++i)

@@ -1,5 +1,4 @@
 #include "ldpc.h"
-#include <algorithm>
 #include <iterator>
 
 namespace ldpc
@@ -70,6 +69,17 @@ ldpc_code::ldpc_code(const std::string &pFileName)
         // maximum check node degree
         auto tmp = std::max_element(mCN.begin(), mCN.end(), [](const vec_u64 &a, const vec_u64 &b) { return (a.size() < b.size()); });
         mMaxDC = tmp->size();
+
+        // position of transmitted bits
+        for (u64 i = 0; i < mN; i++)
+        {
+            auto tmp = std::find(mShorten.cbegin(), mShorten.cend(), i);
+            if (tmp != mShorten.cend()) continue; // skip if current index shortened
+            tmp = std::find(mPuncture.cbegin(), mPuncture.cend(), i);
+            if (tmp != mPuncture.cend()) continue; // skip if current index punctured
+
+            mBitPos.push_back(i);
+        }
 
         fclose(fpCode);
     }
