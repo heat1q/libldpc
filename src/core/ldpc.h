@@ -65,8 +65,8 @@ namespace ldpc
         // position of transmitted bits, i.e. puncture/shorten exluded
         vec_u64 mBitPos;
 
-        mat_u64 mCheckNodeN; // new
-        mat_u64 mVarNodeN;   // new
+        mat_u64 mCheckNodeN; // direct check node neighbourhood with node oriented index
+        mat_u64 mVarNodeN;   // direct variable node neighbourhood with node oriented index
     };
 
 } // namespace ldpc

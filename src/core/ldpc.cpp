@@ -56,6 +56,9 @@ ldpc_code::ldpc_code(const std::string &pFileName)
         mCN = mat_u64(mM, vec_u64());
         mVN = mat_u64(mN, vec_u64());
 
+        mCheckNodeN = mat_u64(mM, vec_u64());
+        mVarNodeN = mat_u64(mN, vec_u64());
+
         for (u64 i = 0; i < mNNZ; i++)
         {
             // read the non-zero entries, i.e. edges
@@ -64,6 +67,9 @@ ldpc_code::ldpc_code(const std::string &pFileName)
             // save edge index to coressponding CN & VN
             mCN[mEdgeCN[i]].push_back(i);
             mVN[mEdgeVN[i]].push_back(i);
+
+            mCheckNodeN[mEdgeCN[i]].push_back(mEdgeVN[i]);
+            mVarNodeN[mEdgeVN[i]].push_back(mEdgeCN[i]);
         }
 
         // maximum check node degree

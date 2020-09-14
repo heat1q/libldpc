@@ -9,7 +9,7 @@ namespace ldpc
  * @param pI 
  * @param pEarlyTerm 
  */
-    ldpc_decoder::ldpc_decoder(const ldpc_code *code, const unsigned iter, const bool earlyTerm)
+    ldpc_decoder::ldpc_decoder(const std::shared_ptr<ldpc_code> &code, const unsigned iter, const bool earlyTerm)
         : mLdpcCode(code),
           mLv2c(code->nnz()), mLc2v(code->nnz()),
           mExMsgCN(code->max_dc()),

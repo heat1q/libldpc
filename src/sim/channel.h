@@ -8,7 +8,7 @@ namespace ldpc
     {
     public:
         channel() = default;
-        channel(const ldpc_code *code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed);
+        channel(const std::shared_ptr<ldpc_code> &code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed);
         virtual ~channel() = default;
 
         // set param and update rng stream
@@ -18,7 +18,7 @@ namespace ldpc
         virtual void calculate_llrs();
     protected:
         // ptr to const ldpc_code for parameters
-        const ldpc_code *mLdpcCode;
+        std::shared_ptr<ldpc_code> mLdpcCode;
 
         // hold the unique decoder for this channel
         std::shared_ptr<ldpc_decoder> mLdpcDecoder;
@@ -32,7 +32,7 @@ namespace ldpc
     {
     public:
         channel_awgn() = default;
-        channel_awgn(const ldpc_code *code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed, const double snr);
+        channel_awgn(const std::shared_ptr<ldpc_code> &code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed, const double snr);
         virtual ~channel_awgn() = default;
 
         void set_channel_param(const double channelParam) override;
@@ -55,7 +55,7 @@ namespace ldpc
     {
     public:
         channel_bsc() = default;
-        channel_bsc(const ldpc_code *code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed, const double epsilon);
+        channel_bsc(const std::shared_ptr<ldpc_code> &code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed, const double epsilon);
         virtual ~channel_bsc() = default;
 
         void set_channel_param(const double channelParam) override;

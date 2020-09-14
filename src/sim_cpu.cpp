@@ -25,11 +25,11 @@ int main(int argc, char *argv[])
 
         auto snr = parser.get<ldpc::vec_double_t>("snr-range");
         if (snr[0] > snr[1]) throw std::runtime_error("snr min > snr max");
-                
-        ldpc::ldpc_code code(parser.get<std::string>("codefile"));
+        
+        std::shared_ptr<ldpc::ldpc_code> code(new ldpc::ldpc_code(parser.get<std::string>("codefile")));
         std::cout << "========================================================================================" << std::endl;
         std::cout << "codefile: " << parser.get<std::string>("codefile") << std::endl;
-        std::cout << code << std::endl;
+        std::cout << *code << std::endl;
         std::cout << "========================================================================================" << std::endl;
 
         // decoder parameters
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
         simulationParams["max_frames"] = parser.get<ldpc::u64>("--max-frames");
 
         ldpc::ldpc_sim sim(
-            &code,
+            code,
             decoderParams,
             channelParams,
             simulationParams

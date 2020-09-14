@@ -2,7 +2,7 @@
 
 namespace ldpc
 {
-    channel::channel(const ldpc_code *code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed)
+    channel::channel(const std::shared_ptr<ldpc_code> &code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed)
         : mLdpcCode(code),
           mLdpcDecoder(decoder),
           mRNGSeed(seed),
@@ -14,7 +14,7 @@ namespace ldpc
     void channel::simulate() {}
     void channel::calculate_llrs() {}
 
-    channel_awgn::channel_awgn(const ldpc_code *code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed, const double snr)
+    channel_awgn::channel_awgn(const std::shared_ptr<ldpc_code> &code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed, const double snr)
         : channel(code, decoder, seed),
           mX(vec_double_t(code->nct(), 1.)), // initialize to all one, i.e. all zero cw
           mY(vec_double_t(code->nct())),
@@ -77,7 +77,7 @@ namespace ldpc
         }
     }
 
-    channel_bsc::channel_bsc(const ldpc_code *code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed, const double epsilon)
+    channel_bsc::channel_bsc(const std::shared_ptr<ldpc_code> &code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed, const double epsilon)
         : channel(code, decoder, seed),
           mX(vec_bits_t(code->nct(), 0)), // initialize to all zero cw
           mY(vec_bits_t(code->nct())),

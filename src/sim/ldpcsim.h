@@ -34,11 +34,11 @@ namespace ldpc
     {
     public:
         ldpc_sim() = default;
-        ldpc_sim(const ldpc_code *code,
+        ldpc_sim(const std::shared_ptr<ldpc_code> &code,
                  const param_map &decoderParams,
                  const param_map &channelParams,
                  const param_map &simulationParams);
-        ldpc_sim(const ldpc_code *code,
+        ldpc_sim(const std::shared_ptr<ldpc_code> &code,
                  const param_map &decoderParams,
                  const param_map &channelParams,
                  const param_map &simulationParams,
@@ -52,7 +52,8 @@ namespace ldpc
         friend std::ostream &operator<<(std::ostream &os, const ldpc_sim &sim);        
 
     private:
-        const ldpc_code *mLdpcCode;
+        std::shared_ptr<ldpc_code> mLdpcCode;
+
         std::vector<std::shared_ptr<ldpc_decoder>> mLdpcDecoder;
         std::vector<std::shared_ptr<channel>> mChannel;
 

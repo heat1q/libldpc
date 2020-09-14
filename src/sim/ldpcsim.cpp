@@ -4,7 +4,7 @@
 
 namespace ldpc
 {
-    ldpc_sim::ldpc_sim(const ldpc_code *code,
+    ldpc_sim::ldpc_sim(const std::shared_ptr<ldpc_code> &code,
                        const param_map &decoderParams,
                        const param_map &channelParams,
                        const param_map &simulationParams)
@@ -12,7 +12,7 @@ namespace ldpc
     {
     }
 
-    ldpc_sim::ldpc_sim(const ldpc_code *code,
+    ldpc_sim::ldpc_sim(const std::shared_ptr<ldpc_code> &code,
                        const param_map &decoderParams,
                        const param_map &channelParams,
                        const param_map &simulationParams,
