@@ -5,9 +5,9 @@
 namespace ldpc
 {
     /**
- * @brief LDPC Decoder class
- * 
- */
+    * @brief LDPC Decoder class
+    * 
+    */
     class ldpc_decoder
     {
         friend class channel;
@@ -19,7 +19,7 @@ namespace ldpc
         ldpc_decoder(const ldpc_code *code, const unsigned iter, const bool earlyTerm);
 
         unsigned decode();
-        bool is_codeword_legacy();
+        bool is_codeword();
 
         //getter functions
         const u64 max_iter() const { return mMaxIter; }
