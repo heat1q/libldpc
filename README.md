@@ -16,14 +16,29 @@ All possible flags are listed in `flags.txt` with their respective default value
 `$ make ldpc` produces a shared library containing the simulator for external usage. See b)
 
 ### a) Running the Executable
-After successful build the simulator can be executed by  
-`$./ldpc_sim -code [CODEFILE] -sim [SIMFILE] [-threads [NUMTHREADS] -seed [SEED]]`  
+After successful build the simulator can be executed. Note the usage:
+```
+$./ldpc_sim --help
+Usage: ldpc_sim [options] codefile output-file snr-range 
 
-The arguments `-threads` and `-seed` are optional.\
-`CODEFILE` Example codefile can be found in `doc/example_codefile.txt`\
-`SIMFILE` Example simfile can be found in `doc/example_simfile.txt` \
-`SEED` Random Number Generator (RNG) starting seed\
-`NUMTHREADS` Number of frames processed in parallel\
+Positional arguments:
+codefile            	LDPC codefile containing all non-zero entries, column major ordering.
+output-file         	Results output file.
+snr-range           	{MIN} {MAX} {STEP}
+
+Optional arguments:
+-h --help           	shows help message and exits
+-v --version        	prints version information and exits
+-i --num-iterations 	Number of iterations for decoding. (Default: 50)
+-s --seed           	RNG seed. (Default: 0)
+-t --num-threads    	Number of frames to be decoded in parallel. (Default: 1)
+--channel           	Specifies channel {AWGN, BSC, BEC}
+--decoding          	Specifies decoding algorithm {BP,HD}
+--max-frames        	Limit number of decoded frames.
+--frame-error-count 	Maximum frame errors for given simulation point.
+--no-early-term     	Disable early termination for decoding.
+```
+
 
 ### b) Use with Python threads
 The simulator may be used as Python Module in a threaded application.
