@@ -10,12 +10,12 @@ int main(int argc, char *argv[])
     parser.add_argument("snr-range").help("{MIN} {MAX} {STEP}").nargs(3).action([](const std::string &s) { return std::stod(s); });
 
     parser.add_argument("-i", "--num-iterations").help("Number of iterations for decoding. (Default: 50)").default_value(unsigned(50)).action([](const std::string &s) { return static_cast<unsigned>(std::stoul(s)); });
-    parser.add_argument("-s", "--seed").help("RNG seed. (Default: 0)").default_value(ldpc::u64(0)).action([](const std::string &s) { return std::stoull(s); });
+    parser.add_argument("-s", "--seed").help("RNG seed. (Default: 0)").default_value(ldpc::u64(0)).action([](const std::string &s) { return std::stoul(s); });
     parser.add_argument("-t", "--num-threads").help("Number of frames to be decoded in parallel. (Default: 1)").default_value(unsigned(1)).action([](const std::string &s) { return static_cast<unsigned>(std::stoul(s)); });
 
     parser.add_argument("--channel").help("Specifies channel {AWGN, BSC, BEC}").default_value(std::string("AWGN"));
     parser.add_argument("--decoding").help("Specifies decoding algorithm {BP,HD}").default_value(std::string("BP"));
-    parser.add_argument("--max-frames").help("Limit number of decoded frames.").default_value(UINT64_MAX).action([](const std::string &s) { return std::stoull(s); });
+    parser.add_argument("--max-frames").help("Limit number of decoded frames.").default_value(ldpc::u64(10e9)).action([](const std::string &s) { return std::stoul(s); });
     parser.add_argument("--frame-error-count").help("Maximum frame errors for given simulation point.").default_value(ldpc::u64(50)).action([](const std::string &s) { return std::stoul(s); });
     parser.add_argument("--no-early-term").help("Disable early termination for decoding.").default_value(false).implicit_value(true);
 
