@@ -57,12 +57,6 @@ namespace ldpc
                 }
                 else if (channelType == std::string("BSC"))
                 {
-                    // reverse the epsilon values, since we should start at the worst
-                    // crossover probability increase to the best
-                    auto tmp = std::get<vec_double_t>(mChannelParams["x_vals"]);
-                    std::reverse(tmp.begin(), tmp.end());
-                    mChannelParams["x_vals"] = tmp;
-
                     mChannel.push_back(
                         std::make_shared<channel_bsc>(
                             channel_bsc(
@@ -78,6 +72,15 @@ namespace ldpc
                 {
                     throw std::runtime_error("No channel selected.");
                 }
+            }
+
+            // reverse the epsilon values, since we should start at the worst
+            // crossover probability increase to the best
+            if (channelType == std::string("BSC"))
+            {
+                auto tmp = std::get<vec_double_t>(mChannelParams["x_vals"]);
+                std::reverse(tmp.begin(), tmp.end());
+                mChannelParams["x_vals"] = tmp;
             }
         }
         catch (std::exception &e)
