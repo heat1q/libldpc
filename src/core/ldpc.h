@@ -20,7 +20,7 @@ namespace ldpc
 
         //getter functions
         u64 nc() const { return mN; };
-        u64 kc() const { return mK; };
+        u64 kc() const { return mN-mM; };
         u64 mc() const { return mM; };
         u64 nnz() const { return mNNZ; };
         const mat_u64 &cn() const { return mCN; };
@@ -28,7 +28,7 @@ namespace ldpc
         const vec_u64 &r() const { return mEdgeCN; };
         const vec_u64 &c() const { return mEdgeVN; };
         u64 nct() const { return mNCT; };
-        u64 kct() const { return mKCT; };
+        u64 kct() const { return mNCT-mMCT; };
         u64 mct() const { return mMCT; };
         const vec_u64 &puncture() const { return mPuncture; };
         const vec_u64 &shorten() const { return mShorten; };
@@ -48,7 +48,6 @@ namespace ldpc
 
     private:
         u64 mN;
-        u64 mK;
         u64 mM;
         u64 mNNZ;
         mat_u64 mCN;       /* denotes the check neighbors, i.e. connected VN, for each check node as index in c/r; dimensions cn[mc][cw[i]] */
@@ -58,9 +57,10 @@ namespace ldpc
         vec_u64 mPuncture; /* array pf punctured bit indices */
         vec_u64 mShorten;  /* array of shortened bit indices */
         u64 mNCT;          /* number of transmitted code bits */
-        u64 mKCT;          /* number of transmitted information bits */
         u64 mMCT;          /* number of transmitted parity check bits */
         u64 mMaxDC;
+
+        double mRate;
 
         // position of transmitted bits, i.e. puncture/shorten exluded
         vec_u64 mBitPos;

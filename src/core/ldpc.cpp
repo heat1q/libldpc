@@ -3,154 +3,161 @@
 
 namespace ldpc
 {
-/**
- * @brief Construct a new ldpc code::ldpc code object
- * 
- * @param pFileName 
- */
-ldpc_code::ldpc_code(const std::string &pFileName)
-    : mMaxDC(0)
-{
-    try
+    /**
+    * @brief Construct a new ldpc code::ldpc code object
+    * 
+    * @param pFileName 
+    */
+    ldpc_code::ldpc_code(const std::string &pFileName)
+        : mMaxDC(0)
     {
-        FILE *fpCode = fopen(pFileName.c_str(), "r");
-        if (!fpCode)
+        try
         {
-            throw std::runtime_error("can not open codefile for reading.");
-        }
-
-        fscanf(fpCode, "nc: %lu\n", &mN);
-        fscanf(fpCode, "mc: %lu\n", &mM);
-        fscanf(fpCode, "nct: %lu\n", &mNCT);
-        fscanf(fpCode, "mct: %lu\n", &mMCT);
-        fscanf(fpCode, "nnz: %lu\n", &mNNZ);
-        mK = mN - mM;
-        mKCT = mNCT - mMCT;
-
-        u64 numPuncture = 0;
-        u64 numShorten = 0;
-
-        fscanf(fpCode, "puncture [%lu]: ", &numPuncture);
-        if (numPuncture != 0)
-        {
-            mPuncture = vec_u64(numPuncture);
-            for (u64 i = 0; i < numPuncture; i++)
+            FILE *fpCode = fopen(pFileName.c_str(), "r");
+            if (!fpCode)
             {
-                fscanf(fpCode, " %lu ", &(mPuncture[i]));
+                throw std::runtime_error("can not open codefile for reading.");
             }
-        }
 
-        fscanf(fpCode, "shorten [%lu]: ", &numShorten);
-        if (numShorten != 0)
-        {
-            mShorten = vec_u64(numShorten);
-            for (u64 i = 0; i < numShorten; i++)
+            fscanf(fpCode, "nc: %lu\n", &mN);
+            fscanf(fpCode, "mc: %lu\n", &mM);
+            fscanf(fpCode, "nct: %lu\n", &mNCT);
+            fscanf(fpCode, "mct: %lu\n", &mMCT);
+            fscanf(fpCode, "nnz: %lu\n", &mNNZ);
+
+            u64 numPuncture = 0;
+            u64 numShorten = 0;
+
+            fscanf(fpCode, "puncture [%lu]: ", &numPuncture);
+            if (numPuncture != 0)
             {
-                fscanf(fpCode, " %lu ", &(mShorten[i]));
-            }
-        }
-
-        mEdgeCN = vec_u64(mNNZ);
-        mEdgeVN = vec_u64(mNNZ);
-
-        mCN = mat_u64(mM, vec_u64());
-        mVN = mat_u64(mN, vec_u64());
-
-        mCheckNodeN = mat_u64(mM, vec_u64());
-        mVarNodeN = mat_u64(mN, vec_u64());
-
-        for (u64 i = 0; i < mNNZ; i++)
-        {
-            // read the non-zero entries, i.e. edges
-            fscanf(fpCode, "%lu %lu\n", &(mEdgeCN[i]), &(mEdgeVN[i]));
-
-            // save edge index to coressponding CN & VN
-            mCN[mEdgeCN[i]].push_back(i);
-            mVN[mEdgeVN[i]].push_back(i);
-
-            mCheckNodeN[mEdgeCN[i]].push_back(mEdgeVN[i]);
-            mVarNodeN[mEdgeVN[i]].push_back(mEdgeCN[i]);
-        }
-
-        // maximum check node degree
-        auto tmp = std::max_element(mCN.begin(), mCN.end(), [](const vec_u64 &a, const vec_u64 &b) { return (a.size() < b.size()); });
-        mMaxDC = tmp->size();
-
-        // position of transmitted bits
-        for (u64 i = 0; i < mN; i++)
-        {
-            auto tmp = std::find(mShorten.cbegin(), mShorten.cend(), i);
-            if (tmp != mShorten.cend()) continue; // skip if current index shortened
-            tmp = std::find(mPuncture.cbegin(), mPuncture.cend(), i);
-            if (tmp != mPuncture.cend()) continue; // skip if current index punctured
-
-            mBitPos.push_back(i);
-        }
-
-        fclose(fpCode);
-    }
-    catch (std::exception &e)
-    {
-        std::cout << "Error: ldpc_code(): " << e.what() << std::endl;
-        exit(EXIT_FAILURE);
-    }
-}
-
-
-u64 ldpc_code::calc_rank()
-{
-    u64 rank = mN;
-    mat_u64 checkNodeN = mCheckNodeN;
-    mat_u64 varNodeN = mVarNodeN;
-
-    for (u64 row = 0; row < rank; ++row)
-    {
-        //std::cout << "Row value: " << row << "\n";
-
-        // check what value h[row][row] has
-        auto it = std::find(varNodeN[row].begin(), varNodeN[row].end(), row);
-        if (it != varNodeN[row].end()) // values is non-zero
-        {
-            // now add current row to all rows where a non-zero entry is in the current col, to remove 1
-            vec_u64 tmp = varNodeN[row];
-            for (u64 j = 0; j < tmp.size(); ++j)
-            {
-                //std::cout << "Check: " << tmp[j] << "\n";
-                if (tmp[j] > row)
+                mPuncture = vec_u64(numPuncture);
+                for (u64 i = 0; i < numPuncture; i++)
                 {
-                    //std::cout << "Add rows " << row << " to " << tmp[j] << "\n";
-                    ldpc_code::add_rows(checkNodeN, varNodeN, tmp[j], checkNodeN[row]);
-                }
-            }
-        }
-        else // value is zero
-        {
-            // if there is a row below it with non-zero entry in same col, swap current rows
-            bool isZero = true;
-            // find first row with non-zero entry
-            for (u64 j = 0; j < varNodeN[row].size(); ++j)
-            {
-                if (varNodeN[row][j] > row)
-                {
-                    //std::cout << "Swap rows " << varNodeN[row][j] << " with " << row << "\n";
-                    ldpc_code::swap_rows(checkNodeN, varNodeN, varNodeN[row][j], row);
-                    isZero = false;
-                    break;
+                    fscanf(fpCode, " %lu ", &(mPuncture[i]));
                 }
             }
 
-            // if all elements in current col below h[row][row] are zero, swap col it with rank-1 col
-            if (isZero)
+            fscanf(fpCode, "shorten [%lu]: ", &numShorten);
+            if (numShorten != 0)
             {
-                --rank;
-                // copy last col
-                ldpc_code::zero_col(checkNodeN, varNodeN, row);
-                ldpc_code::add_cols(checkNodeN, varNodeN, row, varNodeN[rank]);
+                mShorten = vec_u64(numShorten);
+                for (u64 i = 0; i < numShorten; i++)
+                {
+                    fscanf(fpCode, " %lu ", &(mShorten[i]));
+                }
             }
 
-            --row;
+            mEdgeCN = vec_u64(mNNZ);
+            mEdgeVN = vec_u64(mNNZ);
+
+            mCN = mat_u64(mM, vec_u64());
+            mVN = mat_u64(mN, vec_u64());
+
+            mCheckNodeN = mat_u64(mM, vec_u64());
+            mVarNodeN = mat_u64(mN, vec_u64());
+
+            for (u64 i = 0; i < mNNZ; i++)
+            {
+                // read the non-zero entries, i.e. edges
+                fscanf(fpCode, "%lu %lu\n", &(mEdgeCN[i]), &(mEdgeVN[i]));
+
+                // save edge index to coressponding CN & VN
+                mCN[mEdgeCN[i]].push_back(i);
+                mVN[mEdgeVN[i]].push_back(i);
+
+                mCheckNodeN[mEdgeCN[i]].push_back(mEdgeVN[i]);
+                mVarNodeN[mEdgeVN[i]].push_back(mEdgeCN[i]);
+            }
+
+            // maximum check node degree
+            auto tmp = std::max_element(mCN.begin(), mCN.end(), [](const vec_u64 &a, const vec_u64 &b) { return (a.size() < b.size()); });
+            mMaxDC = tmp->size();
+
+            // position of transmitted bits
+            for (u64 i = 0; i < mN; i++)
+            {
+                auto tmp = std::find(mShorten.cbegin(), mShorten.cend(), i);
+                if (tmp != mShorten.cend())
+                    continue; // skip if current index shortened
+                tmp = std::find(mPuncture.cbegin(), mPuncture.cend(), i);
+                if (tmp != mPuncture.cend())
+                    continue; // skip if current index punctured
+
+                mBitPos.push_back(i);
+            }
+      
+            // transmitted bits
+            mNCT = mN - mPuncture.size() - mShorten.size();
+            mMCT = mM - mPuncture.size();
+
+            // calculate real rate of transmitted code
+            u64 m = calc_rank();
+            mRate = 1. - static_cast<double>(m - mPuncture.size()) / static_cast<double>(mNCT);
+
+            fclose(fpCode);
         }
-        /*
+        catch (std::exception &e)
+        {
+            std::cout << "Error: ldpc_code(): " << e.what() << std::endl;
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    u64 ldpc_code::calc_rank()
+    {
+        u64 rank = mN;
+        mat_u64 checkNodeN = mCheckNodeN;
+        mat_u64 varNodeN = mVarNodeN;
+
+        for (u64 row = 0; row < rank; ++row)
+        {
+            //std::cout << "Row value: " << row << "\n";
+
+            // check what value h[row][row] has
+            auto it = std::find(varNodeN[row].begin(), varNodeN[row].end(), row);
+            if (it != varNodeN[row].end()) // values is non-zero
+            {
+                // now add current row to all rows where a non-zero entry is in the current col, to remove 1
+                vec_u64 tmp = varNodeN[row];
+                for (u64 j = 0; j < tmp.size(); ++j)
+                {
+                    //std::cout << "Check: " << tmp[j] << "\n";
+                    if (tmp[j] > row)
+                    {
+                        //std::cout << "Add rows " << row << " to " << tmp[j] << "\n";
+                        ldpc_code::add_rows(checkNodeN, varNodeN, tmp[j], checkNodeN[row]);
+                    }
+                }
+            }
+            else // value is zero
+            {
+                // if there is a row below it with non-zero entry in same col, swap current rows
+                bool isZero = true;
+                // find first row with non-zero entry
+                for (u64 j = 0; j < varNodeN[row].size(); ++j)
+                {
+                    if (varNodeN[row][j] > row)
+                    {
+                        //std::cout << "Swap rows " << varNodeN[row][j] << " with " << row << "\n";
+                        ldpc_code::swap_rows(checkNodeN, varNodeN, varNodeN[row][j], row);
+                        isZero = false;
+                        break;
+                    }
+                }
+
+                // if all elements in current col below h[row][row] are zero, swap col it with rank-1 col
+                if (isZero)
+                {
+                    --rank;
+                    // copy last col
+                    ldpc_code::zero_col(checkNodeN, varNodeN, row);
+                    ldpc_code::add_cols(checkNodeN, varNodeN, row, varNodeN[rank]);
+                }
+
+                --row;
+            }
+            /*
         std::cout << "CN Perspective:\n";
         for (const auto &vn : checkNodeN)
         {
@@ -168,127 +175,124 @@ u64 ldpc_code::calc_rank()
         }
         std::cout << "\n";
         */
+        }
+
+        return rank;
     }
 
-    return rank;
-}
-
-void ldpc_code::swap_rows(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 first, u64 second)
-{
-    vec_u64 first_tmp = checkNodeN[first];
-    vec_u64 second_tmp = checkNodeN[second];
-
-    ldpc_code::zero_row(checkNodeN, varNodeN, first);
-    ldpc_code::zero_row(checkNodeN, varNodeN, second);
-
-    ldpc_code::add_rows(checkNodeN, varNodeN, first, second_tmp);
-    ldpc_code::add_rows(checkNodeN, varNodeN, second, first_tmp);
-}
-
-void ldpc_code::swap_cols(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 first, u64 second)
-{
-    vec_u64 first_tmp = varNodeN[first];
-    vec_u64 second_tmp = varNodeN[second];
-
-    ldpc_code::zero_col(checkNodeN, varNodeN, first);
-    ldpc_code::zero_col(checkNodeN, varNodeN, second);
-
-    ldpc_code::add_cols(checkNodeN, varNodeN, first, second_tmp);
-    ldpc_code::add_cols(checkNodeN, varNodeN, second, first_tmp);
-}
-
-void ldpc_code::add_rows(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 dest, const vec_u64 &src)
-{
-    vec_u64 new_row = checkNodeN[dest];
-    for (auto vn : src) // append new vn and check if already in
+    void ldpc_code::swap_rows(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 first, u64 second)
     {
-        auto it = std::find(new_row.begin(), new_row.end(), vn);
-        if (it == new_row.end())
-        {
-            new_row.push_back(vn);
-        }
-        else
-        {
-            new_row.erase(it);
-        }
+        vec_u64 first_tmp = checkNodeN[first];
+        vec_u64 second_tmp = checkNodeN[second];
+
+        ldpc_code::zero_row(checkNodeN, varNodeN, first);
+        ldpc_code::zero_row(checkNodeN, varNodeN, second);
+
+        ldpc_code::add_rows(checkNodeN, varNodeN, first, second_tmp);
+        ldpc_code::add_rows(checkNodeN, varNodeN, second, first_tmp);
     }
 
-    ldpc_code::zero_row(checkNodeN, varNodeN, dest); // set row zero
-
-    checkNodeN[dest] = new_row;
-
-    // append to vn
-    for (auto vn : new_row)
+    void ldpc_code::swap_cols(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 first, u64 second)
     {
-        varNodeN[vn].push_back(dest);
+        vec_u64 first_tmp = varNodeN[first];
+        vec_u64 second_tmp = varNodeN[second];
+
+        ldpc_code::zero_col(checkNodeN, varNodeN, first);
+        ldpc_code::zero_col(checkNodeN, varNodeN, second);
+
+        ldpc_code::add_cols(checkNodeN, varNodeN, first, second_tmp);
+        ldpc_code::add_cols(checkNodeN, varNodeN, second, first_tmp);
     }
-}
 
-void ldpc_code::add_cols(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 dest, const vec_u64 &src)
-{
-    vec_u64 new_col = varNodeN[dest];
-    for (auto cn : src) // append new cn and check if already in
+    void ldpc_code::add_rows(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 dest, const vec_u64 &src)
     {
-        auto it = std::find(new_col.begin(), new_col.end(), cn);
-        if (it == new_col.end())
+        vec_u64 new_row = checkNodeN[dest];
+        for (auto vn : src) // append new vn and check if already in
         {
-            new_col.push_back(cn);
+            auto it = std::find(new_row.begin(), new_row.end(), vn);
+            if (it == new_row.end())
+            {
+                new_row.push_back(vn);
+            }
+            else
+            {
+                new_row.erase(it);
+            }
         }
-        else
+
+        ldpc_code::zero_row(checkNodeN, varNodeN, dest); // set row zero
+
+        checkNodeN[dest] = new_row;
+
+        // append to vn
+        for (auto vn : new_row)
         {
-            new_col.erase(it);
+            varNodeN[vn].push_back(dest);
         }
     }
 
-    ldpc_code::zero_col(checkNodeN, varNodeN, dest); // set row zero
-
-    varNodeN[dest] = new_col;
-
-    // append to cn
-    for (auto cn : new_col)
+    void ldpc_code::add_cols(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 dest, const vec_u64 &src)
     {
-        checkNodeN[cn].push_back(dest);
-    }
-}
+        vec_u64 new_col = varNodeN[dest];
+        for (auto cn : src) // append new cn and check if already in
+        {
+            auto it = std::find(new_col.begin(), new_col.end(), cn);
+            if (it == new_col.end())
+            {
+                new_col.push_back(cn);
+            }
+            else
+            {
+                new_col.erase(it);
+            }
+        }
 
-void ldpc_code::zero_row(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 m)
-{
-    for (auto vn : checkNodeN[m]) // from selected row, for each vn index, remove m from vn
+        ldpc_code::zero_col(checkNodeN, varNodeN, dest); // set row zero
+
+        varNodeN[dest] = new_col;
+
+        // append to cn
+        for (auto cn : new_col)
+        {
+            checkNodeN[cn].push_back(dest);
+        }
+    }
+
+    void ldpc_code::zero_row(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 m)
     {
-        varNodeN[vn].erase(std::remove(varNodeN[vn].begin(), varNodeN[vn].end(), m), varNodeN[vn].end());
+        for (auto vn : checkNodeN[m]) // from selected row, for each vn index, remove m from vn
+        {
+            varNodeN[vn].erase(std::remove(varNodeN[vn].begin(), varNodeN[vn].end(), m), varNodeN[vn].end());
+        }
+        checkNodeN[m] = vec_u64();
     }
-    checkNodeN[m] = vec_u64();
-}
 
-void ldpc_code::zero_col(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 n)
-{
-    for (auto cn : varNodeN[n]) // from selected col, for each cn index, remove n from cn
+    void ldpc_code::zero_col(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 n)
     {
-        checkNodeN[cn].erase(std::remove(checkNodeN[cn].begin(), checkNodeN[cn].end(), n), checkNodeN[cn].end());
+        for (auto cn : varNodeN[n]) // from selected col, for each cn index, remove n from cn
+        {
+            checkNodeN[cn].erase(std::remove(checkNodeN[cn].begin(), checkNodeN[cn].end(), n), checkNodeN[cn].end());
+        }
+        varNodeN[n] = vec_u64();
     }
-    varNodeN[n] = vec_u64();
-}
 
-/**
- * @brief Prints parameters of LDPC code
- * 
- */
-std::ostream &operator<<(std::ostream &os, const ldpc_code &code)
-{
-    os << "nc : " << code.nc() << "\n";
-    os << "mc : " << code.mc() << "\n";
-    os << "kc : " << code.kc() << "\n";
-    os << "nnz : " << code.nnz() << "\n";
-    os << "nct :" << code.nct() << "\n";
-    os << "mct : " << code.mct() << "\n";
-    os << "kct : " << code.kct() << "\n";
-    os << "max dc : " << code.max_dc() << "\n";
-    os << "puncture[" << code.puncture().size() << "]: " << code.puncture() << "\n";
-    os << "shorten[" << code.shorten().size() << "]: " << code.shorten();
-    return os;
-}
-
+    /**
+    * @brief Prints parameters of LDPC code
+    * 
+    */
+    std::ostream &operator<<(std::ostream &os, const ldpc_code &code)
+    {
+        os << "N : " << code.nc() << "\n";
+        os << "M : " << code.mc() << "\n";
+        os << "K : " << code.kc() << "\n";
+        os << "NNZ : " << code.nnz() << "\n";
+        os << "Rate : " << code.mRate << "\n";
+        //os << "max dc : " << code.max_dc() << "\n";
+        os << "puncture[" << code.puncture().size() << "] : " << code.puncture() << "\n";
+        os << "shorten[" << code.shorten().size() << "] : " << code.shorten() << "\n";
+        os << "N (transmitted) : " << code.nct() << "\n";
+        os << "M (transmitted) : " << code.mct() << "\n";
+        os << "K (transmitted) : " << code.kct() << "\n";
+        return os;
+    }
 } // namespace ldpc
-
-
-
