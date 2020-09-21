@@ -122,7 +122,7 @@ namespace ldpc
         {
             for (auto p : mLdpcCode->puncture())
             {
-                mLdpcDecoder->mLLRIn[p] = delta;// * (1 - 2 * (rand() % 2)); // set random signed low values, i.e. simulate erasure LLR=0
+                mLdpcDecoder->mLLRIn[p] = delta * (1 - 2 * (rand() % 2)); // set random signed low values, i.e. simulate erasure LLR=0
             }
         }
         if (mLdpcCode->shorten().size() != 0)
