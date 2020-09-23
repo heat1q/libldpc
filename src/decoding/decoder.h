@@ -16,7 +16,7 @@ namespace ldpc
 
     public:
         ldpc_decoder() = default;
-        ldpc_decoder(const std::shared_ptr<ldpc_code> &code, const unsigned iter, const bool earlyTerm);
+        ldpc_decoder(const std::shared_ptr<ldpc_code> &code, const unsigned iter, const bool earlyTerm, const std::string &type);
 
         unsigned decode();
         bool is_codeword();
@@ -33,12 +33,19 @@ namespace ldpc
         const vec_bits_t &syndrome() const { return mSynd; }
         const vec_bits_t &estm_cw() const { return mCO; }
 
+        static inline constexpr int sign(const double x);
+        static inline constexpr double jacobian(const double x, const double y);
+        static inline constexpr double minsum(const double x, const double y);
+
     private:
         std::shared_ptr<ldpc_code> mLdpcCode;
 
         vec_double_t mLv2c;
         vec_double_t mLc2v;
-        vec_double_t mExMsgCN;
+
+        // auxillary vectors for efficient CN update
+        vec_double_t mExMsgF;
+        vec_double_t mExMsgB;
 
         vec_double_t mLLRIn;
         vec_double_t mLLROut;
@@ -46,6 +53,7 @@ namespace ldpc
         vec_bits_t mSynd;
         vec_bits_t mCO;
 
+        double (*mCNApprox)(double x, double y);
         const unsigned mMaxIter;
         const bool mEarlyTerm;
     };

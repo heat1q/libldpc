@@ -3,20 +3,25 @@
 namespace ldpc
 {
     /**
- * @brief Construct a new ldpc decoder::ldpc decoder object
- * 
- * @param pCode 
- * @param pI 
- * @param pEarlyTerm 
- */
-    ldpc_decoder::ldpc_decoder(const std::shared_ptr<ldpc_code> &code, const unsigned iter, const bool earlyTerm)
+    * @brief Construct a new ldpc decoder::ldpc decoder object
+    * 
+    * @param pCode 
+    * @param pI 
+    * @param pEarlyTerm 
+    */
+    ldpc_decoder::ldpc_decoder(const std::shared_ptr<ldpc_code> &code, const unsigned iter, const bool earlyTerm, const std::string &type)
         : mLdpcCode(code),
           mLv2c(code->nnz()), mLc2v(code->nnz()),
-          mExMsgCN(code->max_dc()),
+          mExMsgF(code->max_dc()), mExMsgB(code->max_dc()),
           mLLRIn(code->nc()), mLLROut(code->nc()),
           mSynd(code->mc()), mCO(code->nc()),
+          mCNApprox(jacobian),
           mMaxIter(iter), mEarlyTerm(earlyTerm)
     {
+        if (type == std::string("BP_MS"))
+        {
+            mCNApprox = minsum;
+        }
     }
 
     /**
@@ -39,18 +44,22 @@ namespace ldpc
             for (u64 i = 0; i < mLdpcCode->mc(); ++i)
             {
                 auto cw = mLdpcCode->cn()[i].size();
-                auto cn = const_cast<u64 *>(mLdpcCode->cn()[i].data());
+                auto &cn = mLdpcCode->cn()[i];
 
-                double tmp = 1;
-                for (u64 j = 0; j < cw; ++j)
+                // J. Chen et al. “Reduced-Complexity Decoding of LDPC Codes”
+                mExMsgF[0] = mLv2c[cn[0]];
+                mExMsgB[cw - 1] = mLv2c[cn[cw - 1]];
+                for (u64 j = 1; j < cw; ++j)
                 {
-                    mExMsgCN[j] = 1 - 2 / (exp(mLv2c[cn[j]]) + 1); //tanh(mLv2c[cn[j]]);
-                    tmp *= mExMsgCN[j];
+                    mExMsgF[j] = mCNApprox(mExMsgF[j - 1], mLv2c[cn[j]]);
+                    mExMsgB[cw - 1 - j] = mCNApprox(mExMsgB[cw - j], mLv2c[cn[cw - j - 1]]);
                 }
 
-                for (u64 j = 0; j < cw; ++j)
+                mLc2v[cn[0]] = mExMsgB[1];
+                mLc2v[cn[cw - 1]] = mExMsgF[cw - 2];
+                for (u64 j = 1; j < cw - 1; ++j)
                 {
-                    mLc2v[cn[j]] = log((mExMsgCN[j] + tmp) / (mExMsgCN[j] - tmp)); //2*atanh(tmp/mExMsgCN[j]);
+                    mLc2v[cn[j]] = mCNApprox(mExMsgF[j - 1], mExMsgB[j + 1]);
                 }
             }
 
@@ -109,5 +118,20 @@ namespace ldpc
         }
 
         return true;
+    }
+
+    constexpr int ldpc_decoder::sign(const double x)
+    {
+        return (1 - 2 * static_cast<int>(std::signbit(x)));
+    }
+
+    constexpr double ldpc_decoder::jacobian(const double x, const double y)
+    {
+        return sign(x) * sign(y) * std::min(std::abs(x), std::abs(y)) + std::log((1 + std::exp(-std::abs(x + y))) / (1 + std::exp(-std::abs(x - y))));
+    }
+
+    constexpr double ldpc_decoder::minsum(const double x, const double y)
+    {
+        return sign(x) * sign(y) * std::min(std::abs(x), std::abs(y));
     }
 } // namespace ldpc

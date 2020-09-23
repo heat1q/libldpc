@@ -36,7 +36,8 @@ namespace ldpc
                         ldpc_decoder(
                             mLdpcCode,
                             std::get<u32>(mDecoderParams["iterations"]),
-                            std::get<bool>(mDecoderParams["early_termination"])
+                            std::get<bool>(mDecoderParams["early_termination"]),
+                            std::get<std::string>(mDecoderParams["type"])
                         )
                     )
                 );

@@ -59,14 +59,14 @@ namespace ldpc
         {
             for (auto p : mLdpcCode->puncture())
             {
-                mLdpcDecoder->mLLRIn[p] = 1e-9 * (1 - 2 * (rand() % 2)); // set random signed low values, i.e. simulate erasure LLR=0
+                mLdpcDecoder->mLLRIn[p] = 0.0; // punctured bits = erasure LLR=0
             }
         }
         if (mLdpcCode->shorten().size() != 0)
         {
             for (auto s : mLdpcCode->shorten())
             {
-                mLdpcDecoder->mLLRIn[s] = 1e9; // simulate certain bit
+                mLdpcDecoder->mLLRIn[s] = 99999.9; // simulate certain bit
             }
         }
 
@@ -122,7 +122,7 @@ namespace ldpc
         {
             for (auto p : mLdpcCode->puncture())
             {
-                mLdpcDecoder->mLLRIn[p] = delta * (1 - 2 * (rand() % 2)); // set random signed low values, i.e. simulate erasure LLR=0
+                mLdpcDecoder->mLLRIn[p] = 0.0;//delta * (1 - 2 * (rand() % 2)); // set random signed low values, i.e. simulate erasure LLR=0
             }
         }
         if (mLdpcCode->shorten().size() != 0)

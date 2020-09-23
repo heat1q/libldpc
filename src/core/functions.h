@@ -76,15 +76,11 @@ namespace ldpc
         return os;
     }
 
-    using bits_t = unsigned char;
-    using labels_t = unsigned int;
-    using symbols_t = unsigned int;
+    using bits_t = int;
     using u64 = unsigned long;
     using u32 = unsigned int;
 
     using vec_bits_t = std::vector<bits_t>;
-    using vec_labels_t = std::vector<labels_t>;
-    using vec_symbols_t = std::vector<symbols_t>;
     using vec_u64 = std::vector<u64>;
     using vec_double_t = std::vector<double>;
 
