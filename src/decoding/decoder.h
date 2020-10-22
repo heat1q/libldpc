@@ -53,7 +53,7 @@ namespace ldpc
         vec_bits_t mSynd;
         vec_bits_t mCO;
 
-        double (*mCNApprox)(double x, double y);
+        std::function<double(double, double)> mCNApprox;
         const unsigned mMaxIter;
         const bool mEarlyTerm;
     };
