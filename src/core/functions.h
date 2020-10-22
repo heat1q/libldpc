@@ -63,16 +63,13 @@ namespace ldpc
         typename std::vector<T>::const_iterator it = v.begin();
         for (; it != v.end(); ++it)
         {
-            if (it == v.end() - 1)
+            os << *it;
+            if (it != v.end() - 1)
             {
-                os << *it << "]";
-                break;
-            }
-            else
-            {
-                os << *it << ", ";
+                os << ", ";
             }
         }
+        os << "]";
         return os;
     }
 
@@ -88,7 +85,32 @@ namespace ldpc
     using mat_u64 = std::vector<std::vector<u64>>;
     using mat_double_t = std::vector<std::vector<double>>;
 
-    using param_map = std::unordered_map<std::string, std::variant<bool, u32, u64, double, std::string, vec_double_t>>;
+    struct
+    {
+        bool earlyTerm;
+        u32 iterations;
+        std::string type;
+    } typedef decoder_param;
+
+    struct
+    {
+        u64 seed;
+        vec_double_t xRange;
+        vec_double_t xVals;
+        std::string type;
+    } typedef channel_param;
+
+    struct
+    {
+        u32 threads;
+        u64 maxFrames;
+        u64 fec;
+        std::string resultFile;
+    } typedef simulation_param;
+
+    std::ostream &operator<<(std::ostream &os, const decoder_param &p);
+    std::ostream &operator<<(std::ostream &os, const channel_param &p);
+    std::ostream &operator<<(std::ostream &os, const simulation_param &p);
 
     void dec2bin(u64 val, uint8_t m);
     int sign(double a);

@@ -9,16 +9,16 @@ namespace ldpc
     * @param pI 
     * @param pEarlyTerm 
     */
-    ldpc_decoder::ldpc_decoder(const std::shared_ptr<ldpc_code> &code, const unsigned iter, const bool earlyTerm, const std::string &type)
+    ldpc_decoder::ldpc_decoder(const std::shared_ptr<ldpc_code> &code, const decoder_param &decoderParam)
         : mLdpcCode(code),
           mLv2c(code->nnz()), mLc2v(code->nnz()),
           mExMsgF(code->max_dc()), mExMsgB(code->max_dc()),
           mLLRIn(code->nc()), mLLROut(code->nc()),
           mSynd(code->mc()), mCO(code->nc()),
           mCNApprox(jacobian),
-          mMaxIter(iter), mEarlyTerm(earlyTerm)
+          mDecoderParam(decoderParam)
     {
-        if (type == std::string("BP_MS"))
+        if (mDecoderParam.type == std::string("BP_MS"))
         {
             mCNApprox = minsum;
         }
@@ -38,7 +38,7 @@ namespace ldpc
         }
 
         unsigned I = 0;
-        while (I < mMaxIter)
+        while (I < mDecoderParam.iterations)
         {
             // CN processing
             for (u64 i = 0; i < mLdpcCode->mc(); ++i)
@@ -85,7 +85,7 @@ namespace ldpc
                 }
             }
 
-            if (mEarlyTerm)
+            if (mDecoderParam.earlyTerm)
             {
                 if (is_codeword())
                 {

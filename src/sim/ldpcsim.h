@@ -35,13 +35,13 @@ namespace ldpc
     public:
         ldpc_sim() = default;
         ldpc_sim(const std::shared_ptr<ldpc_code> &code,
-                 const param_map &decoderParams,
-                 const param_map &channelParams,
-                 const param_map &simulationParams);
+                 const decoder_param &decoderParams,
+                 const channel_param &channelParams,
+                 const simulation_param &simulationParams);
         ldpc_sim(const std::shared_ptr<ldpc_code> &code,
-                 const param_map &decoderParams,
-                 const param_map &channelParams,
-                 const param_map &simulationParams,
+                 const decoder_param &decoderParams,
+                 const channel_param &channelParams,
+                 const simulation_param &simulationParams,
                  sim_results_t *results);
 
         void start(bool *stopFlag);
@@ -49,7 +49,7 @@ namespace ldpc
         //void log_error(u64 pFrameNum, double pSNR);
         //void print_file_header(const char *binaryFile, const char *codeFile, const char *simFile, const char *mapFile);
 
-        friend std::ostream &operator<<(std::ostream &os, const ldpc_sim &sim);        
+        friend std::ostream &operator<<(std::ostream &os, const ldpc_sim &sim);
 
     private:
         std::shared_ptr<ldpc_code> mLdpcCode;
@@ -57,9 +57,9 @@ namespace ldpc
         std::vector<std::shared_ptr<ldpc_decoder>> mLdpcDecoder;
         std::vector<std::shared_ptr<channel>> mChannel;
 
-        param_map mDecoderParams;
-        param_map mChannelParams;
-        param_map mSimulationParams;
+        const decoder_param &mDecoderParams;
+        const channel_param &mChannelParams;
+        const simulation_param &mSimulationParams;
 
         sim_results_t *mResults;
     };

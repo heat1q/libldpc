@@ -7,33 +7,33 @@ extern "C"
         //setup LDPC code
         std::shared_ptr<ldpc::ldpc_code> code(new ldpc::ldpc_code(codeFile));
 
-        // TODO - decoder parameters
-        ldpc::param_map decoderParams;
-        //decoderParams["iterations"] = 50;
-        //decoderParams["type"] = "BP";
-        //decoderParams["early_termination"] = true;
+        // // TODO - decoder parameters
+        // ldpc::param_map decoderParams;
+        // //decoderParams["iterations"] = 50;
+        // //decoderParams["type"] = "BP";
+        // //decoderParams["early_termination"] = true;
 
-        // TODO - channel parameters
-        ldpc::param_map channelParams;
-        //channelParams["type"] = "AWGN";
-        channelParams["seed"] = seed;
-        //channelParams["x_range"] = snr;
+        // // TODO - channel parameters
+        // ldpc::param_map channelParams;
+        // //channelParams["type"] = "AWGN";
+        // channelParams["seed"] = seed;
+        // //channelParams["x_range"] = snr;
 
-        // TODO - simulation parameters
-        ldpc::param_map simulationParams;
-        simulationParams["threads"] = numThreads;
-        //simulationParams["fec"] = 50;
-        //simulationParams["max_frames"] = 1000000000;
+        // // TODO - simulation parameters
+        // ldpc::param_map simulationParams;
+        // simulationParams["threads"] = numThreads;
+        // //simulationParams["fec"] = 50;
+        // //simulationParams["max_frames"] = 1000000000;
 
-        //setup sim
-        ldpc::ldpc_sim sim(
-            code,
-            decoderParams,
-            channelParams,
-            simulationParams
-        );
+        // //setup sim
+        // ldpc::ldpc_sim sim(
+        //     code,
+        //     decoderParams,
+        //     channelParams,
+        //     simulationParams
+        // );
 
-        sim.start(stopFlag);
+        // sim.start(stopFlag);
     }
 
     void allocate_results(ldpc::sim_results_t *res, ldpc::u64 len)

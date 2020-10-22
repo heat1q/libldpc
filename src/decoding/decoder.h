@@ -16,15 +16,12 @@ namespace ldpc
 
     public:
         ldpc_decoder() = default;
-        ldpc_decoder(const std::shared_ptr<ldpc_code> &code, const unsigned iter, const bool earlyTerm, const std::string &type);
+        ldpc_decoder(const std::shared_ptr<ldpc_code> &code, const decoder_param &decoderParam);
 
         unsigned decode();
         bool is_codeword();
 
         //getter functions
-        const u64 max_iter() const { return mMaxIter; }
-        const bool early_termination() const { return mEarlyTerm; }
-
         const vec_double_t &lv2c() const { return mLv2c; }
         const vec_double_t &lc2v() const { return mLc2v; }
         const vec_double_t &llr_in() const { return mLLRIn; }
@@ -54,7 +51,6 @@ namespace ldpc
         vec_bits_t mCO;
 
         std::function<double(double, double)> mCNApprox;
-        const unsigned mMaxIter;
-        const bool mEarlyTerm;
+        const decoder_param &mDecoderParam;
     };
 } // namespace ldpc

@@ -33,16 +33,16 @@ int main(int argc, char *argv[])
         std::cout << "========================================================================================" << std::endl;
 
         // decoder parameters
-        ldpc::param_map decoderParams;
-        decoderParams["iterations"] = parser.get<ldpc::u32>("--num-iterations");
-        decoderParams["type"] = parser.get<std::string>("--decoding");
-        decoderParams["early_termination"] = !parser.get<bool>("--no-early-term");
+        ldpc::decoder_param decoderParams;
+        decoderParams.iterations = parser.get<ldpc::u32>("--num-iterations");
+        decoderParams.type = parser.get<std::string>("--decoding");
+        decoderParams.earlyTerm = !parser.get<bool>("--no-early-term");
 
         // channel parameters
-        ldpc::param_map channelParams;
-        channelParams["type"] = parser.get<std::string>("--channel");
-        channelParams["seed"] = parser.get<ldpc::u64>("--seed");
-        channelParams["x_range"] = snr;
+        ldpc::channel_param channelParams;
+        channelParams.type = parser.get<std::string>("--channel");
+        channelParams.seed = parser.get<ldpc::u64>("--seed");
+        channelParams.xRange = snr;
 
         ldpc::vec_double_t x;
         double val = snr[0];
@@ -51,14 +51,14 @@ int main(int argc, char *argv[])
             x.push_back(val);
             val += snr[2];
         }
-        channelParams["x_vals"] = x;
+        channelParams.xVals = x;
 
         // simulation parameters
-        ldpc::param_map simulationParams;
-        simulationParams["result_file"] = parser.get<std::string>("output-file");
-        simulationParams["threads"] = parser.get<ldpc::u32>("--num-threads");
-        simulationParams["fec"] = parser.get<ldpc::u64>("--frame-error-count");
-        simulationParams["max_frames"] = parser.get<ldpc::u64>("--max-frames");
+        ldpc::simulation_param simulationParams;
+        simulationParams.resultFile = parser.get<std::string>("output-file");
+        simulationParams.threads = parser.get<ldpc::u32>("--num-threads");
+        simulationParams.fec = parser.get<ldpc::u64>("--frame-error-count");
+        simulationParams.maxFrames = parser.get<ldpc::u64>("--max-frames");
 
         ldpc::ldpc_sim sim(
             code,

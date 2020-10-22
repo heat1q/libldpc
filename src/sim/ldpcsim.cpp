@@ -5,17 +5,17 @@
 namespace ldpc
 {
     ldpc_sim::ldpc_sim(const std::shared_ptr<ldpc_code> &code,
-                       const param_map &decoderParams,
-                       const param_map &channelParams,
-                       const param_map &simulationParams)
+                       const decoder_param &decoderParams,
+                       const channel_param &channelParams,
+                       const simulation_param &simulationParams)
         : ldpc_sim(code, decoderParams, channelParams, simulationParams, nullptr)
     {
     }
 
     ldpc_sim::ldpc_sim(const std::shared_ptr<ldpc_code> &code,
-                       const param_map &decoderParams,
-                       const param_map &channelParams,
-                       const param_map &simulationParams,
+                       const decoder_param &decoderParams,
+                       const channel_param &channelParams,
+                       const simulation_param &simulationParams,
                        sim_results_t *results)
         : mLdpcCode(code),
           mDecoderParams(decoderParams),
@@ -25,45 +25,41 @@ namespace ldpc
     {
         try
         {
-            auto channelType = std::get<std::string>(mChannelParams["type"]);
-
             //results may vary with same seed, since some threads are executed more than others
-            for (u32 i = 0; i < std::get<u32>(mSimulationParams["threads"]); ++i)
+            for (u32 i = 0; i < mSimulationParams.threads; ++i)
             {
                 //decoder
                 mLdpcDecoder.push_back(
                     std::make_shared<ldpc_decoder>(
                         ldpc_decoder(
                             mLdpcCode,
-                            std::get<u32>(mDecoderParams["iterations"]),
-                            std::get<bool>(mDecoderParams["early_termination"]),
-                            std::get<std::string>(mDecoderParams["type"])
+                            mDecoderParams
                         )
                     )
                 );
 
                 // initialize the correct channel
-                if (channelType == std::string("AWGN"))
+                if (mChannelParams.type == std::string("AWGN"))
                 {
                     mChannel.push_back(
                         std::make_shared<channel_awgn>(
                             channel_awgn(
                                 mLdpcCode,
                                 mLdpcDecoder.back(),
-                                std::get<u64>(mChannelParams["seed"]) + i,
+                                mChannelParams.seed + i,
                                 1.
                             )
                         )
                     );
                 }
-                else if (channelType == std::string("BSC"))
+                else if (mChannelParams.type == std::string("BSC"))
                 {
                     mChannel.push_back(
                         std::make_shared<channel_bsc>(
                             channel_bsc(
                                 mLdpcCode,
                                 mLdpcDecoder.back(),
-                                std::get<u64>(mChannelParams["seed"]) + i,
+                                mChannelParams.seed + i,
                                 0.
                             )
                         )
@@ -73,16 +69,7 @@ namespace ldpc
                 {
                     throw std::runtime_error("No channel selected.");
                 }
-            }
-
-            // reverse the epsilon values, since we should start at the worst
-            // crossover probability increase to the best
-            if (channelType == std::string("BSC"))
-            {
-                auto tmp = std::get<vec_double_t>(mChannelParams["x_vals"]);
-                std::reverse(tmp.begin(), tmp.end());
-                mChannelParams["x_vals"] = tmp;
-            }
+            }            
         }
         catch (std::exception &e)
         {
@@ -93,28 +80,14 @@ namespace ldpc
 
     std::ostream &operator<<(std::ostream &os, const ldpc_sim &sim)
     {
-        auto printVariant = [&os](const auto &val) { os << val << "\n"; };
-
         os << "== Decoder Parameters\n";
-        for (auto it = sim.mDecoderParams.cbegin(); it != sim.mDecoderParams.cend(); ++it)
-        {
-            os << " " << it->first << ": ";
-            std::visit(printVariant, it->second);
-        }
+        os << sim.mDecoderParams << "\n";
 
         os << "== Channel Parameters\n";
-        for (auto it = sim.mChannelParams.cbegin(); it != sim.mChannelParams.cend(); ++it)
-        {
-            os << " " << it->first << ": ";
-            std::visit(printVariant, it->second);
-        }
+        os << sim.mChannelParams << "\n";
 
         os << "== Simulation Parameters\n";
-        for (auto it = sim.mSimulationParams.cbegin(); it != sim.mSimulationParams.cend(); ++it)
-        {
-            os << " " << it->first << ": ";
-            std::visit(printVariant, it->second);
-        }
+        os << sim.mSimulationParams << "\n";
         return os;
     }
 
@@ -126,10 +99,18 @@ namespace ldpc
         u64 iters;
         u64 bec_tmp;
 
-        auto xVals = std::get<vec_double_t>(mChannelParams["x_vals"]);
-        auto minFec = std::get<u64>(mSimulationParams["fec"]);
-        auto maxFrames = std::get<u64>(mSimulationParams["max_frames"]);
-        auto threads = std::get<u32>(mSimulationParams["threads"]);
+        auto xVals = mChannelParams.xVals;
+        auto minFec = mSimulationParams.fec;
+        auto maxFrames = mSimulationParams.maxFrames;
+        std::string xValType = "SNR";
+
+        if (mChannelParams.type == std::string("BSC")) 
+        {
+            xValType = "EPS";
+            // reverse the epsilon values, since we should start at the worst
+            // crossover probability increase to the best
+            std::reverse(xVals.begin(), xVals.end());
+        }
 
         std::vector<std::string> printResStr(xVals.size() + 1, std::string());
         std::ofstream fp;
@@ -143,8 +124,6 @@ namespace ldpc
         #endif
         #endif
 
-        std::string xValType = "SNR";
-        if (std::get<std::string>(mChannelParams["type"]) == std::string("BSC")) xValType = "EPS";
 
         std::cout << "=============================" <<           "===========================================================" << std::endl;
         std::cout << "  FEC   |      FRAME     |   " <<  xValType << "   |    BER     |    FER     | AVGITERS  |  TIME/FRAME   \n";
@@ -160,7 +139,7 @@ namespace ldpc
             auto timeStart = std::chrono::high_resolution_clock::now();
 
             #pragma omp parallel default(none)                                                                                       \
-                num_threads(threads) private(bec_tmp)                                                                                \
+                num_threads(mSimulationParams.threads) private(bec_tmp)                                                              \
                 firstprivate(xVals, mLdpcCode, stdout)                                                                               \
                 shared(stopFlag, timeStart, mLdpcDecoder, mChannel, fec, bec, frames, printResStr, fp, resStr, i, minFec, maxFrames) \
                 reduction(+: iters)
@@ -225,7 +204,7 @@ namespace ldpc
 
                                 try
                                 {
-                                    fp.open(std::get<std::string>(mSimulationParams["result_file"]));
+                                    fp.open(mSimulationParams.resultFile);
                                     for (const auto &x : printResStr)
                                     {
                                         fp << x << "\n";
