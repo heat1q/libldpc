@@ -19,10 +19,11 @@ namespace ldpc
                 throw std::runtime_error("can not open codefile for reading.");
             }
 
+            u64 val;
             fscanf(fpCode, "nc: %lu\n", &mN);
             fscanf(fpCode, "mc: %lu\n", &mM);
-            fscanf(fpCode, "nct: %lu\n", &mNCT);
-            fscanf(fpCode, "mct: %lu\n", &mMCT);
+            fscanf(fpCode, "nct: %lu\n", &val);
+            fscanf(fpCode, "mct: %lu\n", &val);
             fscanf(fpCode, "nnz: %lu\n", &mNNZ);
 
             u64 numPuncture = 0;
@@ -86,16 +87,10 @@ namespace ldpc
 
                 mBitPos.push_back(i);
             }
-      
-            // transmitted bits
-            mNCT = mN - mPuncture.size() - mShorten.size();
-            mMCT = mM - mPuncture.size();
-
-            // calculate real rate of transmitted code
-            u64 m = calc_rank();
-            mRate = 1. - static_cast<double>(m - mPuncture.size()) / static_cast<double>(mNCT);
-
             fclose(fpCode);
+
+            // rank of matrix
+            mRank = calc_rank();
         }
         catch (std::exception &e)
         {
@@ -282,14 +277,18 @@ namespace ldpc
     */
     std::ostream &operator<<(std::ostream &os, const ldpc_code &code)
     {
+        // calculate real rate of transmitted code
+        auto rate = 1. - static_cast<double>(code.mRank - code.mPuncture.size()) / static_cast<double>(code.nct());
+
         os << "N : " << code.nc() << "\n";
         os << "M : " << code.mc() << "\n";
         os << "K : " << code.kc() << "\n";
         os << "NNZ : " << code.nnz() << "\n";
-        os << "Rate : " << code.mRate << "\n";
+        os << "Rank: " << code.mRank << "\n";
         //os << "max dc : " << code.max_dc() << "\n";
         os << "puncture[" << code.puncture().size() << "] : " << code.puncture() << "\n";
         os << "shorten[" << code.shorten().size() << "] : " << code.shorten() << "\n";
+        os << "Rate : " << rate << "\n";
         os << "N (transmitted) : " << code.nct() << "\n";
         os << "M (transmitted) : " << code.mct() << "\n";
         os << "K (transmitted) : " << code.kct() << "\n";

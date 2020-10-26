@@ -27,9 +27,9 @@ namespace ldpc
         const mat_u64 &vn() const { return mVN; };
         const vec_u64 &r() const { return mEdgeCN; };
         const vec_u64 &c() const { return mEdgeVN; };
-        u64 nct() const { return mNCT; };
-        u64 kct() const { return mNCT-mMCT; };
-        u64 mct() const { return mMCT; };
+        u64 nct() const { return mN - mPuncture.size() - mShorten.size(); };
+        u64 kct() const { return nct() - mct(); };              /* number of transmitted code bits */
+        u64 mct() const { return mM - mPuncture.size(); };      /* number of transmitted parity check bits */
         const vec_u64 &puncture() const { return mPuncture; };
         const vec_u64 &shorten() const { return mShorten; };
         u64 max_dc() const { return mMaxDC; };
@@ -56,11 +56,8 @@ namespace ldpc
         vec_u64 mEdgeVN;   /* edge oriented non zero column indices; length nnz */
         vec_u64 mPuncture; /* array pf punctured bit indices */
         vec_u64 mShorten;  /* array of shortened bit indices */
-        u64 mNCT;          /* number of transmitted code bits */
-        u64 mMCT;          /* number of transmitted parity check bits */
         u64 mMaxDC;
-
-        double mRate;
+        u64 mRank;
 
         // position of transmitted bits, i.e. puncture/shorten exluded
         vec_u64 mBitPos;
