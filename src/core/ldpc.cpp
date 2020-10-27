@@ -90,7 +90,7 @@ namespace ldpc
             fclose(fpCode);
 
             // rank of matrix
-            mRank = calc_rank();
+            //mRank = calc_rank();
         }
         catch (std::exception &e)
         {
@@ -278,13 +278,13 @@ namespace ldpc
     std::ostream &operator<<(std::ostream &os, const ldpc_code &code)
     {
         // calculate real rate of transmitted code
-        auto rate = 1. - static_cast<double>(code.mRank - code.mPuncture.size()) / static_cast<double>(code.nct());
+        auto rate = 1. - static_cast<double>(code.mct()) / static_cast<double>(code.nct());
 
         os << "N : " << code.nc() << "\n";
         os << "M : " << code.mc() << "\n";
         os << "K : " << code.kc() << "\n";
         os << "NNZ : " << code.nnz() << "\n";
-        os << "Rank: " << code.mRank << "\n";
+        //os << "Rank: " << code.mRank << "\n";
         //os << "max dc : " << code.max_dc() << "\n";
         os << "puncture[" << code.puncture().size() << "] : " << code.puncture() << "\n";
         os << "shorten[" << code.shorten().size() << "] : " << code.shorten() << "\n";
