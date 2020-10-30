@@ -5,7 +5,7 @@ project(LDPC-Simulator)
 
 set(CMAKE_CXX_FLAGS "-O3 -fopenmp -Wall -pthread")
 set(SIM_FLAGS "" CACHE STRING "Compile flags (see flags.txt)")
-set(BASE_SRC "src/core/functions.cpp" "src/core/ldpc.cpp" "src/decoding/decoder.cpp" "src/sim/channel.cpp" "src/sim/ldpcsim.cpp")
+set(BASE_SRC "src/core/gf2.cpp" "src/core/functions.cpp" "src/core/ldpc.cpp" "src/decoding/decoder.cpp" "src/sim/channel.cpp" "src/sim/ldpcsim.cpp")
 
 # add the executable
 add_executable(ldpc_sim "src/sim_cpu.cpp" ${BASE_SRC})

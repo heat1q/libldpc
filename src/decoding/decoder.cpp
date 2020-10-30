@@ -108,10 +108,10 @@ namespace ldpc
             s = 0;
             for (u64 j = 0; j < mLdpcCode->cn()[i].size(); j++)
             {
-                s ^= mCO[mLdpcCode->c()[mLdpcCode->cn()[i][j]]];
+                s += mCO[mLdpcCode->c()[mLdpcCode->cn()[i][j]]];
             }
 
-            if (s)
+            if (s != 0)
             {
                 return false;
             }

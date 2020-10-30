@@ -105,7 +105,7 @@ namespace ldpc
     {
         for (u64 i = 0; i < mLdpcCode->nct(); ++i)
         {
-            mY[i] = static_cast<bits_t>(mRandBernoulli(mRNGEngine)); // generate a 1 with probability epsilon
+            mY[i] = mRandBernoulli(mRNGEngine); // generate a 1 with probability epsilon
         }
     }
 
@@ -122,7 +122,7 @@ namespace ldpc
         {
             for (auto p : mLdpcCode->puncture())
             {
-                mLdpcDecoder->mLLRIn[p] = 0.0;//delta * (1 - 2 * (rand() % 2)); // set random signed low values, i.e. simulate erasure LLR=0
+                mLdpcDecoder->mLLRIn[p] = 0.0; // simulate erasure LLR=0
             }
         }
         if (mLdpcCode->shorten().size() != 0)
@@ -136,7 +136,7 @@ namespace ldpc
         for (u64 i = 0; i < mLdpcCode->nct(); ++i)
         {
             // +delta for 0; -delta for 1
-            mLdpcDecoder->mLLRIn[mLdpcCode->bit_pos()[i]] = delta * (1 - 2 * mY[i]);
+            mLdpcDecoder->mLLRIn[mLdpcCode->bit_pos()[i]] = delta * (1 - 2 * mY[i].value);
         }
     }
 

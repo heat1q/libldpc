@@ -1,6 +1,5 @@
 #pragma once
 
-#include <iostream>
 #include <cinttypes>
 #include <vector>
 #include <memory>
@@ -12,6 +11,8 @@
 #include <algorithm>
 #include <unordered_map>
 #include <variant>
+
+#include "gf2.h"
 
 #define TIME_PROF(log, exec, unit)                                                                                                             \
     do                                                                                                                                         \
@@ -73,7 +74,7 @@ namespace ldpc
         return os;
     }
 
-    using bits_t = int;
+    using bits_t = gf2;
     using u64 = unsigned long;
     using u32 = unsigned int;
 
