@@ -5,7 +5,7 @@
 int main(int argc, char *argv[])
 {
     argparse::ArgumentParser parser("ldpc_sim");
-    parser.add_argument("codefile").help("LDPC codefile containing all non-zero entries, column major ordering.");
+    parser.add_argument("codefile").help("LDPC codefile containing all non-zero entries, compressed sparse row (CSR) format.");
     parser.add_argument("output-file").help("Results output file.");
     parser.add_argument("snr-range").help("{MIN} {MAX} {STEP}").nargs(3).action([](const std::string &s) { return std::stod(s); });
 

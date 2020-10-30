@@ -13,6 +13,7 @@
 #include <variant>
 
 #include "gf2.h"
+#include "sparse.h"
 
 #define TIME_PROF(log, exec, unit)                                                                                                             \
     do                                                                                                                                         \
