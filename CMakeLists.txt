@@ -11,10 +11,15 @@ set(BASE_SRC "src/core/gf2.cpp" "src/core/functions.cpp" "src/core/ldpc.cpp" "sr
 add_executable(ldpc_sim "src/sim_cpu.cpp" ${BASE_SRC})
 target_compile_definitions(ldpc_sim PRIVATE LOG_FRAME_TIME=1 ${SIM_FLAGS})
 
+# add the executable
+add_executable(ldpc_tests "tests/init.cpp" ${BASE_SRC})
+target_compile_definitions(ldpc_tests PRIVATE ${SIM_FLAGS})
+
 # shared library
 add_library(ldpc SHARED "src/shared.cpp" ${BASE_SRC})
 target_compile_definitions(ldpc PRIVATE LOG_FRAME_TIME=1 LIB_SHARED=1 ${SIM_FLAGS})
 
 # specify the C++ standard
 target_compile_features(ldpc_sim PRIVATE cxx_std_17)
+target_compile_features(ldpc_tests PRIVATE cxx_std_17)
 target_compile_features(ldpc PRIVATE cxx_std_17)
