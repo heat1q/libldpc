@@ -6,37 +6,81 @@ namespace ldpc
 {
 
     /**
- * @brief LDPC code class
- * 
- */
+    * @brief LDPC code class
+    * 
+    */
     class ldpc_code
     {
     public:
-        ldpc_code(const std::string &pFileName);
+        /**
+         * @brief Construct a new ldpc code object.
+         * 
+         * @param pcFileName parity-check matrix file
+         */
+        ldpc_code(const std::string &pcFileName);
 
+        /**
+         * @brief Construct a new ldpc code object
+         * 
+         * @param pcFileName parity-check matrix file
+         * @param genFileName generator matrix file
+         */
+        ldpc_code(const std::string &pcFileName, const std::string &genFileName);
+
+        /**
+         * @brief Read the parity-check matrix from file.
+         * 
+         * @param pcFileName Filename
+         */
+        void read_H(const std::string &pcFileName);
+
+        /**
+         * @brief Read the generator matrix from file.
+         * 
+         * @param genFileName Filename
+         */
+        void read_G(const std::string &genFileName);
+
+        /**
+         * @brief Calculates the rank of H.
+         * 
+         * @return u64 rank
+         */
         u64 calc_rank();
 
         friend std::ostream &operator<<(std::ostream &os, const ldpc_code &code);
 
-        //getter functions
+        // Number of columns (variable nodes)
         u64 nc() const { return mN; };
-        u64 kc() const { return mN-mM; };
+        // Number of information bits
+        u64 kc() const { return mN - mM; };
+        // Number of parity-checks (check nodes)
         u64 mc() const { return mM; };
+        // Number of non-zero entries (number of edges)
         u64 nnz() const { return mNNZ; };
         const mat_u64 &cn() const { return mCN; };
         const mat_u64 &vn() const { return mVN; };
         const vec_u64 &r() const { return mEdgeCN; };
         const vec_u64 &c() const { return mEdgeVN; };
+        // Number of transmitted columns (variable nodes)
         u64 nct() const { return mN - mPuncture.size() - mShorten.size(); };
-        u64 kct() const { return nct() - mct(); };              /* number of transmitted code bits */
-        u64 mct() const { return mM - mPuncture.size(); };      /* number of transmitted parity check bits */
+        // Number of transmitted information bits
+        u64 kct() const { return nct() - mct(); };
+        // Number of transmitted parity-checks (check nodes)
+        u64 mct() const { return mM - mPuncture.size(); };
+        // Array of puncture indices
         const vec_u64 &puncture() const { return mPuncture; };
+        // Array of shorten indices
         const vec_u64 &shorten() const { return mShorten; };
+        // Maximum check node degree
         u64 max_dc() const { return mMaxDC; };
         const mat_u64 &cn_index() const { return mCheckNodeN; };
         const mat_u64 &vn_index() const { return mVarNodeN; };
-
         const vec_u64 &bit_pos() const { return mBitPos; }
+        // Parity-check matrix
+        const sparse_csr<bits_t> &H() const { return mH; }
+        // Generator matrix
+        const sparse_csr<bits_t> &G() const { return mG; }
 
         // operations for gaussian elimination on sparse matrices over gf(2)
         static void swap_rows(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 i, u64 j);
@@ -46,6 +90,7 @@ namespace ldpc
         static void zero_row(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 m);
         static void zero_col(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 n);
 
+        
     private:
         u64 mN;
         u64 mM;
@@ -64,6 +109,9 @@ namespace ldpc
 
         mat_u64 mCheckNodeN; // direct check node neighbourhood with node oriented index
         mat_u64 mVarNodeN;   // direct variable node neighbourhood with node oriented index
+
+        sparse_csr<bits_t> mH; // Parity-Check Matrix
+        sparse_csr<bits_t> mG; // Generator Matrix
     };
 
 } // namespace ldpc

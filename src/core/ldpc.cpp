@@ -3,100 +3,124 @@
 
 namespace ldpc
 {
-    /**
-    * @brief Construct a new ldpc code::ldpc code object
-    * 
-    * @param pFileName 
-    */
-    ldpc_code::ldpc_code(const std::string &pFileName)
+
+    ldpc_code::ldpc_code(const std::string &pcFileName)
         : mMaxDC(0)
     {
         try
         {
-            FILE *fpCode = fopen(pFileName.c_str(), "r");
-            if (!fpCode)
-            {
-                throw std::runtime_error("can not open codefile for reading.");
-            }
-
-            u64 val;
-            fscanf(fpCode, "nc: %lu\n", &mN);
-            fscanf(fpCode, "mc: %lu\n", &mM);
-            fscanf(fpCode, "nct: %lu\n", &val);
-            fscanf(fpCode, "mct: %lu\n", &val);
-            fscanf(fpCode, "nnz: %lu\n", &mNNZ);
-
-            u64 numPuncture = 0;
-            u64 numShorten = 0;
-
-            fscanf(fpCode, "puncture [%lu]: ", &numPuncture);
-            if (numPuncture != 0)
-            {
-                mPuncture = vec_u64(numPuncture);
-                for (u64 i = 0; i < numPuncture; i++)
-                {
-                    fscanf(fpCode, " %lu ", &(mPuncture[i]));
-                }
-            }
-
-            fscanf(fpCode, "shorten [%lu]: ", &numShorten);
-            if (numShorten != 0)
-            {
-                mShorten = vec_u64(numShorten);
-                for (u64 i = 0; i < numShorten; i++)
-                {
-                    fscanf(fpCode, " %lu ", &(mShorten[i]));
-                }
-            }
-
-            mEdgeCN = vec_u64(mNNZ);
-            mEdgeVN = vec_u64(mNNZ);
-
-            mCN = mat_u64(mM, vec_u64());
-            mVN = mat_u64(mN, vec_u64());
-
-            mCheckNodeN = mat_u64(mM, vec_u64());
-            mVarNodeN = mat_u64(mN, vec_u64());
-
-            for (u64 i = 0; i < mNNZ; i++)
-            {
-                // read the non-zero entries, i.e. edges
-                fscanf(fpCode, "%lu %lu\n", &(mEdgeCN[i]), &(mEdgeVN[i]));
-
-                // save edge index to coressponding CN & VN
-                mCN[mEdgeCN[i]].push_back(i);
-                mVN[mEdgeVN[i]].push_back(i);
-
-                mCheckNodeN[mEdgeCN[i]].push_back(mEdgeVN[i]);
-                mVarNodeN[mEdgeVN[i]].push_back(mEdgeCN[i]);
-            }
-
-            // maximum check node degree
-            auto tmp = std::max_element(mCN.begin(), mCN.end(), [](const vec_u64 &a, const vec_u64 &b) { return (a.size() < b.size()); });
-            mMaxDC = tmp->size();
-
-            // position of transmitted bits
-            for (u64 i = 0; i < mN; i++)
-            {
-                auto tmp = std::find(mShorten.cbegin(), mShorten.cend(), i);
-                if (tmp != mShorten.cend())
-                    continue; // skip if current index shortened
-                tmp = std::find(mPuncture.cbegin(), mPuncture.cend(), i);
-                if (tmp != mPuncture.cend())
-                    continue; // skip if current index punctured
-
-                mBitPos.push_back(i);
-            }
-            fclose(fpCode);
-
-            // rank of matrix
-            //mRank = calc_rank();
+            read_H(pcFileName);
         }
         catch (std::exception &e)
         {
             std::cout << "Error: ldpc_code(): " << e.what() << std::endl;
             exit(EXIT_FAILURE);
         }
+    }
+
+    ldpc_code::ldpc_code(const std::string &pcFileName, const std::string &genFileName)
+        : ldpc_code(pcFileName)
+    {
+        if (!genFileName.empty())
+        {
+            try
+            {
+                read_G(genFileName);
+            }
+            catch (std::exception &e)
+            {
+                std::cout << "Error: ldpc_code(): " << e.what() << std::endl;
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+
+    void ldpc_code::read_H(const std::string &pcFileName)
+    {
+        FILE *fpCode = fopen(pcFileName.c_str(), "r");
+        if (!fpCode)
+        {
+            throw std::runtime_error("can not open codefile for reading.");
+        }
+
+        u64 val;
+        fscanf(fpCode, "nc: %lu\n", &mN);
+        fscanf(fpCode, "mc: %lu\n", &mM);
+        fscanf(fpCode, "nct: %lu\n", &val);
+        fscanf(fpCode, "mct: %lu\n", &val);
+        fscanf(fpCode, "nnz: %lu\n", &mNNZ);
+
+        u64 numPuncture = 0;
+        u64 numShorten = 0;
+
+        fscanf(fpCode, "puncture [%lu]: ", &numPuncture);
+        if (numPuncture != 0)
+        {
+            mPuncture = vec_u64(numPuncture);
+            for (u64 i = 0; i < numPuncture; i++)
+            {
+                fscanf(fpCode, " %lu ", &(mPuncture[i]));
+            }
+        }
+
+        fscanf(fpCode, "shorten [%lu]: ", &numShorten);
+        if (numShorten != 0)
+        {
+            mShorten = vec_u64(numShorten);
+            for (u64 i = 0; i < numShorten; i++)
+            {
+                fscanf(fpCode, " %lu ", &(mShorten[i]));
+            }
+        }
+
+        mEdgeCN = vec_u64(mNNZ);
+        mEdgeVN = vec_u64(mNNZ);
+
+        mCN = mat_u64(mM, vec_u64());
+        mVN = mat_u64(mN, vec_u64());
+
+        mCheckNodeN = mat_u64(mM, vec_u64());
+        mVarNodeN = mat_u64(mN, vec_u64());
+
+        for (u64 i = 0; i < mNNZ; i++)
+        {
+            // read the non-zero entries, i.e. edges
+            fscanf(fpCode, "%lu %lu\n", &(mEdgeCN[i]), &(mEdgeVN[i]));
+
+            // save edge index to coressponding CN & VN
+            mCN[mEdgeCN[i]].push_back(i);
+            mVN[mEdgeVN[i]].push_back(i);
+
+            mCheckNodeN[mEdgeCN[i]].push_back(mEdgeVN[i]);
+            mVarNodeN[mEdgeVN[i]].push_back(mEdgeCN[i]);
+        }
+
+        // maximum check node degree
+        auto tmp = std::max_element(mCN.begin(), mCN.end(), [](const vec_u64 &a, const vec_u64 &b) { return (a.size() < b.size()); });
+        mMaxDC = tmp->size();
+
+        // position of transmitted bits
+        for (u64 i = 0; i < mN; i++)
+        {
+            auto tmp = std::find(mShorten.cbegin(), mShorten.cend(), i);
+            if (tmp != mShorten.cend())
+                continue; // skip if current index shortened
+            tmp = std::find(mPuncture.cbegin(), mPuncture.cend(), i);
+            if (tmp != mPuncture.cend())
+                continue; // skip if current index punctured
+
+            mBitPos.push_back(i);
+        }
+        fclose(fpCode);
+
+        mH = sparse_csr<bits_t>(mM, mN);
+        mH.read_from_file(pcFileName, 7);
+    }
+
+    void ldpc_code::read_G(const std::string &genFileName)
+    {
+        mG = sparse_csr<bits_t>(mN - mM, mN);
+        mG.read_from_file(genFileName, 0);
     }
 
     u64 ldpc_code::calc_rank()

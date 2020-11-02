@@ -29,7 +29,7 @@ namespace ldpc
 
     std::ostream &operator<<(std::ostream &os, const gf2 &a)
     {
-        os << a.value;
+        os << static_cast<int>(a.value);
         return os;
     }
 

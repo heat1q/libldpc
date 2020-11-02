@@ -41,8 +41,8 @@ namespace ldpc
 
         void read_from_file(const std::string &filename, int skipLines);
 
-        std::vector<T> multiply_left(const std::vector<T> &left);   // for encoding
-        std::vector<T> multiply_right(const std::vector<T> &right); // for syndrome
+        std::vector<T> multiply_left(const std::vector<T> &left) const;   // for encoding
+        std::vector<T> multiply_right(const std::vector<T> &right) const; // for syndrome
 
         const int num_cols() const { return numCols; }
         const int num_rows() const { return numRows; }
@@ -79,13 +79,10 @@ namespace ldpc
             std::istringstream record(line);
             record >> entry.rowIndex;
             record >> entry.colIndex;
+            record >> entry.value;
 
             // no value is given
-            if (record)
-            {
-                record >> entry.value;
-            }
-            else
+            if (entry.value == 0)
             {
                 entry.value = T(1);
             }
@@ -107,7 +104,7 @@ namespace ldpc
      * @return std::vector<T> 
      */
     template <typename T>
-    std::vector<T> sparse_csr<T>::multiply_left(const std::vector<T> &left)
+    std::vector<T> sparse_csr<T>::multiply_left(const std::vector<T> &left) const
     {
         std::vector<T> result(numCols);
 
@@ -130,7 +127,7 @@ namespace ldpc
      * @return std::vector<T> 
      */
     template <typename T>
-    std::vector<T> sparse_csr<T>::multiply_right(const std::vector<T> &right)
+    std::vector<T> sparse_csr<T>::multiply_right(const std::vector<T> &right) const
     {
         std::vector<T> result(numRows);
 
