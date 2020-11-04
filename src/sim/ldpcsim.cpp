@@ -166,7 +166,7 @@ namespace ldpc
                         ++frames;
 
                         bec_tmp = 0;
-                        for (u64 j = 0; j < mLdpcCode->nc(); ++j)
+                        for (int j = 0; j < mLdpcCode->nc(); ++j)
                         {
                             bec_tmp += (mLdpcDecoder[tid]->llr_out()[j] <= 0);
                         }

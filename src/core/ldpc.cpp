@@ -43,12 +43,13 @@ namespace ldpc
             throw std::runtime_error("can not open codefile for reading.");
         }
 
+        int m, n;
         u64 val;
-        fscanf(fpCode, "nc: %lu\n", &mN);
-        fscanf(fpCode, "mc: %lu\n", &mM);
+        fscanf(fpCode, "nc: %d\n", &n);
+        fscanf(fpCode, "mc: %d\n", &m);
         fscanf(fpCode, "nct: %lu\n", &val);
         fscanf(fpCode, "mct: %lu\n", &val);
-        fscanf(fpCode, "nnz: %lu\n", &mNNZ);
+        fscanf(fpCode, "nnz: %lu\n", &val);
 
         u64 numPuncture = 0;
         u64 numShorten = 0;
@@ -73,34 +74,15 @@ namespace ldpc
             }
         }
 
-        mEdgeCN = vec_u64(mNNZ);
-        mEdgeVN = vec_u64(mNNZ);
-
-        mCN = mat_u64(mM, vec_u64());
-        mVN = mat_u64(mN, vec_u64());
-
-        mCheckNodeN = mat_u64(mM, vec_u64());
-        mVarNodeN = mat_u64(mN, vec_u64());
-
-        for (u64 i = 0; i < mNNZ; i++)
-        {
-            // read the non-zero entries, i.e. edges
-            fscanf(fpCode, "%lu %lu\n", &(mEdgeCN[i]), &(mEdgeVN[i]));
-
-            // save edge index to coressponding CN & VN
-            mCN[mEdgeCN[i]].push_back(i);
-            mVN[mEdgeVN[i]].push_back(i);
-
-            mCheckNodeN[mEdgeCN[i]].push_back(mEdgeVN[i]);
-            mVarNodeN[mEdgeVN[i]].push_back(mEdgeCN[i]);
-        }
+        mH = sparse_csr<bits_t>(m, n);
+        mH.read_from_file(pcFileName, 7);
 
         // maximum check node degree
-        auto tmp = std::max_element(mCN.begin(), mCN.end(), [](const vec_u64 &a, const vec_u64 &b) { return (a.size() < b.size()); });
+        auto tmp = std::max_element(mH.row_neighbor().begin(), mH.row_neighbor().end(), [](const auto &a, const auto &b) { return (a.size() < b.size()); });
         mMaxDC = tmp->size();
 
         // position of transmitted bits
-        for (u64 i = 0; i < mN; i++)
+        for (int i = 0; i < n; i++)
         {
             auto tmp = std::find(mShorten.cbegin(), mShorten.cend(), i);
             if (tmp != mShorten.cend())
@@ -112,27 +94,23 @@ namespace ldpc
             mBitPos.push_back(i);
         }
         fclose(fpCode);
-
-        mH = sparse_csr<bits_t>(mM, mN);
-        mH.read_from_file(pcFileName, 7);
     }
 
     void ldpc_code::read_G(const std::string &genFileName)
     {
-        mG = sparse_csr<bits_t>(mN - mM, mN);
+        mG = sparse_csr<bits_t>(mH.num_cols() - mH.num_rows(), mH.num_cols());
         mG.read_from_file(genFileName, 0);
     }
 
     u64 ldpc_code::calc_rank()
     {
-        u64 rank = mN;
-        mat_u64 checkNodeN = mCheckNodeN;
-        mat_u64 varNodeN = mVarNodeN;
+        u64 rank = mH.num_cols();
+        /*
+        mat_u64 checkNodeN = mCheckNodeN; // direct check node neighbourhood with node oriented index
+        mat_u64 varNodeN = mVarNodeN;     // direct variable node neighbourhood with node oriented index
 
         for (u64 row = 0; row < rank; ++row)
         {
-            //std::cout << "Row value: " << row << "\n";
-
             // check what value h[row][row] has
             auto it = std::find(varNodeN[row].begin(), varNodeN[row].end(), row);
             if (it != varNodeN[row].end()) // values is non-zero
@@ -141,10 +119,8 @@ namespace ldpc
                 vec_u64 tmp = varNodeN[row];
                 for (u64 j = 0; j < tmp.size(); ++j)
                 {
-                    //std::cout << "Check: " << tmp[j] << "\n";
                     if (tmp[j] > row)
                     {
-                        //std::cout << "Add rows " << row << " to " << tmp[j] << "\n";
                         ldpc_code::add_rows(checkNodeN, varNodeN, tmp[j], checkNodeN[row]);
                     }
                 }
@@ -176,26 +152,8 @@ namespace ldpc
 
                 --row;
             }
-            /*
-        std::cout << "CN Perspective:\n";
-        for (const auto &vn : checkNodeN)
-        {
-            ldpc::vec_u64 row(this->nc());
-            for (auto vn_i : vn)
-            {
-                row[vn_i] = 1;
-            }
-
-            for (u64 n = 0; n < this->nc(); ++n)
-            {
-                std::cout << row[n] << " ";
-            }
-            std::cout << "\n";
         }
-        std::cout << "\n";
         */
-        }
-
         return rank;
     }
 

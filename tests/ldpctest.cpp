@@ -21,9 +21,9 @@ namespace ldpc_tests
 
     void is_generator_matrix(const ldpc::ldpc_code &code)
     {
-        for (ldpc::u64 i = 0; i < code.mc(); i++) // rows of H
+        for (int i = 0; i < code.mc(); i++) // rows of H
         {
-            for (ldpc::u64 j = 0; j < code.kc(); j++) // cols of G transpose = rows of G
+            for (int j = 0; j < code.kc(); j++) // cols of G transpose = rows of G
             {
                 auto &h = code.H().row_neighbor()[i];
                 auto &g = code.G().row_neighbor()[j];

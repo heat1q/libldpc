@@ -44,8 +44,8 @@ namespace ldpc
         std::vector<T> multiply_left(const std::vector<T> &left) const;   // for encoding
         std::vector<T> multiply_right(const std::vector<T> &right) const; // for syndrome
 
-        const int num_cols() const { return numCols; }
-        const int num_rows() const { return numRows; }
+        int num_cols() const { return numCols; }
+        int num_rows() const { return numRows; }
         const std::vector<std::vector<node>> &col_neighbor() const { return colN; }
         const std::vector<std::vector<node>> &row_neighbor() const { return rowN; }
         const std::vector<edge<T>> &nz_entry() const { return nonZeroVals; }

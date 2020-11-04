@@ -31,57 +31,56 @@ namespace ldpc
     */
     unsigned ldpc_decoder::decode()
     {
+        auto &edges = mLdpcCode->H().nz_entry();
+
         //initialize
-        for (u64 i = 0; i < mLdpcCode->nnz(); ++i)
+        for (int i = 0; i < mLdpcCode->nnz(); ++i)
         {
-            mLv2c[i] = mLLRIn[mLdpcCode->c()[i]];
+            mLv2c[i] = mLLRIn[edges[i].colIndex];
         }
 
         unsigned I = 0;
         while (I < mDecoderParam.iterations)
         {
             // CN processing
-            for (u64 i = 0; i < mLdpcCode->mc(); ++i)
+            for (int i = 0; i < mLdpcCode->mc(); ++i)
             {
-                auto cw = mLdpcCode->cn()[i].size();
-                auto &cn = mLdpcCode->cn()[i];
+                auto cw = mLdpcCode->H().row_neighbor()[i].size();
+                auto &cn = mLdpcCode->H().row_neighbor()[i];
 
                 // J. Chen et al. “Reduced-Complexity Decoding of LDPC Codes”
-                mExMsgF[0] = mLv2c[cn[0]];
-                mExMsgB[cw - 1] = mLv2c[cn[cw - 1]];
+                mExMsgF[0] = mLv2c[cn[0].edgeIndex];
+                mExMsgB[cw - 1] = mLv2c[cn[cw - 1].edgeIndex];
                 for (u64 j = 1; j < cw; ++j)
                 {
-                    mExMsgF[j] = mCNApprox(mExMsgF[j - 1], mLv2c[cn[j]]);
-                    mExMsgB[cw - 1 - j] = mCNApprox(mExMsgB[cw - j], mLv2c[cn[cw - j - 1]]);
+                    mExMsgF[j] = mCNApprox(mExMsgF[j - 1], mLv2c[cn[j].edgeIndex]);
+                    mExMsgB[cw - 1 - j] = mCNApprox(mExMsgB[cw - j], mLv2c[cn[cw - j - 1].edgeIndex]);
                 }
 
-                mLc2v[cn[0]] = mExMsgB[1];
-                mLc2v[cn[cw - 1]] = mExMsgF[cw - 2];
+                mLc2v[cn[0].edgeIndex] = mExMsgB[1];
+                mLc2v[cn[cw - 1].edgeIndex] = mExMsgF[cw - 2];
                 for (u64 j = 1; j < cw - 1; ++j)
                 {
-                    mLc2v[cn[j]] = mCNApprox(mExMsgF[j - 1], mExMsgB[j + 1]);
+                    mLc2v[cn[j].edgeIndex] = mCNApprox(mExMsgF[j - 1], mExMsgB[j + 1]);
                 }
             }
 
             // VN processing and app calc
-            for (u64 i = 0; i < mLdpcCode->nc(); ++i) // only transmitted bits
+            for (int i = 0; i < mLdpcCode->nc(); ++i) // only transmitted bits
             {
                 mLLROut[i] = mLLRIn[i];
-                auto vw = mLdpcCode->vn()[i].size();                    // degree of VN
-                auto vn = const_cast<u64 *>(mLdpcCode->vn()[i].data()); //neighbours of VN
-                while (vw--)
+                auto &vn = mLdpcCode->H().col_neighbor()[i];       //neighbours of VN
+
+                for (const auto &hi : vn)
                 {
-                    mLLROut[i] += mLc2v[*vn++];
+                    mLLROut[i] += mLc2v[hi.edgeIndex];
                 }
 
                 mCO[i] = (mLLROut[i] <= 0); // approx decision on ith bits
 
-                vw = mLdpcCode->vn()[i].size();                    // degree of VN
-                vn = const_cast<u64 *>(mLdpcCode->vn()[i].data()); //neighbours of VN
-                while (vw--)
+                for (const auto &hi : vn)
                 {
-                    mLv2c[*vn] = mLLROut[i] - mLc2v[*vn];
-                    ++vn;
+                    mLv2c[hi.edgeIndex] = mLLROut[i] - mLc2v[hi.edgeIndex];
                 }
             }
 
@@ -103,12 +102,12 @@ namespace ldpc
     {
         //calc syndrome
         bits_t s;
-        for (u64 i = 0; i < mLdpcCode->mc(); i++)
+        for (int i = 0; i < mLdpcCode->mc(); i++)
         {
             s = 0;
-            for (u64 j = 0; j < mLdpcCode->cn()[i].size(); j++)
+            for (const auto &hj : mLdpcCode->H().row_neighbor()[i])
             {
-                s += mCO[mLdpcCode->c()[mLdpcCode->cn()[i][j]]];
+                s += mCO[hj.nodeIndex];
             }
 
             if (s != 0)

@@ -51,31 +51,25 @@ namespace ldpc
         friend std::ostream &operator<<(std::ostream &os, const ldpc_code &code);
 
         // Number of columns (variable nodes)
-        u64 nc() const { return mN; };
+        int nc() const { return mH.num_cols(); };
         // Number of information bits
-        u64 kc() const { return mN - mM; };
+        int kc() const { return mH.num_cols() - mH.num_rows(); };
         // Number of parity-checks (check nodes)
-        u64 mc() const { return mM; };
+        int mc() const { return mH.num_rows(); };
         // Number of non-zero entries (number of edges)
-        u64 nnz() const { return mNNZ; };
-        const mat_u64 &cn() const { return mCN; };
-        const mat_u64 &vn() const { return mVN; };
-        const vec_u64 &r() const { return mEdgeCN; };
-        const vec_u64 &c() const { return mEdgeVN; };
+        int nnz() const { return mH.nz_entry().size(); };
         // Number of transmitted columns (variable nodes)
-        u64 nct() const { return mN - mPuncture.size() - mShorten.size(); };
+        int nct() const { return nc() - mPuncture.size() - mShorten.size(); };
         // Number of transmitted information bits
-        u64 kct() const { return nct() - mct(); };
+        int kct() const { return nct() - mct(); };
         // Number of transmitted parity-checks (check nodes)
-        u64 mct() const { return mM - mPuncture.size(); };
+        int mct() const { return mc() - mPuncture.size(); };
         // Array of puncture indices
         const vec_u64 &puncture() const { return mPuncture; };
         // Array of shorten indices
         const vec_u64 &shorten() const { return mShorten; };
         // Maximum check node degree
         u64 max_dc() const { return mMaxDC; };
-        const mat_u64 &cn_index() const { return mCheckNodeN; };
-        const mat_u64 &vn_index() const { return mVarNodeN; };
         const vec_u64 &bit_pos() const { return mBitPos; }
         // Parity-check matrix
         const sparse_csr<bits_t> &H() const { return mH; }
@@ -92,23 +86,12 @@ namespace ldpc
 
         
     private:
-        u64 mN;
-        u64 mM;
-        u64 mNNZ;
-        mat_u64 mCN;       /* denotes the check neighbors, i.e. connected VN, for each check node as index in c/r; dimensions cn[mc][cw[i]] */
-        mat_u64 mVN;       /* denotes the var neighbors, i.e., connected CN, for each variable node as index in c/r; dimensions vn[nc][vw[i]] */
-        vec_u64 mEdgeCN;   /* edge oriented non zero row indices; length nnz */
-        vec_u64 mEdgeVN;   /* edge oriented non zero column indices; length nnz */
         vec_u64 mPuncture; /* array pf punctured bit indices */
         vec_u64 mShorten;  /* array of shortened bit indices */
         u64 mMaxDC;
-        u64 mRank;
 
         // position of transmitted bits, i.e. puncture/shorten exluded
         vec_u64 mBitPos;
-
-        mat_u64 mCheckNodeN; // direct check node neighbourhood with node oriented index
-        mat_u64 mVarNodeN;   // direct variable node neighbourhood with node oriented index
 
         sparse_csr<bits_t> mH; // Parity-Check Matrix
         sparse_csr<bits_t> mG; // Generator Matrix

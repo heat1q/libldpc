@@ -42,7 +42,7 @@ namespace ldpc
      */
     void channel_awgn::simulate()
     {
-        for (u64 i = 0; i < mLdpcCode->nct(); ++i)
+        for (int i = 0; i < mLdpcCode->nct(); ++i)
         {
             mY[i] = mRandNormal(mRNGEngine) + mX[i]; // x \in {-1,+1}
         }
@@ -71,7 +71,7 @@ namespace ldpc
         }
 
         //bpsk
-        for (u64 i = 0; i < mLdpcCode->nct(); ++i)
+        for (int i = 0; i < mLdpcCode->nct(); ++i)
         {
             mLdpcDecoder->mLLRIn[mLdpcCode->bit_pos()[i]] = 2 * mY[i] / mSigma2;
         }
@@ -103,7 +103,7 @@ namespace ldpc
      */
     void channel_bsc::simulate()
     {
-        for (u64 i = 0; i < mLdpcCode->nct(); ++i)
+        for (int i = 0; i < mLdpcCode->nct(); ++i)
         {
             mY[i] = mRandBernoulli(mRNGEngine); // generate a 1 with probability epsilon
         }
@@ -133,7 +133,7 @@ namespace ldpc
             }
         }
 
-        for (u64 i = 0; i < mLdpcCode->nct(); ++i)
+        for (int i = 0; i < mLdpcCode->nct(); ++i)
         {
             // +delta for 0; -delta for 1
             mLdpcDecoder->mLLRIn[mLdpcCode->bit_pos()[i]] = delta * (1 - 2 * mY[i].value);
