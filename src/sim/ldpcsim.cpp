@@ -74,7 +74,6 @@ namespace ldpc
         catch (std::exception &e)
         {
             std::cout << "Error: ldpc_sim::ldpc_sim() " << e.what() << "\n";
-            exit(EXIT_FAILURE);
         }
     }
 
@@ -99,7 +98,14 @@ namespace ldpc
         u64 iters;
         u64 bec_tmp;
 
-        auto xVals = mChannelParams.xVals;
+        ldpc::vec_double_t xVals;
+        double val = mChannelParams.xRange[0];
+        while (val < mChannelParams.xRange[1])
+        {
+            xVals.push_back(val);
+            val += mChannelParams.xRange[2];
+        }
+
         auto minFec = mSimulationParams.fec;
         auto maxFrames = mSimulationParams.maxFrames;
         std::string xValType = "SNR";

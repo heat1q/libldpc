@@ -32,33 +32,32 @@ int main(int argc, char *argv[])
         std::cout << *code << std::endl;
         std::cout << "========================================================================================" << std::endl;
 
+        std::string decType, chType, resFile;
+        decType = parser.get<std::string>("--decoding");
+        chType = parser.get<std::string>("--channel");
+        resFile = parser.get<std::string>("output-file");
+
         // decoder parameters
         ldpc::decoder_param decoderParams;
         decoderParams.iterations = parser.get<ldpc::u32>("--num-iterations");
-        decoderParams.type = parser.get<std::string>("--decoding");
         decoderParams.earlyTerm = !parser.get<bool>("--no-early-term");
+        decoderParams.type = decType.c_str();
 
         // channel parameters
         ldpc::channel_param channelParams;
-        channelParams.type = parser.get<std::string>("--channel");
         channelParams.seed = parser.get<ldpc::u64>("--seed");
-        channelParams.xRange = snr;
-
-        ldpc::vec_double_t x;
-        double val = snr[0];
-        while (val < snr[1])
+        channelParams.type = chType.c_str();
+        for (int i = 0; i < 3; ++i)
         {
-            x.push_back(val);
-            val += snr[2];
+           channelParams.xRange[i] = snr[i];
         }
-        channelParams.xVals = x;
 
         // simulation parameters
         ldpc::simulation_param simulationParams;
-        simulationParams.resultFile = parser.get<std::string>("output-file");
         simulationParams.threads = parser.get<ldpc::u32>("--num-threads");
         simulationParams.fec = parser.get<ldpc::u64>("--frame-error-count");
         simulationParams.maxFrames = parser.get<ldpc::u64>("--max-frames");
+        simulationParams.resultFile = resFile.c_str();
 
         ldpc::ldpc_sim sim(
             code,

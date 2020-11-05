@@ -91,15 +91,14 @@ namespace ldpc
     {
         bool earlyTerm;
         u32 iterations;
-        std::string type;
+        const char *type;
     } typedef decoder_param;
 
     struct
     {
         u64 seed;
-        vec_double_t xRange;
-        vec_double_t xVals;
-        std::string type;
+        double xRange[3];
+        const char *type;
     } typedef channel_param;
 
     struct
@@ -107,7 +106,7 @@ namespace ldpc
         u32 threads;
         u64 maxFrames;
         u64 fec;
-        std::string resultFile;
+        const char *resultFile;
     } typedef simulation_param;
 
     std::ostream &operator<<(std::ostream &os, const decoder_param &p);

@@ -29,27 +29,26 @@ namespace ldpc
 
     std::ostream &operator<<(std::ostream &os, const decoder_param &p)
     {
-        os << "Type: " << p.type << "\n";
-        os << "Iterations: " << p.iterations << "\n";
-        os << "Early Termination: " << p.earlyTerm;
+        os << " Type: " << p.type << "\n";
+        os << " Iterations: " << p.iterations << "\n";
+        os << " Early Termination: " << p.earlyTerm;
         return os;
     }
 
     std::ostream &operator<<(std::ostream &os, const channel_param &p)
     {
-        os << "Type: " << p.type << "\n";
-        os << "Seed: " << p.seed << "\n";
-        os << "Range: " << p.xRange << "\n";
-        os << "Values: " << p.xVals;
+        os << " Type: " << p.type << "\n";
+        os << " Seed: " << p.seed << "\n";
+        os << " Range: Min: " << p.xRange[0] << ", Max: " << p.xRange[1] << ", Step: " << p.xRange[2];
         return os;
     }
 
     std::ostream &operator<<(std::ostream &os, const simulation_param &p)
     {
-        os << "Threads: " << p.threads << "\n";
-        os << "FEC: " << p.fec << "\n";
-        os << "Max Frames: " << p.maxFrames << "\n";
-        os << "Output File: " << p.resultFile;
+        os << " Threads: " << p.threads << "\n";
+        os << " FEC: " << p.fec << "\n";
+        os << " Max Frames: " << p.maxFrames << "\n";
+        os << " Output File: " << p.resultFile;
         return os;
     }
 } // namespace ldpc
