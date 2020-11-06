@@ -14,9 +14,14 @@ namespace ldpc
           mLv2c(code->nnz()), mLc2v(code->nnz()),
           mExMsgF(code->max_dc()), mExMsgB(code->max_dc()),
           mLLRIn(code->nc()), mLLROut(code->nc()),
-          mSynd(code->mc()), mCO(code->nc()),
+          mCO(code->nc()),
           mCNApprox(jacobian),
           mDecoderParam(decoderParam)
+    {
+        set_approximation();
+    }
+
+    void ldpc_decoder::set_approximation()
     {
         if (mDecoderParam.type == std::string("BP_MS"))
         {

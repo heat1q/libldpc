@@ -18,17 +18,23 @@ namespace ldpc
         ldpc_decoder() = default;
         ldpc_decoder(const std::shared_ptr<ldpc_code> &code, const decoder_param &decoderParam);
 
+        void set_approximation();
+
         unsigned decode();
         bool is_codeword();
 
+        // Set the input LLR
+        void llr_in(const vec_double_t &llrIn) { mLLRIn = llrIn; }
+
+        // Set the parameters
+        void set_param(const decoder_param &decoderParam) { mDecoderParam = decoderParam; set_approximation(); }
+
         //getter functions
+        const decoder_param &param() const { return mDecoderParam; }
+
         const vec_double_t &lv2c() const { return mLv2c; }
         const vec_double_t &lc2v() const { return mLc2v; }
-        const vec_double_t &llr_in() const { return mLLRIn; }
         const vec_double_t &llr_out() const { return mLLROut; }
-
-        const vec_bits_t &syndrome() const { return mSynd; }
-        const vec_bits_t &estm_cw() const { return mCO; }
 
         static inline constexpr int sign(const double x);
         static inline constexpr double jacobian(const double x, const double y);
@@ -47,10 +53,9 @@ namespace ldpc
         vec_double_t mLLRIn;
         vec_double_t mLLROut;
 
-        vec_bits_t mSynd;
         vec_bits_t mCO;
 
         std::function<double(double, double)> mCNApprox;
-        const decoder_param &mDecoderParam;
+        decoder_param mDecoderParam;
     };
 } // namespace ldpc
