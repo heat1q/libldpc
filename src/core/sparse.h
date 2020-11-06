@@ -61,6 +61,14 @@ namespace ldpc
         std::vector<edge<T>> nonZeroVals;    // edges, i.e. non-zero entries with row and col index
     };
 
+    /**
+     * @brief Read a sparse CSR file.
+     * 
+     * @throw runtime_error
+     * @tparam T finite field
+     * @param filename Input file
+     * @param skipLines Number of lines to skip from head
+     */
     template <typename T>
     void sparse_csr<T>::read_from_file(const std::string &filename, int skipLines)
     {
@@ -68,6 +76,8 @@ namespace ldpc
 
         std::ifstream infile(filename);
         std::string line;
+
+        if (!infile.good()) throw std::runtime_error("can not open file for reading");
 
         // skip lines at beginning of file
         while (skipLines-- > 0)

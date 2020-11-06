@@ -21,17 +21,14 @@ namespace ldpc
     ldpc_code::ldpc_code(const std::string &pcFileName, const std::string &genFileName)
         : ldpc_code(pcFileName)
     {
-        if (!genFileName.empty())
+        try
         {
-            try
-            {
-                read_G(genFileName);
-            }
-            catch (std::exception &e)
-            {
-                std::cout << "Error: ldpc_code(): " << e.what() << std::endl;
-                exit(EXIT_FAILURE);
-            }
+            read_G(genFileName);
+        }
+        catch (std::exception &e)
+        {
+            std::cout << "Error: ldpc_code(): " << e.what() << std::endl;
+            exit(EXIT_FAILURE);
         }
     }
 
