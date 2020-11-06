@@ -41,8 +41,11 @@ namespace ldpc
 
         void read_from_file(const std::string &filename, int skipLines);
 
-        std::vector<T> multiply_left(const std::vector<T> &left) const;   // for encoding
-        std::vector<T> multiply_right(const std::vector<T> &right) const; // for syndrome
+        void multiply_left(const std::vector<T> &left, std::vector<T> &result) const; // for encoding
+        std::vector<T> multiply_left(const std::vector<T> &left) const;
+
+        void multiply_right(const std::vector<T> &right, std::vector<T> &result) const; // for syndrome
+        std::vector<T> multiply_right(const std::vector<T> &right) const;
 
         int num_cols() const { return numCols; }
         int num_rows() const { return numRows; }
@@ -101,13 +104,11 @@ namespace ldpc
      * 
      * @tparam T finite field
      * @param left Row vector
-     * @return std::vector<T> 
+     * @param result Result row vector
      */
     template <typename T>
-    std::vector<T> sparse_csr<T>::multiply_left(const std::vector<T> &left) const
+    void sparse_csr<T>::multiply_left(const std::vector<T> &left, std::vector<T> &result) const
     {
-        std::vector<T> result(numCols);
-
         for (int j = 0; j < numCols; ++j)
         {
             for (const auto &n : colN[j])
@@ -115,7 +116,20 @@ namespace ldpc
                 result[j] += left[n.nodeIndex] * nonZeroVals[n.edgeIndex].value;
             }
         }
+    }
 
+    /**
+     * @brief Multiply vector from left handside with matrix over field T
+     * 
+     * @tparam T finite field
+     * @param left Row vector
+     * @return std::vector<T> Result row vector
+     */
+    template <typename T>
+    std::vector<T> sparse_csr<T>::multiply_left(const std::vector<T> &left) const
+    {
+        std::vector<T> result(numCols);
+        multiply_left(left, result);
         return result;
     }
 
@@ -124,13 +138,11 @@ namespace ldpc
      * 
      * @tparam T finite field
      * @param right Column vector
-     * @return std::vector<T> 
+     * @param result Result column vector
      */
     template <typename T>
-    std::vector<T> sparse_csr<T>::multiply_right(const std::vector<T> &right) const
+    void sparse_csr<T>::multiply_right(const std::vector<T> &right, std::vector<T> &result) const
     {
-        std::vector<T> result(numRows);
-
         for (int i = 0; i < numRows; ++i)
         {
             for (const auto &n : rowN[i])
@@ -138,7 +150,20 @@ namespace ldpc
                 result[i] += right[n.nodeIndex] * nonZeroVals[n.edgeIndex].value;
             }
         }
+    }
 
+    /**
+     * @brief Multiply vector from right handside with matrix over field T
+     * 
+     * @tparam T finite field
+     * @param right Column vector
+     * @return std::vector<T> Result column vector
+     */
+    template <typename T>
+    std::vector<T> sparse_csr<T>::multiply_right(const std::vector<T> &right) const
+    {
+        std::vector<T> result(numRows);
+        multiply_right(right, result);
         return result;
     }
 } // namespace ldpc
