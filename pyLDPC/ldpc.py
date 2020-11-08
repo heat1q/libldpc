@@ -3,7 +3,7 @@ import os
 import threading
 import numpy as np
 
-LIB_PATH = f"{os.path.dirname(os.path.dirname(os.path.abspath(__file__)))}/libldpc.so"
+LIB_PATH = f"{os.path.dirname(os.path.abspath(__file__))}/libldpc.so"
 
 class sim_results_t(ct.Structure):
     _fields_ = [("fer", ct.POINTER(ct.c_double)),
@@ -20,7 +20,7 @@ class decoder_param(ct.Structure):
 
 
 class LDPC:
-    def __init__(self, pc_file: str, gen_file = "", lib_path = LIB_PATH):    
+    def __init__(self, pc_file: str, gen_file = "", lib = LIB_PATH):    
         self.pc_file = pc_file
         self.gen_file = gen_file 
         self.n = ct.c_int(0)
@@ -29,7 +29,7 @@ class LDPC:
         self.sim_stop_flag = ct.c_ubyte(1)
         self.results = {}
 
-        self.lib = ct.cdll.LoadLibrary(lib_path)
+        self.lib = ct.cdll.LoadLibrary(lib)
         self.lib.argtypes = (ct.c_char_p, ct.c_char_p, ct.c_int, ct.c_int)
         self.lib.ldpc_setup(pc_file.encode("utf-8"), gen_file.encode("utf-8"), ct.byref(self.n), ct.byref(self.m))
 
@@ -39,6 +39,17 @@ class LDPC:
 
 
     def encode(self, info_word: np.array) -> np.array:
+        """Encode a binary array.
+
+        Args:
+            info_word (np.array): Input binary array.
+
+        Raises:
+            RuntimeError: No generator matrix is initially provided.
+
+        Returns:
+            np.array: Encoded binary codeword.
+        """
         if not self.gen_file:
             raise RuntimeError("No generator matrix provided for encoding")
 
