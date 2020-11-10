@@ -39,68 +39,61 @@ namespace ldpc
 
     void ldpc_code::read_H(const std::string &pcFileName)
     {
-        FILE *fpCode = fopen(pcFileName.c_str(), "r");
-        if (!fpCode)
+        std::ifstream infile(pcFileName);
+        std::string line;
+        int skipLines = 0;
+
+        if (!infile.good()) throw std::runtime_error("can not open file for reading");
+
+        while (getline(infile, line))
         {
-            throw std::runtime_error("can not open codefile for reading.");
-        }
-
-        int m, n;
-        u64 val;
-        fscanf(fpCode, "nc: %d\n", &n);
-        fscanf(fpCode, "mc: %d\n", &m);
-        fscanf(fpCode, "nct: %lu\n", &val);
-        fscanf(fpCode, "mct: %lu\n", &val);
-        fscanf(fpCode, "nnz: %lu\n", &val);
-
-        u64 numPuncture = 0;
-        u64 numShorten = 0;
-
-        fscanf(fpCode, "puncture [%lu]: ", &numPuncture);
-        if (numPuncture != 0)
-        {
-            mPuncture = vec_u64(numPuncture);
-            for (u64 i = 0; i < numPuncture; i++)
+            // support legacy code files
+            // where code parameters are separated by ':'
+            if (auto i = line.find(':'); i != std::string::npos)
             {
-                fscanf(fpCode, " %lu ", &(mPuncture[i]));
+                int index;
+                auto token = line.substr(0, i);
+                std::istringstream record(line.substr(i+1));
+
+                if (token.find("puncture") != std::string::npos)
+                {
+                    while (record >> index) mPuncture.push_back(index);
+                } 
+                else if (token.find("shorten") != std::string::npos)
+                {
+                    while (record >> index) mShorten.push_back(index);
+                }
+
+                ++skipLines;
+            }
+            else
+            {
+                break;
             }
         }
 
-        fscanf(fpCode, "shorten [%lu]: ", &numShorten);
-        if (numShorten != 0)
-        {
-            mShorten = vec_u64(numShorten);
-            for (u64 i = 0; i < numShorten; i++)
-            {
-                fscanf(fpCode, " %lu ", &(mShorten[i]));
-            }
-        }
+        infile.close();
 
-        mH = sparse_csr<bits_t>(m, n);
-        mH.read_from_file(pcFileName, 7);
+        mH.read_from_file(pcFileName, skipLines);
 
         // maximum check node degree
         auto tmp = std::max_element(mH.row_neighbor().begin(), mH.row_neighbor().end(), [](const auto &a, const auto &b) { return (a.size() < b.size()); });
         mMaxDC = tmp->size();
 
         // position of transmitted bits
-        for (int i = 0; i < n; i++)
+        for (int i = 0; i < nc(); i++)
         {
             auto tmp = std::find(mShorten.cbegin(), mShorten.cend(), i);
-            if (tmp != mShorten.cend())
-                continue; // skip if current index shortened
+            if (tmp != mShorten.cend()) continue; // skip if current index shortened
             tmp = std::find(mPuncture.cbegin(), mPuncture.cend(), i);
-            if (tmp != mPuncture.cend())
-                continue; // skip if current index punctured
+            if (tmp != mPuncture.cend()) continue; // skip if current index punctured
 
             mBitPos.push_back(i);
         }
-        fclose(fpCode);
     }
 
     void ldpc_code::read_G(const std::string &genFileName)
     {
-        mG = sparse_csr<bits_t>(mH.num_cols() - mH.num_rows(), mH.num_cols());
         mG.read_from_file(genFileName, 0);
     }
 

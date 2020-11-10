@@ -3,6 +3,7 @@
 #include <vector>
 #include <iostream>
 #include <sstream>
+#include <map>
 
 namespace ldpc
 {
@@ -80,6 +81,13 @@ namespace ldpc
 
         if (!infile.good()) throw std::runtime_error("can not open file for reading");
 
+        std::map<int, std::vector<node>> cols;
+        std::map<int, std::vector<node>> rows;
+
+        numCols = 0;
+        numRows = 0;
+        nonZeroVals.clear();
+
         // skip lines at beginning of file
         while (skipLines-- > 0)
         {
@@ -103,11 +111,25 @@ namespace ldpc
 
             nonZeroVals.push_back(entry);
 
-            colN[entry.colIndex].push_back(node({entry.rowIndex, index}));
-            rowN[entry.rowIndex].push_back(node({entry.colIndex, index}));
+            cols[entry.colIndex].push_back(node({entry.rowIndex, index}));
+            rows[entry.rowIndex].push_back(node({entry.colIndex, index}));
+
+            // find the number of columns and rows from indices
+            numCols = std::max(numCols, entry.colIndex);
+            numRows = std::max(numRows, entry.rowIndex);
 
             ++index;
         }
+
+        ++numCols;
+        ++numRows;
+
+        colN = std::vector<std::vector<node>>(numCols, std::vector<node>());
+        rowN = std::vector<std::vector<node>>(numRows, std::vector<node>());
+
+        // copy assign the elements of the map to the vector
+        for (auto e : cols) colN[e.first] = e.second;
+        for (auto e : rows) rowN[e.first] = e.second;
     }
 
     /**
