@@ -5,12 +5,15 @@ namespace ldpc
     channel::channel(const std::shared_ptr<ldpc_code> &code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed)
         : mLdpcCode(code),
           mLdpcDecoder(decoder),
-          mRNGSeed(seed),
-          mRNGEngine(std::mt19937_64(seed))
+          mRNG(seed),
+          mRandInfoWord(std::bind(std::bernoulli_distribution(0.5), std::mt19937_64(seed << 1))),
+          mInfoWord(vec_bits_t(code->kc(), 0)),
+          mCodeWord(vec_bits_t(code->nc(), 0))
     {
     }
 
     void channel::set_channel_param(const double channelParam) {}
+    void channel::encode_and_map() {}
     void channel::simulate() {}
     void channel::calculate_llrs() {}
 
@@ -20,38 +23,43 @@ namespace ldpc
           mY(vec_double_t(code->nct())),
           mSNR(snr),
           mSigma2(pow(10, -snr / 10)),
-          mRandNormal(std::normal_distribution<double>(0., sqrt(mSigma2)))
+          mRandNormal(std::bind(std::normal_distribution<double>(0., sqrt(mSigma2)), mRNG))
     {
     }
 
-    /**
-     * @brief Update the noise variance and reinitialize the RNG.
-     * 
-     * @param channelParam SNR defined as E_s / \sigma^2, E_s = 1.
-     */
     void channel_awgn::set_channel_param(const double channelParam)
     {
         mSNR = channelParam;
         mSigma2 = pow(10, -mSNR / 10);
-        mRandNormal = std::normal_distribution<double>(0., sqrt(mSigma2));
+        mRandNormal = std::bind(std::normal_distribution<double>(0., sqrt(mSigma2)), mRNG);
     }
 
-    /**
-     * @brief Simulate the binary-input (biAWGN) channel with noise variance \sigma^2.
-     * 
-     */
+    void channel_awgn::encode_and_map()
+    {
+        for (auto &u : mInfoWord)
+        {
+            u = mRandInfoWord();
+        }
+
+        mLdpcCode->G().multiply_left(mInfoWord, mCodeWord);
+
+        // only select transmitted codeword bits
+        for (int i = 0; i < mLdpcCode->nct(); ++i)
+        {
+            // 0 --> +1
+            // 1 --> -1
+            mX[i] = 1 - (2 * mCodeWord[mLdpcCode->bit_pos()[i]].value);
+        }
+    }
+
     void channel_awgn::simulate()
     {
         for (int i = 0; i < mLdpcCode->nct(); ++i)
         {
-            mY[i] = mRandNormal(mRNGEngine) + mX[i]; // x \in {-1,+1}
+            mY[i] = mRandNormal() + mX[i]; // x \in {-1,+1}
         }
     }
 
-    /**
-     * @brief Calculate the LLR values for the biAWGN channel.
-     * 
-     */
     void channel_awgn::calculate_llrs()
     {
         //puncturing & shortening
@@ -82,37 +90,40 @@ namespace ldpc
           mX(vec_bits_t(code->nct(), 0)), // initialize to all zero cw
           mY(vec_bits_t(code->nct())),
           mEpsilon(epsilon),
-          mRandBernoulli(std::bernoulli_distribution(epsilon))
+          mRandBernoulli(std::bind(std::bernoulli_distribution(epsilon), mRNG))
     {
     }
 
-    /**
-     * @brief Update the crossover probability and reinitialize the RNG.
-     * 
-     * @param channelParam \espilon < 0.5
-     */
+    void channel_bsc::encode_and_map()
+    {
+        for (auto &u : mInfoWord)
+        {
+            u = mRandInfoWord();
+        }
+
+        mLdpcCode->G().multiply_left(mInfoWord, mCodeWord);
+
+        // only select transmitted codeword bits
+        for (int i = 0; i < mLdpcCode->nct(); ++i)
+        {
+            mX[i] = mCodeWord[mLdpcCode->bit_pos()[i]];
+        }
+    }
+
     void channel_bsc::set_channel_param(const double channelParam)
     {
         mEpsilon = channelParam;
-        mRandBernoulli = std::bernoulli_distribution(mEpsilon);
+        mRandBernoulli = std::bind(std::bernoulli_distribution(mEpsilon), mRNG);
     }
 
-    /**
-     * @brief Simulate the Binary Symmetric Channel (BSC) with crossover probability \epsilon.
-     * 
-     */
     void channel_bsc::simulate()
     {
         for (int i = 0; i < mLdpcCode->nct(); ++i)
         {
-            mY[i] = mRandBernoulli(mRNGEngine); // generate a 1 with probability epsilon
+            mY[i] = mX[i] + mRandBernoulli(); // flip bit with probability epsilon
         }
     }
 
-    /**
-     * @brief Calculate the LLR values for the BSC.
-     * 
-     */
     void channel_bsc::calculate_llrs()
     {
         const double delta = log((1 - mEpsilon) / mEpsilon);

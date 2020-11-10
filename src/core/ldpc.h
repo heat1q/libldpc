@@ -70,6 +70,7 @@ namespace ldpc
         const vec_u64 &shorten() const { return mShorten; };
         // Maximum check node degree
         u64 max_dc() const { return mMaxDC; };
+        // Index position of transmitted bits 
         const vec_u64 &bit_pos() const { return mBitPos; }
         // Parity-check matrix
         const sparse_csr<bits_t> &H() const { return mH; }

@@ -9,6 +9,8 @@ int main(int argc, char *argv[])
     parser.add_argument("output-file").help("Results output file.");
     parser.add_argument("snr-range").help("{MIN} {MAX} {STEP}").nargs(3).action([](const std::string &s) { return std::stod(s); });
 
+    parser.add_argument("-G", "--gen-matrix").help("Generator matrix file, compressed sparse row (CSR) format.").default_value(std::string(""));
+
     parser.add_argument("-i", "--num-iterations").help("Number of iterations for decoding. (Default: 50)").default_value(unsigned(50)).action([](const std::string &s) { return static_cast<unsigned>(std::stoul(s)); });
     parser.add_argument("-s", "--seed").help("RNG seed. (Default: 0)").default_value(ldpc::u64(0)).action([](const std::string &s) { return std::stoul(s); });
     parser.add_argument("-t", "--num-threads").help("Number of frames to be decoded in parallel. (Default: 1)").default_value(unsigned(1)).action([](const std::string &s) { return static_cast<unsigned>(std::stoul(s)); });
@@ -26,9 +28,10 @@ int main(int argc, char *argv[])
         auto snr = parser.get<ldpc::vec_double_t>("snr-range");
         if (snr[0] > snr[1]) throw std::runtime_error("snr min > snr max");
         
-        std::shared_ptr<ldpc::ldpc_code> code(new ldpc::ldpc_code(parser.get<std::string>("codefile")));
+        auto code = std::make_shared<ldpc::ldpc_code>(parser.get<std::string>("codefile"), parser.get<std::string>("-G"));
         std::cout << "========================================================================================" << std::endl;
-        std::cout << "codefile: " << parser.get<std::string>("codefile") << std::endl;
+        std::cout << "Parity-Check Matrix: " << parser.get<std::string>("codefile") << std::endl;
+        std::cout << "Generator Matrix: " << parser.get<std::string>("-G") << std::endl;
         std::cout << *code << std::endl;
         std::cout << "========================================================================================" << std::endl;
 

@@ -157,6 +157,11 @@ namespace ldpc
 
                 do
                 {
+                    if (!mLdpcCode->G().empty())
+                    {
+                        mChannel[tid]->encode_and_map();
+                    }
+
                     // calculate the channel transitions
                     mChannel[tid]->simulate();
 
@@ -171,10 +176,11 @@ namespace ldpc
                         #pragma omp atomic update
                         ++frames;
 
+                        // count the bit errors
                         bec_tmp = 0;
-                        for (int j = 0; j < mLdpcCode->nc(); ++j)
+                        for (auto ci : mLdpcCode->bit_pos())
                         {
-                            bec_tmp += (mLdpcDecoder[tid]->llr_out()[j] <= 0);
+                            bec_tmp += (mLdpcDecoder[tid]->estimate()[ci] != mChannel[tid]->codeword()[ci]);
                         }
 
                         if (bec_tmp > 0)

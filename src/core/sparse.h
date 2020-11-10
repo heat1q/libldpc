@@ -52,6 +52,7 @@ namespace ldpc
         const std::vector<std::vector<node>> &col_neighbor() const { return colN; }
         const std::vector<std::vector<node>> &row_neighbor() const { return rowN; }
         const std::vector<edge<T>> &nz_entry() const { return nonZeroVals; }
+        bool empty() const { return ((numCols == 0) && (numRows == 0)); }
 
     private:
         int numCols;                         // number of columns

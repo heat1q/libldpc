@@ -36,6 +36,9 @@ namespace ldpc
         const vec_double_t &lc2v() const { return mLc2v; }
         const vec_double_t &llr_out() const { return mLLROut; }
 
+        // The current estimated codeword
+        const vec_bits_t &estimate() const { return mCO; }
+
         static inline constexpr int sign(const double x);
         static inline constexpr double jacobian(const double x, const double y);
         static inline constexpr double minsum(const double x, const double y);

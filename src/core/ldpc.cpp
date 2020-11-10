@@ -5,7 +5,9 @@ namespace ldpc
 {
 
     ldpc_code::ldpc_code(const std::string &pcFileName)
-        : mMaxDC(0)
+        : mMaxDC(0),
+          mH(),
+          mG()
     {
         try
         {
@@ -21,14 +23,17 @@ namespace ldpc
     ldpc_code::ldpc_code(const std::string &pcFileName, const std::string &genFileName)
         : ldpc_code(pcFileName)
     {
-        try
+        if (!genFileName.empty())
         {
-            read_G(genFileName);
-        }
-        catch (std::exception &e)
-        {
-            std::cout << "Error: ldpc_code(): " << e.what() << std::endl;
-            exit(EXIT_FAILURE);
+            try
+            {
+                read_G(genFileName);
+            }
+            catch (std::exception &e)
+            {
+                std::cout << "Error: ldpc_code(): " << e.what() << std::endl;
+                exit(EXIT_FAILURE);
+            }
         }
     }
 
