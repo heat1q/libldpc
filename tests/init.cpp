@@ -27,6 +27,7 @@ int main(int argc, char *argv[])
     {
         ldpc::ldpc_code code(pcFile, genFile);
         ldpc_tests::gf2();
+        ldpc_tests::rank(code);
         ldpc_tests::is_generator_matrix(code);
         ldpc_tests::codeword(code);
 

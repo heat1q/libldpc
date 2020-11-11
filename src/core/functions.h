@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <variant>
+#include <forward_list>
 
 #include "gf2.h"
 #include "sparse.h"
@@ -75,6 +76,17 @@ namespace ldpc
         return os;
     }
 
+    template <class T>
+    std::ostream &operator<<(std::ostream &os, const std::forward_list<T> &l)
+    {
+        for (const auto &x : l)
+        {
+            os << x << " -> ";
+        }
+        os << "NULL";
+        return os;
+    }
+
     using bits_t = gf2;
     using u64 = unsigned long;
     using u32 = unsigned int;
@@ -82,10 +94,12 @@ namespace ldpc
     using vec_bits_t = std::vector<bits_t>;
     using vec_u64 = std::vector<u64>;
     using vec_double_t = std::vector<double>;
+    using vec_int = std::vector<int>;
 
     using mat_bits_t = std::vector<std::vector<bits_t>>;
     using mat_u64 = std::vector<std::vector<u64>>;
     using mat_double_t = std::vector<std::vector<double>>;
+    using mat_int = std::vector<std::vector<int>>;
 
     struct
     {

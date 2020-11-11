@@ -19,6 +19,11 @@ namespace ldpc_tests
         std::cout << "passed: gf2 arithmetics" << std::endl;
     }
 
+    void rank(const ldpc::ldpc_code &code)
+    {
+        std::cout << "passed: gf2 rank calculated: " << code.H().rank() << std::endl;
+    }
+
     void is_generator_matrix(const ldpc::ldpc_code &code)
     {
         for (int i = 0; i < code.mc(); i++) // rows of H

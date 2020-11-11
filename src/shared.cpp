@@ -74,7 +74,7 @@ extern "C"
     ldpc::u64 calculate_rank(const char *codeFile)
     {
         ldpc::ldpc_code code(codeFile);
-        return code.calc_rank();
+        return code.H().rank();
     }
 
     void encode(uint8_t *infoWord, uint8_t *codeWord)

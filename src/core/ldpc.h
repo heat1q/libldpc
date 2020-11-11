@@ -41,13 +41,6 @@ namespace ldpc
          */
         void read_G(const std::string &genFileName);
 
-        /**
-         * @brief Calculates the rank of H.
-         * 
-         * @return u64 rank
-         */
-        u64 calc_rank();
-
         friend std::ostream &operator<<(std::ostream &os, const ldpc_code &code);
 
         // Number of columns (variable nodes)
@@ -65,34 +58,25 @@ namespace ldpc
         // Number of transmitted parity-checks (check nodes)
         int mct() const { return mc() - mPuncture.size(); };
         // Array of puncture indices
-        const vec_u64 &puncture() const { return mPuncture; };
+        const vec_int &puncture() const { return mPuncture; };
         // Array of shorten indices
-        const vec_u64 &shorten() const { return mShorten; };
+        const vec_int &shorten() const { return mShorten; };
         // Maximum check node degree
-        u64 max_dc() const { return mMaxDC; };
+        int max_dc() const { return mMaxDC; };
         // Index position of transmitted bits 
-        const vec_u64 &bit_pos() const { return mBitPos; }
+        const vec_int &bit_pos() const { return mBitPos; }
         // Parity-check matrix
         const sparse_csr<bits_t> &H() const { return mH; }
         // Generator matrix
         const sparse_csr<bits_t> &G() const { return mG; }
-
-        // operations for gaussian elimination on sparse matrices over gf(2)
-        static void swap_rows(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 i, u64 j);
-        static void swap_cols(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 i, u64 j);
-        static void add_rows(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 dest, const vec_u64 &src);
-        static void add_cols(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 dest, const vec_u64 &src);
-        static void zero_row(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 m);
-        static void zero_col(mat_u64 &checkNodeN, mat_u64 &varNodeN, u64 n);
-
         
     private:
-        vec_u64 mPuncture; /* array pf punctured bit indices */
-        vec_u64 mShorten;  /* array of shortened bit indices */
-        u64 mMaxDC;
+        vec_int mPuncture; /* array pf punctured bit indices */
+        vec_int mShorten;  /* array of shortened bit indices */
+        int mMaxDC;
 
         // position of transmitted bits, i.e. puncture/shorten exluded
-        vec_u64 mBitPos;
+        vec_int mBitPos;
 
         sparse_csr<bits_t> mH; // Parity-Check Matrix
         sparse_csr<bits_t> mG; // Generator Matrix
