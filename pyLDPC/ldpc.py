@@ -6,18 +6,28 @@ import numpy as np
 LIB_PATH = f"{os.path.dirname(os.path.abspath(__file__))}/libldpc.so"
 
 class sim_results_t(ct.Structure):
-    _fields_ = [("fer", ct.POINTER(ct.c_double)),
-                ("ber", ct.POINTER(ct.c_double)),
-                ("avg_iter", ct.POINTER(ct.c_double)),
-                ("time", ct.POINTER(ct.c_double)),
-                ("fec", ct.POINTER(ct.c_ulong)),
-                ("frames", ct.POINTER(ct.c_ulong))]
+    _fields_ = [("fer", ct.POINTER(ct.c_double*50)),
+                ("ber", ct.POINTER(ct.c_double*50)),
+                ("avg_iter", ct.POINTER(ct.c_double*50)),
+                ("time", ct.POINTER(ct.c_double*50)),
+                ("fec", ct.POINTER(ct.c_uint64*50)),
+                ("frames", ct.POINTER(ct.c_uint64*50))]
 
 class decoder_param(ct.Structure):
     _fields_ = [("earlyTerm", ct.c_bool),
                 ("iterations", ct.c_uint32),
                 ("type", ct.c_char_p)]
 
+class channel_param(ct.Structure):
+    _fields_ = [("seed", ct.c_uint64),
+                ("double", ct.c_double * 3),
+                ("type", ct.c_char_p)]
+
+class simulation_param(ct.Structure):
+    _fields_ = [("threads", ct.c_uint32),
+                ("maxFrames", ct.c_uint64),
+                ("fec", ct.c_uint64),
+                ("resultFile", ct.c_char_p)]
 
 class LDPC:
     def __init__(self, pc_file: str, gen_file = "", lib = LIB_PATH):    
@@ -25,9 +35,6 @@ class LDPC:
         self.gen_file = gen_file 
         self.n = ct.c_int(0)
         self.m = ct.c_int(0)
-        self.sim_results_struct = sim_results_t()
-        self.sim_stop_flag = ct.c_ubyte(1)
-        self.results = {}
 
         self.lib = ct.cdll.LoadLibrary(lib)
         self.lib.argtypes = (ct.c_char_p, ct.c_char_p, ct.c_int, ct.c_int)
@@ -36,6 +43,21 @@ class LDPC:
         self.n = self.n.value
         self.m = self.m.value
         self.k = self.n - self.m
+
+        self.sim_stop_flag = ct.c_bool(False)
+        self.sim_results_struct = sim_results_t()
+        self.results = {}
+        self.sim_params = {
+            "earlyTerm": True,
+            "iterations": 50,
+            "decoding": "BP",
+            "seed": 0,
+            "snr": [],
+            "channel": "AWGN",
+            "threads": 1,
+            "maxFrames": int(10e9),
+            "fec": 50
+        }
 
 
     def encode(self, info_word: np.array) -> np.array:
@@ -92,50 +114,69 @@ class LDPC:
         return np.array(out_arr[0:self.n]), iter_req
 
 
-    # def simulate(self, num_threads: int, rng_seed: int):
-    #     def sim_thread():
-    #         lib = ct.cdll.LoadLibrary(LIB_PATH)
+    def simulate(self, **args):
+        """Start the simulation in threaded mode.
 
-    #         lib.argtypes = (sim_results_t, ct.c_uint64)
-    #         lib.allocate_results(ct.byref(self.sim_results_struct), ct.c_uint64(len(self.snrs)))
+        Args (optional):
+            earlyTerm (bool): Terminate decoding if codeword valid
+            iterations (int): Number of decoding iterations
+            decoding (str): "BP", "BP_MS"
+            seed (int): RNG Seed
+            snr (list): [MIN, MAX, STEP]
+            channel (str): "AWGN", "BSC", "BEC"
+            threads (int): Number of parallel threads
+            maxFrames (int): Maximum number of frames per SNR value
+            fec (int): Number of error frames per SNR value
+        """
+        snr = ct.c_double * 3
+        self.sim_params = {**self.sim_params, **args}
+        snr = snr(*self.sim_params["snr"])
+        dec_param = decoder_param(self.sim_params["earlyTerm"], self.sim_params["iterations"], self.sim_params["decoding"].encode("utf-8"))
+        ch_param = channel_param(self.sim_params["seed"], snr, self.sim_params["channel"].encode("utf-8"))
+        sim_param = simulation_param(self.sim_params["threads"], self.sim_params["maxFrames"], self.sim_params["fec"], "".encode("utf-8"))
 
-    #         # set the flag
-    #         self.sim_stop_flag.value = 0
+        def sim_thread():
+            self.sim_stop_flag.value = False
 
-    #         lib.argtypes = (ct.c_char_p, ct.c_char_p, ct.c_int, ct.c_ubyte, ct.c_int, sim_results_t)
-    #         lib.simulate(
-    #             self.code_file.encode("utf-8"), 
-    #             self.sim_file.encode("utf-8"), 
-    #             ct.c_int(num_threads), 
-    #             ct.byref(self.sim_stop_flag), 
-    #             ct.c_int(rng_seed), 
-    #             ct.byref(self.sim_results_struct)
-    #         )
-            
-    #         #free memory of results manually, so that results dont get lost
-    #         lib.argtypes = (sim_results_t, )
-    #         lib.free_results(ct.byref(self.sim_results_struct))
+            self.lib.argtypes = (decoder_param, channel_param, simulation_param, sim_results_t, ct.c_bool)
+            self.lib.simulate(
+                dec_param,
+                ch_param,
+                sim_param,                
+                ct.byref(self.sim_results_struct),
+                ct.byref(self.sim_stop_flag)
+            )
         
-    #     th_sim = threading.Thread(target=sim_thread)
-    #     th_sim.start()
+        th_sim = threading.Thread(target=sim_thread)
+        th_sim.start()
 
-    # def stop_simulation(self):
-    #     if not self.sim_stop_flag.value:
-    #         # save results before clearing
-    #         self.results = self.get_results()
-    #         self.sim_stop_flag.value = 1
+    def stop_simulation(self):
+        """Stop the simulation.
+        """
+        if not self.sim_stop_flag.value:
+            # save results before clearing
+            self.results = self.get_results()
+            self.sim_stop_flag.value = 1
 
-    # def get_results(self):
-    #     if not self.sim_stop_flag.value:
-    #         # we are only interested in entries of frames processed > 0
-    #         max_index = np.sum(np.array(self.sim_results_struct.frames[0:len(self.snrs)]) > 0)
+    def get_results(self):
+        """Return the simulation results.
 
-    #         # convert the cstruct to dictionary
-    #         return dict([(x, getattr(self.sim_results_struct, x)[0:max_index]) for (x,_) in self.sim_results_struct._fields_])
-    #     else:
-    #         return self.results
+        Returns:
+            dict: Simulation results
+        """
+        if not self.sim_stop_flag.value:
+            # we are only interested in entries of frames processed > 0
+            max_index = np.sum(np.array(self.sim_results_struct.frames[0:50]) > 0)
 
-    # def calculate_rank(self):
-    #     lib = ct.cdll.LoadLibrary(LIB_PATH)
-    #     lib.argtypes = (ct.c_char_p, )
-    #     return lib.calculate_rank(self.code_file.encode("utf-8"))
+            # convert the cstruct to dictionary
+            return dict([(x, getattr(self.sim_results_struct, x)[0:max_index]) for (x,_) in self.sim_results_struct._fields_])
+        else:
+            return self.results
+
+    def rank(self):
+        """Calculate the rank of the parity-check matrix over GF(2).
+
+        Returns:
+            int: Rank of H
+        """
+        return self.lib.calculate_rank()
