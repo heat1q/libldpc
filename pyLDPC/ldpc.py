@@ -6,12 +6,12 @@ import numpy as np
 LIB_PATH = f"{os.path.dirname(os.path.abspath(__file__))}/libldpc.so"
 
 class sim_results_t(ct.Structure):
-    _fields_ = [("fer", ct.POINTER(ct.c_double*50)),
-                ("ber", ct.POINTER(ct.c_double*50)),
-                ("avg_iter", ct.POINTER(ct.c_double*50)),
-                ("time", ct.POINTER(ct.c_double*50)),
-                ("fec", ct.POINTER(ct.c_uint64*50)),
-                ("frames", ct.POINTER(ct.c_uint64*50))]
+    _fields_ = [("fer", ct.POINTER(ct.c_double)),
+                ("ber", ct.POINTER(ct.c_double)),
+                ("avg_iter", ct.POINTER(ct.c_double)),
+                ("time", ct.POINTER(ct.c_double)),
+                ("fec", ct.POINTER(ct.c_uint64)),
+                ("frames", ct.POINTER(ct.c_uint64))]
 
 class decoder_param(ct.Structure):
     _fields_ = [("earlyTerm", ct.c_bool),
@@ -45,7 +45,16 @@ class LDPC:
         self.k = self.n - self.m
 
         self.sim_stop_flag = ct.c_bool(False)
-        self.sim_results_struct = sim_results_t()
+        vec_double = ct.c_double * 50
+        vec_u64 = ct.c_uint64 * 50
+        self.sim_results_struct = sim_results_t(
+            vec_double(),
+            vec_double(),
+            vec_double(),
+            vec_double(),
+            vec_u64(),
+            vec_u64(),
+        )
         self.results = {}
         self.sim_params = {
             "earlyTerm": True,
