@@ -189,3 +189,22 @@ class LDPC:
             int: Rank of H
         """
         return self.lib.calculate_rank()
+
+    def syndrome(self, v: np.array) -> np.array:
+        """Calculate the syndrome with respect to the parity-check matrix.
+
+        Args:
+            v (np.array): Binary array of length self.n
+
+        Returns:
+            np.array: Syndrome (length might be larger than self.m)
+        """
+        vec = ct.c_uint8 * self.n
+        word = vec(*v)
+        synd = vec()
+
+        self.lib.argtypes = (vec, vec)
+        self.lib.restype = ct.c_int
+        mc = self.lib.syndrome(ct.byref(word), ct.byref(synd))
+
+        return np.array(synd[0:mc])

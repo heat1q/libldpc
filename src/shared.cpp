@@ -1,3 +1,4 @@
+// Shared library wrapper
 #include "sim/ldpcsim.h"
 
 static std::shared_ptr<ldpc::ldpc_code> ldpcCode;
@@ -56,5 +57,23 @@ extern "C"
         }
         
         return iter;
+    }
+
+    int syndrome(uint8_t* word, uint8_t* syndrome)
+    {
+        vec_bits_t v(ldpcCode->nc(), 0);
+        for (int i = 0; i < ldpcCode->nct(); ++i)
+        {
+            v[ldpcCode->bit_pos()[i]] = word[i];
+        }
+
+        auto s = ldpcCode->H().multiply_right(v);
+
+        for (u64 i = 0; i < s.size(); ++i)
+        {
+            syndrome[i] = s[i].value;
+        }        
+
+        return s.size(); // syndrome length
     }
 }
