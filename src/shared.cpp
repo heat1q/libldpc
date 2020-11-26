@@ -8,14 +8,19 @@ using namespace ldpc;
 
 extern "C"
 {
-    void ldpc_setup(const char *pcFile, const char *genFile, int *n, int *m)
+    void ldpc_setup(const char *pcFile, 
+                    const char *genFile, 
+                    int *n, 
+                    int *m,
+                    int *nct,
+                    int *mct)
     {
         ldpcCode = std::make_shared<ldpc::ldpc_code>(pcFile, genFile);
         decoder_param decoderParams;
         decoderParams.type = "";
         ldpcDecoder = std::make_shared<ldpc::ldpc_decoder>(ldpcCode, decoderParams);
-        *n = ldpcCode->nct();
-        *m = ldpcCode->mct();
+        *n = ldpcCode->nc(); *m = ldpcCode->mc();
+        *nct = ldpcCode->nct(); *mct = ldpcCode->mct();
     }
 
     void simulate(decoder_param decoderParams, channel_param channelParam, simulation_param simParam, sim_results_t *results, bool *stopFlag)
@@ -59,21 +64,15 @@ extern "C"
         return iter;
     }
 
-    int syndrome(uint8_t* word, uint8_t* syndrome)
+    void syndrome(uint8_t* word, uint8_t* syndrome)
     {
-        vec_bits_t v(ldpcCode->nc(), 0);
-        for (int i = 0; i < ldpcCode->nct(); ++i)
-        {
-            v[ldpcCode->bit_pos()[i]] = word[i];
-        }
-
+        vec_bits_t v(word, word + ldpcCode->nc());
+        
         auto s = ldpcCode->H().multiply_right(v);
 
         for (u64 i = 0; i < s.size(); ++i)
         {
             syndrome[i] = s[i].value;
-        }        
-
-        return s.size(); // syndrome length
+        }
     }
 }

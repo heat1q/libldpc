@@ -35,14 +35,23 @@ class LDPC:
         self.gen_file = gen_file 
         self.n = ct.c_int(0)
         self.m = ct.c_int(0)
+        self.nct = ct.c_int(0)
+        self.mct = ct.c_int(0)
 
         self.lib = ct.cdll.LoadLibrary(lib)
         self.lib.argtypes = (ct.c_char_p, ct.c_char_p, ct.c_int, ct.c_int)
-        self.lib.ldpc_setup(pc_file.encode("utf-8"), gen_file.encode("utf-8"), ct.byref(self.n), ct.byref(self.m))
+        self.lib.ldpc_setup(
+            pc_file.encode("utf-8"),
+            gen_file.encode("utf-8"),
+            ct.byref(self.n),
+            ct.byref(self.m),
+            ct.byref(self.nct),
+            ct.byref(self.mct),
+        )
 
-        self.n = self.n.value
-        self.m = self.m.value
-        self.k = self.n - self.m
+        self.nct = self.nct.value;          self.n = self.n.value
+        self.mct = self.mct.value;          self.m = self.m.value
+        self.kct = self.nct - self.mct;     self.k = self.n - self.m
 
         self.sim_stop_flag = ct.c_bool(False)
         vec_double = ct.c_double * 50
@@ -84,15 +93,15 @@ class LDPC:
         if not self.gen_file:
             raise RuntimeError("No generator matrix provided for encoding")
 
-        vec_in = ct.c_uint8 * self.k
-        vec_out = ct.c_uint8 * self.n
+        vec_in = ct.c_uint8 * self.kct
+        vec_out = ct.c_uint8 * self.nct
         in_arr = vec_in(*info_word)
         out_arr = vec_out()
 
         self.lib.argtypes = (vec_in, vec_out)
         self.lib.encode(ct.byref(in_arr), ct.byref(out_arr))
 
-        return np.array(out_arr[0:self.n])
+        return np.array(out_arr[0:self.nct])
 
 
 
@@ -112,7 +121,7 @@ class LDPC:
         """
         dec_params = decoder_param(early_term, iters, dec_type.encode("utf-8"))
 
-        vec_double = ct.c_double * self.n
+        vec_double = ct.c_double * self.nct
         in_arr = vec_double(*llr_in)
         out_arr = vec_double()
 
@@ -120,7 +129,7 @@ class LDPC:
         self.lib.restype = ct.c_int
         iter_req = self.lib.decode(dec_params, ct.byref(in_arr), ct.byref(out_arr))
 
-        return np.array(out_arr[0:self.n]), iter_req
+        return np.array(out_arr[0:self.nct]), iter_req
 
 
     def simulate(self, **args):
@@ -204,7 +213,6 @@ class LDPC:
         synd = vec()
 
         self.lib.argtypes = (vec, vec)
-        self.lib.restype = ct.c_int
-        mc = self.lib.syndrome(ct.byref(word), ct.byref(synd))
+        self.lib.syndrome(ct.byref(word), ct.byref(synd))
 
-        return np.array(synd[0:mc])
+        return np.array(synd[0:self.m])
