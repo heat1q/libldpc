@@ -28,16 +28,6 @@ namespace ldpc
             //results may vary with same seed, since some threads are executed more than others
             for (u32 i = 0; i < mSimulationParams.threads; ++i)
             {
-                //decoder
-                mLdpcDecoder.push_back(
-                    std::make_shared<ldpc_decoder>(
-                        ldpc_decoder(
-                            mLdpcCode,
-                            mDecoderParams
-                        )
-                    )
-                );
-
                 // initialize the correct channel
                 if (mChannelParams.type == std::string("AWGN"))
                 {
@@ -45,7 +35,7 @@ namespace ldpc
                         std::make_shared<channel_awgn>(
                             channel_awgn(
                                 mLdpcCode,
-                                mLdpcDecoder.back(),
+                                mDecoderParams,
                                 mChannelParams.seed + i,
                                 1.
                             )
@@ -58,7 +48,7 @@ namespace ldpc
                         std::make_shared<channel_bsc>(
                             channel_bsc(
                                 mLdpcCode,
-                                mLdpcDecoder.back(),
+                                mDecoderParams,
                                 mChannelParams.seed + i,
                                 0.
                             )
@@ -144,10 +134,10 @@ namespace ldpc
 
             auto timeStart = std::chrono::high_resolution_clock::now();
 
-            #pragma omp parallel default(none)                                                                                       \
-                num_threads(mSimulationParams.threads) private(bec_tmp)                                                              \
-                firstprivate(xVals, mLdpcCode, stdout)                                                                               \
-                shared(stopFlag, timeStart, mLdpcDecoder, mChannel, fec, bec, frames, printResStr, fp, resStr, i, minFec, maxFrames) \
+            #pragma omp parallel default(none)                                                                        \
+                num_threads(mSimulationParams.threads) private(bec_tmp)                                               \
+                firstprivate(xVals, mLdpcCode, stdout)                                                                \
+                shared(stopFlag, timeStart, mChannel, fec, bec, frames, printResStr, fp, resStr, i, minFec, maxFrames)\
                 reduction(+: iters)
             {
                 unsigned tid = omp_get_thread_num();
@@ -169,7 +159,7 @@ namespace ldpc
                     mChannel[tid]->calculate_llrs();
 
                     //decode
-                    iters += mLdpcDecoder[tid]->decode();
+                    iters += mChannel[tid]->decode();
 
                     if (fec < minFec)
                     {
@@ -180,7 +170,7 @@ namespace ldpc
                         bec_tmp = 0;
                         for (auto ci : mLdpcCode->bit_pos())
                         {
-                            bec_tmp += (mLdpcDecoder[tid]->estimate()[ci] != mChannel[tid]->codeword()[ci]);
+                            bec_tmp += (mChannel[tid]->estimate()[ci] != mChannel[tid]->codeword()[ci]);
                         }
 
                         if (bec_tmp > 0)

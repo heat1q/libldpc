@@ -90,6 +90,7 @@ namespace ldpc
     using bits_t = gf2;
     using u64 = unsigned long;
     using u32 = unsigned int;
+    using u8 = unsigned char;
 
     using vec_bits_t = std::vector<bits_t>;
     using vec_u64 = std::vector<u64>;
@@ -100,6 +101,8 @@ namespace ldpc
     using mat_u64 = std::vector<std::vector<u64>>;
     using mat_double_t = std::vector<std::vector<double>>;
     using mat_int = std::vector<std::vector<int>>;
+
+    constexpr u8 ERASURE = 'E';
 
     struct
     {

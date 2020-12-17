@@ -13,21 +13,28 @@ namespace ldpc
         friend class channel;
         friend class channel_awgn;
         friend class channel_bsc;
+        friend class channel_bec;
 
     public:
         ldpc_decoder() = default;
-        ldpc_decoder(const std::shared_ptr<ldpc_code> &code, const decoder_param &decoderParam);
+        ldpc_decoder(const std::shared_ptr<ldpc_code> &code,
+                     const decoder_param &decoderParam);
+        virtual ~ldpc_decoder() = default;
 
         void set_approximation();
 
-        unsigned decode();
+        int decode();
         bool is_codeword();
 
         // Set the input LLR
         void llr_in(const vec_double_t &llrIn) { mLLRIn = llrIn; }
 
         // Set the parameters
-        void set_param(const decoder_param &decoderParam) { mDecoderParam = decoderParam; set_approximation(); }
+        void set_param(const decoder_param &decoderParam)
+        {
+            mDecoderParam = decoderParam;
+            set_approximation();
+        }
 
         //getter functions
         const decoder_param &param() const { return mDecoderParam; }
@@ -43,7 +50,7 @@ namespace ldpc
         static inline constexpr double jacobian(const double x, const double y);
         static inline constexpr double minsum(const double x, const double y);
 
-    private:
+    protected:
         std::shared_ptr<ldpc_code> mLdpcCode;
 
         vec_double_t mLv2c;
@@ -60,5 +67,24 @@ namespace ldpc
 
         std::function<double(double, double)> mCNApprox;
         decoder_param mDecoderParam;
+    };
+
+    class ldpc_decoder_bec : public ldpc_decoder
+    {
+        friend class channel_bec;
+    public:
+        ldpc_decoder_bec() = default;
+        ldpc_decoder_bec(const std::shared_ptr<ldpc_code> &code,
+                         const decoder_param &decoderParam);
+        virtual ~ldpc_decoder_bec() = default;
+
+        int decode();
+
+    private:
+        std::vector<u8> mLv2c; 
+        std::vector<u8> mLc2v;
+
+        std::vector<u8> mLLRIn;
+        std::vector<u8> mLLROut;
     };
 } // namespace ldpc

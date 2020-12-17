@@ -34,7 +34,7 @@ namespace ldpc
     * 
     * @return u64 
     */
-    unsigned ldpc_decoder::decode()
+    int ldpc_decoder::decode()
     {
         auto &edges = mLdpcCode->H().nz_entry();
 

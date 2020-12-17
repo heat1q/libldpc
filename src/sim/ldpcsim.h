@@ -54,7 +54,6 @@ namespace ldpc
     private:
         std::shared_ptr<ldpc_code> mLdpcCode;
 
-        std::vector<std::shared_ptr<ldpc_decoder>> mLdpcDecoder;
         std::vector<std::shared_ptr<channel>> mChannel;
 
         const decoder_param &mDecoderParams;
