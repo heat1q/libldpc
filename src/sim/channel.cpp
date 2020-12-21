@@ -204,8 +204,6 @@ namespace ldpc
 
     void channel_bec::calculate_llrs()
     {
-        const double delta = log((1 - mEpsilon) / mEpsilon);
-
         //puncturing & shortening
         if (mLdpcCode->puncture().size() != 0)
         {

@@ -2,38 +2,12 @@
 
 namespace ldpc
 {
-    /**
-    * @brief Construct a new ldpc decoder::ldpc decoder object
-    * 
-    * @param pCode 
-    * @param pI 
-    * @param pEarlyTerm 
-    */
-    ldpc_decoder::ldpc_decoder(const std::shared_ptr<ldpc_code> &code, const decoder_param &decoderParam)
-        : mLdpcCode(code),
-          mLv2c(code->nnz()), mLc2v(code->nnz()),
-          mExMsgF(code->max_dc()), mExMsgB(code->max_dc()),
-          mLLRIn(code->nc()), mLLROut(code->nc()),
-          mCO(code->nc()),
-          mCNApprox(jacobian),
-          mDecoderParam(decoderParam)
+    ldpc_decoder::ldpc_decoder(const std::shared_ptr<ldpc_code> &code,
+                               const decoder_param &decoderParam)
+        : ldpc_decoder_base<double>(code, decoderParam)
     {
-        set_approximation();
     }
 
-    void ldpc_decoder::set_approximation()
-    {
-        if (mDecoderParam.type == std::string("BP_MS"))
-        {
-            mCNApprox = minsum;
-        }
-    }
-
-    /**
-    * @brief Standard BP LDPC decoding
-    * 
-    * @return u64 
-    */
     int ldpc_decoder::decode()
     {
         auto &edges = mLdpcCode->H().nz_entry();
@@ -74,7 +48,7 @@ namespace ldpc
             for (int i = 0; i < mLdpcCode->nc(); ++i) // only transmitted bits
             {
                 mLLROut[i] = mLLRIn[i];
-                auto &vn = mLdpcCode->H().col_neighbor()[i];       //neighbours of VN
+                auto &vn = mLdpcCode->H().col_neighbor()[i]; //neighbours of VN
 
                 for (const auto &hi : vn)
                 {
@@ -103,39 +77,14 @@ namespace ldpc
         return I;
     }
 
-    bool ldpc_decoder::is_codeword()
+    ldpc_decoder_bec::ldpc_decoder_bec(const std::shared_ptr<ldpc_code> &code,
+                                       const decoder_param &decoderParam)
+        : ldpc_decoder_base<u8>(code, decoderParam)
     {
-        //calc syndrome
-        bits_t s;
-        for (int i = 0; i < mLdpcCode->mc(); i++)
-        {
-            s = 0;
-            for (const auto &hj : mLdpcCode->H().row_neighbor()[i])
-            {
-                s += mCO[hj.nodeIndex];
-            }
-
-            if (s != 0)
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
-    constexpr int ldpc_decoder::sign(const double x)
+    int ldpc_decoder_bec::decode()
     {
-        return (1 - 2 * static_cast<int>(std::signbit(x)));
-    }
 
-    constexpr double ldpc_decoder::jacobian(const double x, const double y)
-    {
-        return sign(x) * sign(y) * std::min(std::abs(x), std::abs(y)) + std::log((1 + std::exp(-std::abs(x + y))) / (1 + std::exp(-std::abs(x - y))));
-    }
-
-    constexpr double ldpc_decoder::minsum(const double x, const double y)
-    {
-        return sign(x) * sign(y) * std::min(std::abs(x), std::abs(y));
     }
 } // namespace ldpc

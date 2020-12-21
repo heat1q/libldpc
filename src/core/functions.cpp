@@ -16,17 +16,6 @@ namespace ldpc
         }
     }
 
-    /**
-    * @brief Sign function
-    * 
-    * @param a 
-    * @return int 
-    */
-    int sign(double a)
-    {
-        return (a <= 0) ? -1 : 1;
-    }
-
     std::ostream &operator<<(std::ostream &os, const decoder_param &p)
     {
         os << " Type: " << p.type << "\n";

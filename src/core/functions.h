@@ -131,6 +131,5 @@ namespace ldpc
     std::ostream &operator<<(std::ostream &os, const simulation_param &p);
 
     void dec2bin(u64 val, uint8_t m);
-    int sign(double a);
 
 } // namespace ldpc
