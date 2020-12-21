@@ -55,6 +55,19 @@ namespace ldpc
                         )
                     );
                 }
+                else if (mChannelParams.type == std::string("BEC"))
+                {
+                    mChannel.push_back(
+                        std::make_shared<channel_bec>(
+                            channel_bec(
+                                mLdpcCode,
+                                mDecoderParams,
+                                mChannelParams.seed + i,
+                                0.
+                            )
+                        )
+                    );
+                }
                 else
                 {
                     throw std::runtime_error("No channel selected.");
@@ -63,7 +76,8 @@ namespace ldpc
         }
         catch (std::exception &e)
         {
-            std::cout << "Error: ldpc_sim::ldpc_sim() " << e.what() << "\n";
+            std::cout << "Error: ldpc_sim::ldpc_sim() " << e.what() << std::endl;
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -100,7 +114,7 @@ namespace ldpc
         auto maxFrames = mSimulationParams.maxFrames;
         std::string xValType = "SNR";
 
-        if (mChannelParams.type == std::string("BSC")) 
+        if (mChannelParams.type == std::string("BSC") || mChannelParams.type == std::string("BEC"))
         {
             xValType = "EPS";
             // reverse the epsilon values, since we should start at the worst

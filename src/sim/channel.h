@@ -225,7 +225,7 @@ namespace ldpc
          */
         int decode() override
         {
-            return mLdpcDecoder->decode();
+            return mLdpcDecoder->decode(mCodeWord);
         }
 
         /**

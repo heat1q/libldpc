@@ -18,6 +18,8 @@ namespace ldpc
     void channel::encode_and_map() {}
     void channel::simulate() {}
     void channel::calculate_llrs() {}
+    int channel::decode() { return 0; }
+    const vec_bits_t &channel::estimate() const { return mCodeWord; }
 
     channel_awgn::channel_awgn(const std::shared_ptr<ldpc_code> &code,
                                const decoder_param &decoderParams,

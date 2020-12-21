@@ -34,14 +34,14 @@ namespace ldpc
               mCNApprox(ldpc::jacobian),
               mCO(code->nc()),
               mLv2c(code->nnz()), mLc2v(code->nnz()),
-              mExMsgF(code->max_dc()), mExMsgB(code->max_dc()),
+              mExMsgF(code->max_degree()), mExMsgB(code->max_degree()),
               mLLRIn(code->nc()), mLLROut(code->nc())
         {
             set_param(decoderParam);
         }
         virtual ~ldpc_decoder_base() = default;
 
-        virtual int decode();
+        virtual int decode() { return 0; }
 
         // Verifies whether mCO is a codeword or not
         bool is_codeword()
@@ -138,5 +138,20 @@ namespace ldpc
         virtual ~ldpc_decoder_bec() = default;
 
         int decode() override;
+        int decode(const vec_bits_t& channelInput);
+
+        // BEC Decoder VN update
+        // if neither of the values equals the channel input then the output is an erasure
+        static inline constexpr u8 vn_update(const u8 l, const u8 r, const bits_t xi)
+        {
+            return ((xi.value == l) || (xi.value == r)) ? xi.value : ERASURE;
+        }
+
+        // BEC Decoder CN update
+        // if any value is an erasure then the output is an erasure
+        static inline constexpr u8 cn_update(const u8 l, const u8 r)
+        {
+            return ((l == ERASURE) || (r == ERASURE)) ? ERASURE : (bits_t(l) + bits_t(r)).value;
+        }
     };
 } // namespace ldpc
