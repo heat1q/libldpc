@@ -61,8 +61,8 @@ namespace ldpc
         const vec_int &puncture() const { return mPuncture; };
         // Array of shorten indices
         const vec_int &shorten() const { return mShorten; };
-        // Maximum check node degree
-        int max_dc() const { return mMaxDC; };
+        // Maximum node degree
+        int max_degree() const { return mMaxDegree; };
         // Index position of transmitted bits 
         const vec_int &bit_pos() const { return mBitPos; }
         // Parity-check matrix
@@ -73,7 +73,7 @@ namespace ldpc
     private:
         vec_int mPuncture; /* array pf punctured bit indices */
         vec_int mShorten;  /* array of shortened bit indices */
-        int mMaxDC;
+        int mMaxDegree;
 
         // position of transmitted bits, i.e. puncture/shorten exluded
         vec_int mBitPos;

@@ -5,7 +5,7 @@ namespace ldpc
 {
 
     ldpc_code::ldpc_code(const std::string &pcFileName)
-        : mMaxDC(0),
+        : mMaxDegree(0),
           mH(),
           mG()
     {
@@ -43,7 +43,8 @@ namespace ldpc
         std::string line;
         int skipLines = 0;
 
-        if (!infile.good()) throw std::runtime_error("can not open file for reading");
+        if (!infile.good())
+            throw std::runtime_error("can not open file for reading");
 
         while (getline(infile, line))
         {
@@ -53,15 +54,17 @@ namespace ldpc
             {
                 int index;
                 auto token = line.substr(0, i);
-                std::istringstream record(line.substr(i+1));
+                std::istringstream record(line.substr(i + 1));
 
                 if (token.find("puncture") != std::string::npos)
                 {
-                    while (record >> index) mPuncture.push_back(index);
-                } 
+                    while (record >> index)
+                        mPuncture.push_back(index);
+                }
                 else if (token.find("shorten") != std::string::npos)
                 {
-                    while (record >> index) mShorten.push_back(index);
+                    while (record >> index)
+                        mShorten.push_back(index);
                 }
 
                 ++skipLines;
@@ -76,17 +79,22 @@ namespace ldpc
 
         mH.read_from_file(pcFileName, skipLines);
 
-        // maximum check node degree
-        auto tmp = std::max_element(mH.row_neighbor().begin(), mH.row_neighbor().end(), [](const auto &a, const auto &b) { return (a.size() < b.size()); });
-        mMaxDC = tmp->size();
+        // maximum node degree
+        auto cd = std::max_element(mH.row_neighbor().begin(), mH.row_neighbor().end(),
+                                    [](const auto &a, const auto &b) { return (a.size() < b.size()); });
+        auto vd = std::max_element(mH.col_neighbor().begin(), mH.col_neighbor().end(),
+                                    [](const auto &a, const auto &b) { return (a.size() < b.size()); });
+        mMaxDegree = std::max(cd->size(), vd->size());
 
         // position of transmitted bits
         for (int i = 0; i < nc(); i++)
         {
             auto tmp = std::find(mShorten.cbegin(), mShorten.cend(), i);
-            if (tmp != mShorten.cend()) continue; // skip if current index shortened
+            if (tmp != mShorten.cend())
+                continue; // skip if current index shortened
             tmp = std::find(mPuncture.cbegin(), mPuncture.cend(), i);
-            if (tmp != mPuncture.cend()) continue; // skip if current index punctured
+            if (tmp != mPuncture.cend())
+                continue; // skip if current index punctured
 
             mBitPos.push_back(i);
         }
@@ -111,7 +119,7 @@ namespace ldpc
         os << "K : " << code.kc() << "\n";
         os << "NNZ : " << code.nnz() << "\n";
         //os << "Rank: " << code.mRank << "\n";
-        //os << "max dc : " << code.max_dc() << "\n";
+        //os << "max dc : " << code.max_degree() << "\n";
         os << "puncture[" << code.puncture().size() << "] : " << code.puncture() << "\n";
         os << "shorten[" << code.shorten().size() << "] : " << code.shorten() << "\n";
         os << "Rate : " << rate << "\n";

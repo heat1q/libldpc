@@ -4,61 +4,154 @@
 
 namespace ldpc
 {
+    constexpr int sign(const double x)
+    {
+        return (1 - 2 * static_cast<int>(std::signbit(x)));
+    }
+
+    constexpr double jacobian(const double x, const double y)
+    {
+        return sign(x) * sign(y) * std::min(std::abs(x), std::abs(y)) + std::log((1 + std::exp(-std::abs(x + y))) / (1 + std::exp(-std::abs(x - y))));
+    }
+
+    constexpr double minsum(const double x, const double y)
+    {
+        return sign(x) * sign(y) * std::min(std::abs(x), std::abs(y));
+    }
+
     /**
-    * @brief LDPC Decoder class
+    * @brief LDPC Decoder base class
     * 
     */
-    class ldpc_decoder
+    template <typename T>
+    class ldpc_decoder_base
     {
-        friend class channel;
-        friend class channel_awgn;
-        friend class channel_bsc;
-
     public:
-        ldpc_decoder() = default;
-        ldpc_decoder(const std::shared_ptr<ldpc_code> &code, const decoder_param &decoderParam);
+        ldpc_decoder_base() = default;
+        ldpc_decoder_base(const std::shared_ptr<ldpc_code> &code,
+                          const decoder_param &decoderParam)
+            : mLdpcCode(code),
+              mCNApprox(ldpc::jacobian),
+              mCO(code->nc()),
+              mLv2c(code->nnz()), mLc2v(code->nnz()),
+              mExMsgF(code->max_degree()), mExMsgB(code->max_degree()),
+              mLLRIn(code->nc()), mLLROut(code->nc())
+        {
+            set_param(decoderParam);
+        }
+        virtual ~ldpc_decoder_base() = default;
 
-        void set_approximation();
+        virtual int decode() { return 0; }
 
-        unsigned decode();
-        bool is_codeword();
+        // Verifies whether mCO is a codeword or not
+        bool is_codeword()
+        {
+            //calc syndrome
+            bits_t s;
+            for (int i = 0; i < mLdpcCode->mc(); i++)
+            {
+                s = 0;
+                for (const auto &hj : mLdpcCode->H().row_neighbor()[i])
+                {
+                    s += mCO[hj.nodeIndex];
+                }
+                if (s != 0)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
 
         // Set the input LLR
-        void llr_in(const vec_double_t &llrIn) { mLLRIn = llrIn; }
+        void set_llr_in(const std::vector<T> &in) { mLLRIn = in; }
 
-        // Set the parameters
-        void set_param(const decoder_param &decoderParam) { mDecoderParam = decoderParam; set_approximation(); }
+        // Get the output LLR
+        const std::vector<T> &llr_out() const { return mLLROut; }
 
-        //getter functions
-        const decoder_param &param() const { return mDecoderParam; }
-
-        const vec_double_t &lv2c() const { return mLv2c; }
-        const vec_double_t &lc2v() const { return mLc2v; }
-        const vec_double_t &llr_out() const { return mLLROut; }
+        // Set the decoder parameters & update the CN approximation operation
+        void set_param(const decoder_param &param)
+        {
+            mDecoderParam = param;
+            if (mDecoderParam.type == std::string("BP_MS"))
+            {
+                mCNApprox = ldpc::minsum;
+            }
+        }
 
         // The current estimated codeword
         const vec_bits_t &estimate() const { return mCO; }
 
-        static inline constexpr int sign(const double x);
-        static inline constexpr double jacobian(const double x, const double y);
-        static inline constexpr double minsum(const double x, const double y);
-
-    private:
+    protected:
         std::shared_ptr<ldpc_code> mLdpcCode;
 
-        vec_double_t mLv2c;
-        vec_double_t mLc2v;
+        decoder_param mDecoderParam;
 
-        // auxillary vectors for efficient CN update
-        vec_double_t mExMsgF;
-        vec_double_t mExMsgB;
+        // CN approximation operation
+        std::function<T(T, T)> mCNApprox;
 
-        vec_double_t mLLRIn;
-        vec_double_t mLLROut;
-
+        // Estimated codeword
         vec_bits_t mCO;
 
-        std::function<double(double, double)> mCNApprox;
-        decoder_param mDecoderParam;
+        // auxillary vectors for efficient CN update
+        std::vector<T> mLv2c;
+        std::vector<T> mLc2v;
+
+        std::vector<T> mExMsgF;
+        std::vector<T> mExMsgB;
+
+        std::vector<T> mLLRIn;
+        std::vector<T> mLLROut;
+    };
+
+    /**
+     * @brief Standard LDPC BP decoder
+     * 
+     */
+    class ldpc_decoder : public ldpc_decoder_base<double>
+    {
+    public:
+        friend class channel;
+        friend class channel_awgn;
+        friend class channel_bsc;
+
+        ldpc_decoder() = default;
+        ldpc_decoder(const std::shared_ptr<ldpc_code> &code,
+                     const decoder_param &decoderParam);
+        virtual ~ldpc_decoder() = default;
+
+        int decode() override;
+    };
+
+    /**
+     * @brief Simplified BP decoder for the BEC
+     * 
+     */
+    class ldpc_decoder_bec : public ldpc_decoder_base<u8>
+    {
+    public:
+        friend class channel_bec;
+
+        ldpc_decoder_bec() = default;
+        ldpc_decoder_bec(const std::shared_ptr<ldpc_code> &code,
+                     const decoder_param &decoderParam);
+        virtual ~ldpc_decoder_bec() = default;
+
+        int decode() override;
+        int decode(const vec_bits_t& channelInput);
+
+        // BEC Decoder VN update
+        // if neither of the values equals the channel input then the output is an erasure
+        static inline constexpr u8 vn_update(const u8 l, const u8 r, const bits_t xi)
+        {
+            return ((xi.value == l) || (xi.value == r)) ? xi.value : ERASURE;
+        }
+
+        // BEC Decoder CN update
+        // if any value is an erasure then the output is an erasure
+        static inline constexpr u8 cn_update(const u8 l, const u8 r)
+        {
+            return ((l == ERASURE) || (r == ERASURE)) ? ERASURE : (bits_t(l) + bits_t(r)).value;
+        }
     };
 } // namespace ldpc

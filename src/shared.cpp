@@ -52,7 +52,7 @@ extern "C"
         {
             llrIn[ldpcCode->bit_pos()[i]] = llr[i];
         }
-        ldpcDecoder->llr_in(llrIn);
+        ldpcDecoder->set_llr_in(llrIn);
 
 
         int iter = ldpcDecoder->decode();

@@ -8,7 +8,9 @@ namespace ldpc
     {
     public:
         channel() = default;
-        channel(const std::shared_ptr<ldpc_code> &code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed);
+        channel(const std::shared_ptr<ldpc_code> &code,
+                const decoder_param &decoderParams,
+                const u64 seed);
         virtual ~channel() = default;
 
         // set param and update rng stream
@@ -17,6 +19,9 @@ namespace ldpc
         virtual void encode_and_map();
         virtual void simulate();
         virtual void calculate_llrs();
+
+        virtual int decode();
+        virtual const vec_bits_t &estimate() const;
 
         // Current transmitted codeword
         const vec_bits_t &codeword() const { return mCodeWord; }
@@ -46,7 +51,10 @@ namespace ldpc
     {
     public:
         channel_awgn() = default;
-        channel_awgn(const std::shared_ptr<ldpc_code> &code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed, const double snr);
+        channel_awgn(const std::shared_ptr<ldpc_code> &code,
+                     const decoder_param &decoderParams,
+                     const u64 seed,
+                     const double snr);
         virtual ~channel_awgn() = default;
 
         /**
@@ -75,6 +83,26 @@ namespace ldpc
         */
         void calculate_llrs() override;
 
+        /**
+         * @brief Decoder the input LLR according to decoding in ldpc_decoder.
+         * 
+         * @return int Number of iterations
+         */
+        int decode() override
+        {
+            return mLdpcDecoder->decode();
+        }
+
+        /**
+         * @brief Current codeword estimate after decoding.
+         * 
+         * @return const vec_bits_t& Codeword estimate
+         */
+        const vec_bits_t &estimate() const override
+        {
+            return mLdpcDecoder->estimate();
+        }
+
     private:
         //channel i/o
         vec_double_t mX;
@@ -91,7 +119,10 @@ namespace ldpc
     {
     public:
         channel_bsc() = default;
-        channel_bsc(const std::shared_ptr<ldpc_code> &code, std::shared_ptr<ldpc_decoder> decoder, const u64 seed, const double epsilon);
+        channel_bsc(const std::shared_ptr<ldpc_code> &code,
+                    const decoder_param &decoderParams,
+                    const u64 seed,
+                    const double epsilon);
         virtual ~channel_bsc() = default;
 
         /**
@@ -120,12 +151,101 @@ namespace ldpc
         */
         void calculate_llrs() override;
 
+        /**
+         * @brief Decoder the input LLR according to decoding in ldpc_decoder.
+         * 
+         * @return int Number of iterations
+         */
+        int decode() override
+        {
+            return mLdpcDecoder->decode();
+        }
+
+        /**
+         * @brief Current codeword estimate after decoding.
+         * 
+         * @return const vec_bits_t& Codeword estimate
+         */
+        const vec_bits_t &estimate() const override
+        {
+            return mLdpcDecoder->estimate();
+        }
+
     private:
         //channel i/o
         vec_bits_t mX;
         vec_bits_t mY;
 
         // crossover probability
+        double mEpsilon;
+
+        std::function<bool()> mRandBernoulli;
+    };
+
+    class channel_bec : public channel
+    {
+    public:
+        channel_bec() = default;
+        channel_bec(const std::shared_ptr<ldpc_code> &code,
+                    const decoder_param &decoderParams,
+                    const u64 seed,
+                    const double epsilon);
+        virtual ~channel_bec() = default;
+
+        /**
+        * @brief Update the crossover probability and reinitialize the RNG.
+        * 
+        * @param channelParam espilon
+        */
+        void set_channel_param(const double channelParam) override;
+
+        /**
+         * @brief Encodes an randomly chosen information word and maps
+         * it to the channel input.
+         * 
+         */
+        void encode_and_map() override;
+
+        /**
+        * @brief Simulate the Binary Erasure Channel (BEC) with erasure probability \epsilon.
+        * 
+        */
+        void simulate() override;
+
+        /**
+        * @brief Calculate the LLR values for the BEC.
+        * 
+        */
+        void calculate_llrs() override;
+
+        /**
+         * @brief Decoder the input LLR according to decoding in ldpc_decoder.
+         * 
+         * @return int Number of iterations
+         */
+        int decode() override
+        {
+            return mLdpcDecoder->decode(mCodeWord);
+        }
+
+        /**
+         * @brief Current codeword estimate after decoding.
+         * 
+         * @return const vec_bits_t& Codeword estimate
+         */
+        const vec_bits_t &estimate() const override
+        {
+            return mLdpcDecoder->estimate();
+        }
+
+    private:
+        std::shared_ptr<ldpc_decoder_bec> mLdpcDecoder;
+
+        //channel i/o
+        vec_bits_t mX;
+        std::vector<u8> mY;
+
+        // erasure probability
         double mEpsilon;
 
         std::function<bool()> mRandBernoulli;
