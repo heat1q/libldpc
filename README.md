@@ -1,4 +1,8 @@
 # LDPC Code Simulation
+
+![Build Status](https://github.com/heat1q/libldpc/workflows/Build/badge.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ### Requirements
 * CMake Version 3.10
 * C++17 
