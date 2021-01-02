@@ -6,16 +6,19 @@
 ### Getting Started
 Building the binary:
 
-`$ cmake . `
- 
-`$ make ldpc_sim` produces an executeable containing the simulator, which is used by e.g. the commandline. See **Running the Simulator**.
+```
+$ cmake .
+$ cmake --build . --target TARGET
+```
+where the target can be the following:
+* `--target ldpcsim` produces an executeable containing the simulator, which is used by e.g. the commandline. See **Running the Simulator**.
 
-`$ make ldpc` produces a shared library containing the simulator for external usage. See **Python Wrapper**.
+* `--target ldpc` produces a shared library containing the simulator for external usage. See **Python Wrapper**.
 
 ### Running the Simulator
 After successful build the simulator can be executed. Note the usage:
 ```
-$./ldpc_sim --help
+$ ./ldpcsim --help
 Usage: ldpc [options] codefile output-file snr-range 
 
 Positional arguments:
