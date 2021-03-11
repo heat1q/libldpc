@@ -100,7 +100,6 @@ namespace ldpc
         u64 bec = 0;
         u64 fec = 0;
         u64 iters;
-        u64 bec_tmp;
 
         ldpc::vec_double_t xVals;
         double val = mChannelParams.xRange[0];
@@ -148,11 +147,10 @@ namespace ldpc
 
             auto timeStart = std::chrono::high_resolution_clock::now();
 
-            #pragma omp parallel default(none)                                                                        \
-                num_threads(mSimulationParams.threads) private(bec_tmp)                                               \
-                firstprivate(xVals, mLdpcCode, stdout)                                                                \
-                shared(stopFlag, timeStart, mChannel, fec, bec, frames, printResStr, fp, resStr, i, minFec, maxFrames)\
-                reduction(+: iters)
+            #pragma omp parallel default(none)                                   \
+                num_threads(mSimulationParams.threads)                           \
+                shared(iters, stopFlag, timeStart, mChannel, fec, xVals, stdout, \
+                    bec, frames, printResStr, fp, resStr, minFec, maxFrames, i)
             {
                 unsigned tid = omp_get_thread_num();
 
@@ -173,7 +171,9 @@ namespace ldpc
                     mChannel[tid]->calculate_llrs();
 
                     //decode
-                    iters += mChannel[tid]->decode();
+                    auto it = mChannel[tid]->decode();
+                    #pragma omp atomic update
+                    iters += it;
 
                     if (fec < minFec)
                     {
@@ -181,7 +181,7 @@ namespace ldpc
                         ++frames;
 
                         // count the bit errors
-                        bec_tmp = 0;
+                        int bec_tmp = 0;
                         for (auto ci : mLdpcCode->bit_pos())
                         {
                             bec_tmp += (mChannel[tid]->estimate()[ci] != mChannel[tid]->codeword()[ci]);
