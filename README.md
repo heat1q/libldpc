@@ -26,23 +26,49 @@ $ ./ldpcsim --help
 Usage: ldpc [options] codefile output-file snr-range 
 
 Positional arguments:
-codefile            	LDPC codefile containing all non-zero entries, compressed sparse row (CSR) format.
-output-file         	Results output file.
-snr-range           	{MIN} {MAX} {STEP}
+codefile                LDPC parity-check matrix file containing all non-zero entries.
+output-file             Results output file.
+snr-range               {MIN} {MAX} {STEP}
 
 Optional arguments:
--h --help           	shows help message and exits
--v --version        	prints version information and exits
--G --gen-matrix     	Generator matrix file, compressed sparse row (CSR) format.
--i --num-iterations 	Number of iterations for decoding. (Default: 50)
--s --seed           	RNG seed. (Default: 0)
--t --num-threads    	Number of frames to be decoded in parallel. (Default: 1)
---channel           	Specifies channel: "AWGN", "BSC", "BEC" (Default: AWGN)
---decoding          	Specifies decoding algorithm: "BP", "BP_MS" (Default: BP)
---max-frames        	Limit number of decoded frames.
---frame-error-count 	Maximum frame errors for given simulation point.
---no-early-term     	Disable early termination for decoding.
+-h --help               shows help message and exits
+-v --version            prints version information and exits
+-G --gen-matrix         Generator matrix file.
+-i --num-iterations     Number of iterations for decoding. (Default: 50)
+-s --seed               RNG seed. (Default: 0)
+-t --num-threads        Number of frames to be decoded in parallel. (Default: 1)
+--channel               Specifies channel: "AWGN", "BSC", "BEC" (Default: AWGN)
+--decoding              Specifies decoding algorithm: "BP", "BP_MS" (Default: BP)
+--max-frames            Limit number of decoded frames.
+--frame-error-count     Maximum frame errors for given simulation point.
+--no-early-term         Disable early termination for decoding.
 ```
+
+### Code File Format
+The code file lists the the non-zero entries of the matrix line-by-line, 
+where the left number refers to the row index and the right to the column index. For example, the matrix 
+```
+0 0 1 0
+0 1 0 0
+0 0 0 1
+1 1 1 0
+```
+is represented as
+```
+0 2
+1 1
+2 3
+3 0
+3 1
+3 2
+```
+Optionally, a puncturing (or shortening) patter may be specified a the top of the file:
+
+*Puncture 2 bits associated with column index 1 and 3*
+```
+puncture [2]: 1 3 
+```
+A sample `k=128`, `n=1024` LDPC code with parity-check matrix `h.txt` and generator matrix `g.txt` can be found in `tests/code/`.
 
 
 ### Python Wrapper
@@ -62,3 +88,6 @@ code.stop_simulation()
 # retrieve the results
 print(code.get_results())
 ```
+
+### Contributing
+If you found a bug or have any suggestions or improvements, feel free to start a discussion or submit a PR!
