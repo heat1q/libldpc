@@ -5,11 +5,11 @@
 int main(int argc, char *argv[])
 {
     argparse::ArgumentParser parser("ldpc");
-    parser.add_argument("codefile").help("LDPC codefile containing all non-zero entries, compressed sparse row (CSR) format.");
+    parser.add_argument("codefile").help("LDPC parity-check matrix file containing all non-zero entries.");
     parser.add_argument("output-file").help("Results output file.");
     parser.add_argument("snr-range").help("{MIN} {MAX} {STEP}").nargs(3).action([](const std::string &s) { return std::stod(s); });
 
-    parser.add_argument("-G", "--gen-matrix").help("Generator matrix file, compressed sparse row (CSR) format.").default_value(std::string(""));
+    parser.add_argument("-G", "--gen-matrix").help("Generator matrix file.").default_value(std::string(""));
 
     parser.add_argument("-i", "--num-iterations").help("Number of iterations for decoding. (Default: 50)").default_value(unsigned(50)).action([](const std::string &s) { return static_cast<unsigned>(std::stoul(s)); });
     parser.add_argument("-s", "--seed").help("RNG seed. (Default: 0)").default_value(ldpc::u64(0)).action([](const std::string &s) { return std::stoul(s); });
